@@ -22,3 +22,7 @@ export function focusField(
 ) {
   ref?.current?.focus();
 }
+
+export function fieldA11yProps(name: string, error?: string) {
+  return { id: name, "aria-invalid": Boolean(error) || undefined, "aria-describedby": error ? `${name}-error` : undefined } as const;
+}

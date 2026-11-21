@@ -4,7 +4,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import type { AdminCategory } from "@/components/admin/partner-manager/types";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -90,6 +90,31 @@ function CategoryFields({ category }: { category?: AdminCategory }) {
   );
 }
 
+function CategoryRowActions({
+  usageCount,
+  children,
+}: {
+  usageCount: number;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <span className="basis-full text-right text-xs text-muted-foreground">
+        {usageCount > 0
+          ? `제휴처 ${usageCount.toLocaleString("ko-KR")}곳에서 사용 중`
+          : "연결된 제휴처 없음"}
+      </span>
+      {children}
+      <span
+        className="inline-flex min-h-10 items-center rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-muted-foreground"
+        title="FK 보호 정책을 적용하는 후속 마이그레이션 전까지 삭제를 지원하지 않습니다."
+      >
+        삭제 잠금
+      </span>
+    </div>
+  );
+}
+
 export default function AdminCategoryManager({
   categories,
   createAction,
@@ -133,7 +158,6 @@ export default function AdminCategoryManager({
       ) : (
         <div className="grid min-w-0 gap-3">
           {categories.map((category) => {
-            const updateFormId = `category-update-${category.id}`;
             const usageCount = usageCountById[category.id] ?? 0;
 
             return (
@@ -144,50 +168,35 @@ export default function AdminCategoryManager({
                 className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end"
               >
                 {canUpdate ? (
-                  <form
-                    id={updateFormId}
-                    action={updateAction}
-                    className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_6rem]"
-                  >
-                    <input type="hidden" name="id" value={category.id} />
-                    <CategoryFields category={category} />
+                  // 수정 버튼이 useFormStatus로 제출 중 상태를 받도록 같은 form 안에 둔다.
+                  // form은 contents라 입력 영역과 작업 영역이 Surface 그리드 칸을 그대로 쓴다.
+                  <form action={updateAction} className="contents">
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_6rem]">
+                      <input type="hidden" name="id" value={category.id} />
+                      <CategoryFields category={category} />
+                    </div>
+                    <CategoryRowActions usageCount={usageCount}>
+                      <SubmitButton variant="ghost" pendingText="수정 중">
+                        수정
+                      </SubmitButton>
+                    </CategoryRowActions>
                   </form>
                 ) : (
-                  <div className="grid min-w-0 gap-1">
-                    <p className="truncate font-semibold text-foreground">
-                      {category.label}
-                    </p>
-                    <p className="text-token truncate text-sm text-muted-foreground">
-                      {category.key}
-                    </p>
-                    <p className="text-ko-pretty line-clamp-2 text-sm text-muted-foreground">
-                      {category.description || "설명 없음"}
-                    </p>
-                  </div>
+                  <>
+                    <div className="grid min-w-0 gap-1">
+                      <p className="truncate font-semibold text-foreground">
+                        {category.label}
+                      </p>
+                      <p className="text-token truncate text-sm text-muted-foreground">
+                        {category.key}
+                      </p>
+                      <p className="text-ko-pretty line-clamp-2 text-sm text-muted-foreground">
+                        {category.description || "설명 없음"}
+                      </p>
+                    </div>
+                    <CategoryRowActions usageCount={usageCount} />
+                  </>
                 )}
-
-                <div className="flex flex-wrap justify-end gap-2">
-                  <span className="basis-full text-right text-xs text-muted-foreground">
-                    {usageCount > 0
-                      ? `제휴처 ${usageCount.toLocaleString("ko-KR")}곳에서 사용 중`
-                      : "연결된 제휴처 없음"}
-                  </span>
-                  {canUpdate ? (
-                    <SubmitButton
-                      form={updateFormId}
-                      variant="ghost"
-                      pendingText="수정 중"
-                    >
-                      수정
-                    </SubmitButton>
-                  ) : null}
-                  <span
-                    className="inline-flex min-h-10 items-center rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-muted-foreground"
-                    title="FK 보호 정책을 적용하는 후속 마이그레이션 전까지 삭제를 지원하지 않습니다."
-                  >
-                    삭제 잠금
-                  </span>
-                </div>
                 <div className="grid min-w-0 gap-2 xl:col-span-2">
                   <p className="text-xs font-semibold text-muted-foreground">
                     사용자 칩 미리보기

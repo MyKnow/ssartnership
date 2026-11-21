@@ -1,3 +1,4 @@
+import { getKstDateString } from "@/lib/datetime";
 import {
   createAnnouncementPayload,
   createExpiringPartnerPayload,
@@ -17,7 +18,7 @@ import {
   releaseOperationalNotificationDedupe,
 } from "@/lib/operational-notifications";
 import { createExpiringPartnershipDedupeKey } from "@/lib/partner-notification-routing";
-import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-auth/portal-paths";
 import type { DeliveryResult, PushAudience, PushPayload } from "./types.ts";
 import { normalizePartnerVisibility } from "../partner-visibility.ts";
 
@@ -82,16 +83,8 @@ type OperationalExpiringPartnerDependencies = {
   createPartnerNotification?: typeof createPartnerOperationalNotification;
 };
 
-export function getKstDateString(daysFromToday = 0, baseDate = new Date()) {
-  const now = new Date(
-    baseDate.getTime() + daysFromToday * 24 * 60 * 60 * 1000,
-  );
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const year = kst.getUTCFullYear();
-  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(kst.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+// 만료 알림 cron이 쓰는 기존 import 경로를 유지한다. 구현은 datetime.ts.
+export { getKstDateString };
 
 export function isPushOpsConfigured() {
   return isPushConfigured();

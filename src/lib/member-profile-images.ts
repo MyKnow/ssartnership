@@ -1,11 +1,16 @@
+import { activateMemberProfileImageRecord, PROFILE_IMAGE_RETENTION_DAYS } from "@/lib/repositories/supabase/member-profile-image-records.supabase";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import { cache } from "react";
 import { fetchPublicImage, isPublicIpAddress } from "@/lib/image-proxy";
-import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
+import {
+  MAX_GRADUATE_PROFILE_IMAGE_BYTES,
+  type MemberProfileImageStatus,
+} from "@/lib/graduate-verification";
 import { normalizeMattermostProfileImage } from "@/lib/graduate-verification-files";
 import { storeMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 import { sanitizeHttpUrl } from "@/lib/validation";
 import { IMAGE_SOURCE_MIME_TYPES } from "@/lib/image-upload/policy";
 import {
@@ -16,15 +21,15 @@ import {
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set<string>(IMAGE_SOURCE_MIME_TYPES);
 
-const REVIEWABLE_IMAGE_STATUSES = ["pending", "approved", "rejected"] as const;
+const REVIEWABLE_IMAGE_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+] as const satisfies readonly MemberProfileImageStatus[];
 const MAX_MEMBER_PROFILE_IMAGE_URL_LENGTH = 2_000;
 
 export const MAX_MEMBER_PROFILE_IMAGE_SOURCE_BYTES =
   MAX_GRADUATE_PROFILE_IMAGE_BYTES;
-
-type MemberProfileImageStatus =
-  | (typeof REVIEWABLE_IMAGE_STATUSES)[number]
-  | "superseded";
 
 type ExistingProfileImage = {
   id: string;
@@ -45,11 +50,6 @@ type MemberProfileImageRow = {
 };
 
 export type MemberProfileImageSource = "legacy" | "mattermost";
-export type MemberProfilePhotoReviewStatus =
-  | "missing"
-  | "approved"
-  | "pending"
-  | "rejected";
 type StoredMemberProfilePhotoReviewStatus = Exclude<
   MemberProfilePhotoReviewStatus,
   "missing"
@@ -516,7 +516,7 @@ export async function discardMemberProfileImage(input: {
     .update({
       status: "superseded",
       delete_after: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000,
+        Date.now() + PROFILE_IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString(),
       updated_at: input.updatedAt ?? new Date().toISOString(),
     })
@@ -532,75 +532,8 @@ export async function discardMemberProfileImage(input: {
 export async function activateMemberProfileImage(input: {
   memberId: string;
   nextImageId: string;
-  updatedAt?: string;
 }) {
-  const supabase = getSupabaseAdminClient();
-  const updatedAt = input.updatedAt ?? new Date().toISOString();
-  const [{ data: member, error: memberLookupError }, { data: target, error: targetLookupError }] =
-    await Promise.all([
-      supabase
-        .from("members")
-        .select("id")
-        .eq("id", input.memberId)
-        .is("deleted_at", null)
-        .maybeSingle(),
-      supabase
-        .from("member_profile_images")
-        .select("id")
-        .eq("id", input.nextImageId)
-        .eq("member_id", input.memberId)
-        .is("deleted_at", null)
-        .maybeSingle(),
-    ]);
-  if (memberLookupError || !member?.id || targetLookupError || !target?.id) {
-    throw new Error("현재 프로필 사진을 반영하지 못했습니다.");
-  }
-
-  const { error: previousImagesError } = await supabase
-    .from("member_profile_images")
-    .update({
-      status: "superseded",
-      delete_after: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000,
-      ).toISOString(),
-      updated_at: updatedAt,
-    })
-    .eq("member_id", input.memberId)
-    .neq("id", input.nextImageId)
-    .eq("status", "approved")
-    .is("deleted_at", null);
-  if (previousImagesError) {
-    throw new Error("이전 프로필 사진 상태를 정리하지 못했습니다.");
-  }
-
-  const { data: activatedImage, error: activationError } = await supabase
-    .from("member_profile_images")
-    .update({
-      status: "approved",
-      reviewed_at: updatedAt,
-      review_reason: null,
-      delete_after: null,
-      updated_at: updatedAt,
-    })
-    .eq("id", input.nextImageId)
-    .eq("member_id", input.memberId)
-    .is("deleted_at", null)
-    .select("id")
-    .maybeSingle();
-  if (activationError || !activatedImage?.id) {
-    throw new Error("현재 프로필 사진을 반영하지 못했습니다.");
-  }
-
-  const { error: memberUpdateError } = await supabase
-    .from("members")
-    .update({ updated_at: updatedAt })
-    .eq("id", input.memberId)
-    .is("deleted_at", null);
-  if (memberUpdateError) {
-    throw new Error("현재 프로필 사진 변경 시각을 저장하지 못했습니다.");
-  }
-
-  return true;
+  return activateMemberProfileImageRecord(input.memberId, input.nextImageId);
 }
 
 /**
@@ -640,7 +573,6 @@ export async function syncMemberProfileImage(
     await activateMemberProfileImage({
       memberId: input.memberId,
       nextImageId: pendingImageId,
-      updatedAt,
     });
     return { updated: true, skipped: false };
   } catch {

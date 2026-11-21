@@ -4,10 +4,7 @@ import {
   ADMIN_PREFETCH_MIN_SAMPLE_COUNT,
   type AdminPrefetchSummaryMetric,
 } from "@/lib/admin-performance";
-
-function formatPercent(value: number) {
-  return `${Math.round(value).toLocaleString("ko-KR")}%`;
-}
+import { formatPercent } from "@/lib/number-format";
 
 function getStatus(metric: AdminPrefetchSummaryMetric) {
   if (metric.status === "met") {

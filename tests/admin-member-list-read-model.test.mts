@@ -123,10 +123,16 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.doesNotMatch(source, /getCurrentMemberProfileImageMemberIds/);
   assert.doesNotMatch(source, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(source, /unstable_cache/);
-  assert.match(source, /ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60/);
+  assert.match(
+    source,
+    /ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS =\s*SLOW_CHANGING_DATA_CACHE_SECONDS/,
+  );
   assert.match(source, /getCachedAdminMemberOptions\(\)/);
   assert.match(source, /rpc\(\s*"get_admin_member_filter_options"/);
-  assert.match(source, /ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(
+    source,
+    /ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS =\s*ADMIN_READ_BURST_CACHE_SECONDS/,
+  );
   assert.match(source, /getCachedAdminMemberPolicyContext\(\)/);
   assert.match(source, /select\("id,kind,version"\)/);
   assert.doesNotMatch(source, /select\(POLICY_SELECT\)/);

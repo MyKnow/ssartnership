@@ -3,10 +3,10 @@ import { cn } from "@/lib/cn";
 import Badge from "@/components/ui/Badge";
 
 export const CURRENT_DIFF_BADGE_CLASS =
-  "border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100";
+  "border border-danger/15 bg-danger/10 text-danger border-danger/20 bg-danger/15 text-danger";
 
 export const REQUESTED_DIFF_BADGE_CLASS =
-  "border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100";
+  "border border-success/15 bg-success/10 text-success border-success/20 bg-success/15 text-success";
 
 export function ListChips({
   values,
@@ -55,8 +55,8 @@ export function DiffText({
       className={cn(
         "break-words text-sm font-medium leading-6",
         tone === "current"
-          ? "text-rose-700 dark:text-rose-100"
-          : "text-emerald-700 dark:text-emerald-100",
+          ? "text-danger text-danger"
+          : "text-success text-success",
       )}
     >
       {children}
@@ -80,8 +80,8 @@ export function DiffLink({
       className={cn(
         "break-all text-sm font-medium leading-6 underline decoration-1 underline-offset-4",
         tone === "current"
-          ? "text-rose-700 decoration-rose-300 hover:text-rose-600 dark:text-rose-100 dark:decoration-rose-400"
-          : "text-emerald-700 decoration-emerald-300 hover:text-emerald-600 dark:text-emerald-100 dark:decoration-emerald-400",
+          ? "text-danger decoration-rose-300 hover:text-danger text-danger dark:decoration-rose-400"
+          : "text-success decoration-emerald-300 hover:text-success text-success dark:decoration-emerald-400",
       )}
       href={href}
       target="_blank"
@@ -103,12 +103,12 @@ export function DiffPanel({
 }) {
   const toneClass =
     tone === "current"
-      ? "border-rose-500/20 bg-rose-500/5"
-      : "border-emerald-500/20 bg-emerald-500/5";
+      ? "border-danger/20 bg-danger/5"
+      : "border-success/20 bg-success/5";
   const labelClass =
     tone === "current"
-      ? "text-rose-700 dark:text-rose-200"
-      : "text-emerald-700 dark:text-emerald-200";
+      ? "text-danger text-danger"
+      : "text-success text-success";
 
   return (
     <div className={cn("min-w-0 rounded-2xl border p-4", toneClass)}>

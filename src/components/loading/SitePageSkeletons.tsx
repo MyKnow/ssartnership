@@ -715,3 +715,92 @@ export function CertificationVerifyPageSkeleton() {
     </div>
   );
 }
+
+function CouponWalletItemSkeleton() {
+  return (
+    <div className="grid min-h-24 grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-panel border border-border bg-surface px-4 py-4 sm:px-5">
+      <div className="grid min-w-0 gap-3">
+        <div className="flex items-center gap-2">
+          <StaticSkeleton className="h-6 w-16 rounded-full" />
+          <StaticSkeleton className="h-4 w-28 rounded-lg" />
+        </div>
+        <StaticSkeleton className="h-6 w-full max-w-sm" />
+      </div>
+      <StaticSkeleton className="mt-1 h-10 w-10 rounded-[1rem]" />
+    </div>
+  );
+}
+
+export function CouponWalletPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <LoadingHeader />
+      <main>
+        <Container className="pb-16 pt-8 sm:pt-10" size="wide">
+          <div className="mx-auto max-w-5xl space-y-5">
+            <div className="rounded-panel border border-border/70 bg-surface-elevated/95 px-5 py-5 shadow-flat sm:px-6 sm:py-6">
+              <SectionHeadingSkeleton
+                eyebrowWidth="w-28"
+                titleWidth="w-24"
+                descriptionWidth="max-w-md"
+              />
+            </div>
+            {Array.from({ length: 2 }).map((_, sectionIndex) => (
+              <section key={sectionIndex} className="space-y-3">
+                <div className="flex items-end justify-between gap-2 px-1">
+                  <div className="grid gap-2">
+                    <StaticSkeleton className="h-4 w-20 rounded-lg" />
+                    <StaticSkeleton className="h-5 w-32" />
+                  </div>
+                  <StaticSkeleton className="h-6 w-12 rounded-full" />
+                </div>
+                <div className="grid gap-3">
+                  {Array.from({ length: 2 }).map((__, itemIndex) => (
+                    <CouponWalletItemSkeleton key={itemIndex} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </Container>
+      </main>
+    </div>
+  );
+}
+
+export function PartnerBenefitUsePageSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <LoadingHeader />
+      <main>
+        <Container className="pb-16 pt-10" size="wide">
+          <div className="mx-auto w-full max-w-4xl space-y-6">
+            <div className="space-y-3">
+              <StaticSkeleton className="h-11 w-40 rounded-[1rem]" />
+              <SectionHeadingSkeleton
+                eyebrowWidth="w-28"
+                titleWidth="w-40"
+                descriptionWidth="max-w-lg"
+              />
+            </div>
+            <div className="grid min-w-0 gap-4">
+              <StaticSkeleton className="aspect-[16/9] w-full rounded-[32px]" />
+              <Card className="grid min-w-0 gap-4 border-border bg-surface p-4 sm:p-5">
+                <div className="grid gap-2">
+                  <StaticSkeleton className="h-3 w-12 rounded-lg" />
+                  <StaticSkeleton className="h-5 w-40" />
+                  <StaticSkeleton className="mt-2 h-3 w-16 rounded-lg" />
+                  <StaticSkeleton className="h-6 w-full max-w-xs" />
+                  <StaticSkeleton className="mt-2 h-3 w-14 rounded-lg" />
+                  <StaticSkeleton className="h-6 w-12" />
+                </div>
+                <StaticSkeleton className="h-12 w-full rounded-2xl" />
+                <StaticSkeleton className="h-12 w-full rounded-full" />
+              </Card>
+            </div>
+          </div>
+        </Container>
+      </main>
+    </div>
+  );
+}

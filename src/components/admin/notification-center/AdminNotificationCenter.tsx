@@ -13,7 +13,7 @@ import type { PushAudienceScope } from "@/lib/push";
 import type {
   AdminNotificationOperationLog,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 
 type Props = Pick<AdminPushManagerProps, "automaticSummaries" | "recentLogs">;
 type NotificationCenterProps = Props & {
@@ -164,27 +164,27 @@ export default function AdminNotificationCenter({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="발송 결과"
-          value={`${stats.sentLogs.toLocaleString()}건`}
+          value={`${stats.sentLogs.toLocaleString("ko-KR")}건`}
           description="발송 완료로 마감된 로그"
         />
         <MetricCard
           label="실패"
-          value={`${stats.failedLogs.toLocaleString()}건`}
+          value={`${stats.failedLogs.toLocaleString("ko-KR")}건`}
           description="실패 및 일부 실패 로그"
         />
         <MetricCard
           label="예약/대기"
-          value={`${stats.pendingLogs.toLocaleString()}건`}
+          value={`${stats.pendingLogs.toLocaleString("ko-KR")}건`}
           description="대기 또는 대상 없음 로그"
         />
         <MetricCard
           label="즉시 / 자동"
-          value={`${stats.manualLogs.toLocaleString()} · ${stats.automaticLogs.toLocaleString()}`}
+          value={`${stats.manualLogs.toLocaleString("ko-KR")} · ${stats.automaticLogs.toLocaleString("ko-KR")}`}
           description="즉시 발송 · 자동 발송"
         />
         <MetricCard
           label="대상자 요약"
-          value={`${stats.audienceTotal.toLocaleString()}명`}
+          value={`${stats.audienceTotal.toLocaleString("ko-KR")}명`}
           description={`전체 ${stats.audienceScopes.all} · 기수 ${stats.audienceScopes.year} · 캠퍼스 ${stats.audienceScopes.campus} · 개인 ${stats.audienceScopes.member}`}
         />
       </div>

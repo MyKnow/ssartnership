@@ -354,7 +354,7 @@ test("reconciliation surfaces safe skip reasons and certificate warnings", async
   assert.equal(withWarning.certificateExpiresInDays, 5);
 });
 
-test("reconciliation route is secret-gated and scheduled without exposing pass ids", () => {
+test("reconciliation route is secret-gated, registered, and never exposes pass ids", () => {
   const route = readFileSync(
     new URL(
       "../src/app/api/cron/reconcile-apple-wallet-passes/route.ts",
@@ -362,7 +362,18 @@ test("reconciliation route is secret-gated and scheduled without exposing pass i
     ),
     "utf8",
   );
-  const vercel = readFileSync(new URL("../vercel.json", import.meta.url), "utf8");
+  const schedules = JSON.parse(
+    readFileSync(
+      new URL(
+        "../deploy/self-host-operations/production-cron/schedules.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ) as {
+    crons: Array<{ path: string }>;
+    unscheduled: Array<{ path: string; reason: string }>;
+  };
 
   assert.match(route, /ensureCronApiAccess\(request/);
   assert.match(route, /getCronErrorResponse\("reconcile-apple-wallet-passes"/);
@@ -377,5 +388,14 @@ test("reconciliation route is secret-gated and scheduled without exposing pass i
   assert.doesNotMatch(route, /queueMicrotask/);
   assert.doesNotMatch(route, /import\("@\/lib\/activity-logs"\)/);
   assert.doesNotMatch(route, /publicId|memberId|passId/);
-  assert.match(vercel, /\/api\/cron\/reconcile-apple-wallet-passes/);
+  // Wallet stays disabled in production, so the route is registered but
+  // deliberately unscheduled until the operator enables Apple Wallet.
+  assert.equal(
+    schedules.crons.some((entry) => entry.path === "/api/cron/reconcile-apple-wallet-passes"),
+    false,
+  );
+  assert.deepEqual(
+    schedules.unscheduled.find((entry) => entry.path === "/api/cron/reconcile-apple-wallet-passes"),
+    { path: "/api/cron/reconcile-apple-wallet-passes", reason: "apple-wallet-disabled" },
+  );
 });

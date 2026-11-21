@@ -1,12 +1,26 @@
 [Unit]
 Description=SSARTNERSHIP private relay ingress rules
 Before=docker.service
-After=network-pre.target
-Wants=network-pre.target
+# The rules resolve the operations VM route; wait for configured addresses
+# and routes instead of racing early boot networking.
+After=network-online.target
+Wants=network-online.target
+# Bound retries to about ten attempts within two minutes, then stay failed.
+# docker.service requires this unit, so containers never start without the
+# relay rules.
+StartLimitIntervalSec=120
+StartLimitBurst=10
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5
+# Retry without passing through the failed state (systemd 254+). In the
+# default mode the first failure already fails docker.service's pending start
+# job as a dependency failure, so a later successful retry would leave Docker
+# stopped until the next boot.
+RestartMode=direct
 User=root
 UMask=0077
 EnvironmentFile=/etc/myknow/secrets/ssartnership-pve-relay.env

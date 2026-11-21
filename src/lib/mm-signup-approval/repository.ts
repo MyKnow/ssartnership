@@ -9,6 +9,7 @@ import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { getSignupApprovalExpiresAt } from "@/lib/image-upload/signup";
 import { attachMattermostSignupApprovalProfileImage } from "@/lib/member-signup-profile";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { logServerError } from "@/lib/server-log";
 
 const EXPIRED_APPROVAL_BATCH_SIZE = 100;
 const EXPIRED_APPROVAL_CLEANUP_CONCURRENCY = 4;
@@ -101,7 +102,7 @@ export async function createMattermostSignupApprovalRequest(
         actor: { kind: "signup", id: input.signupUploadOwnerId },
         purpose: "member-signup-profile",
         uploadId: input.profileImageUploadId,
-      }).catch(() => undefined);
+      }).catch((error) => logServerError("[signup-approval] image cleanup pending", error));
     }
     return { status: "pending" as const, request: existing };
   }
@@ -120,10 +121,11 @@ export async function createMattermostSignupApprovalRequest(
     });
   }
 
-  try {
-    const { data, error } = await getSupabaseAdminClient()
-      .from("member_signup_approval_requests")
-      .insert({
+  // A duplicate or timed-out INSERT may already reference this upload. Keep its
+  // existing approval expiry; only the atomic reference-aware collector retires it.
+  const { data, error } = await getSupabaseAdminClient()
+    .from("member_signup_approval_requests")
+    .insert({
       mm_user_id: input.mmUserId,
       mattermost_account_id: input.mattermostAccountId,
       mm_username: input.mmUsername,
@@ -145,45 +147,28 @@ export async function createMattermostSignupApprovalRequest(
         : null,
       marketing_policy_checked: input.marketingPolicyChecked,
       consent_ip_address: input.ipAddress,
-        consent_user_agent: input.userAgent,
-        profile_image_upload_id: input.profileImageUploadId ?? null,
-        expires_at: expiresAt.toISOString(),
-      })
-      .select(SAFE_REQUEST_SELECT)
-      .single();
+      consent_user_agent: input.userAgent,
+      profile_image_upload_id: input.profileImageUploadId ?? null,
+      expires_at: expiresAt.toISOString(),
+    })
+    .select(SAFE_REQUEST_SELECT)
+    .single();
 
-    if (error) {
-      if (error.code === "23505") {
-        const pending = await findPendingMattermostSignupApprovalRequest(input.mmUserId);
-        if (pending) {
-          if (input.profileImageUploadId && input.signupUploadOwnerId) {
-            await getImageUploadRepository().discard({
-              actor: { kind: "signup", id: input.signupUploadOwnerId },
-              purpose: "member-signup-profile",
-              uploadId: input.profileImageUploadId,
-            }).catch(() => undefined);
-          }
-          return { status: "pending" as const, request: pending };
-        }
-        throw new MattermostSignupApprovalRepositoryError("already_pending");
+  if (error) {
+    if (error.code === "23505") {
+      const pending = await findPendingMattermostSignupApprovalRequest(input.mmUserId);
+      if (pending) {
+        return { status: "pending" as const, request: pending };
       }
-      throw new MattermostSignupApprovalRepositoryError("db_error");
+      throw new MattermostSignupApprovalRepositoryError("already_pending");
     }
-
-    return {
-      status: "created" as const,
-      request: mapSafeRow(data),
-    };
-  } catch (error) {
-    if (input.profileImageUploadId && input.signupUploadOwnerId) {
-      await getImageUploadRepository().discard({
-        actor: { kind: "signup", id: input.signupUploadOwnerId },
-        purpose: "member-signup-profile",
-        uploadId: input.profileImageUploadId,
-      }).catch(() => undefined);
-    }
-    throw error;
+    throw new MattermostSignupApprovalRepositoryError("db_error");
   }
+
+  return {
+    status: "created" as const,
+    request: mapSafeRow(data),
+  };
 }
 
 export type MattermostSignupApprovalRequestPage = {
@@ -360,7 +345,7 @@ export async function rejectMattermostSignupApprovalRequest(input: {
       actor: { kind: "signup", id: context.ownerId },
       purpose: "member-signup-profile",
       uploadId: context.uploadId,
-    }).catch(() => undefined);
+    }).catch((error) => logServerError("[signup-approval] image cleanup pending", error));
   }
   return { status: "rejected" as const };
 }

@@ -3,7 +3,7 @@ import type {
   PartnerPortalDashboard,
   PartnerPortalServiceMetrics,
 } from "../../partner-dashboard.ts";
-import type { PartnerPortalCompanyScope } from "../../partner-portal-scope.ts";
+import type { PartnerPortalCompanyScope } from "../../partner-auth/portal-scope.ts";
 import type { PartnerSession } from "../../partner-session.ts";
 import {
   buildMockPartnerPortalDashboardFromSetups,

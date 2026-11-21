@@ -20,13 +20,6 @@ export function createPartnerPreviewExpiresAt(now = new Date()) {
   return new Date(now.getTime() + PARTNER_PREVIEW_TOKEN_TTL_MS).toISOString();
 }
 
-export function isMissingPartnerPreviewExpiryColumnError(errorMessage: string) {
-  return (
-    errorMessage.includes("Could not find the 'expires_at' column") ||
-    errorMessage.includes('column "expires_at" does not exist')
-  );
-}
-
 export function resolvePartnerPreviewExpiresAt(
   expiresAt?: string | null,
   createdAt?: string | null,

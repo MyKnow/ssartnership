@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -15,13 +18,12 @@ import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
-import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import { getMemberLoginCompletionHref } from "@/lib/member-required-gates";
 import {
   persistLastMemberLoginMethod,
   readLastMemberLoginMethod,
   type MemberLoginMethod,
 } from "@/lib/member-login-method-preference.client";
-import { sanitizeReturnTo } from "@/lib/return-to";
 import { isValidEmail, normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 const loginMethods: MemberLoginMethod[] = ["username", "email"];
@@ -196,17 +198,16 @@ export default function LoginForm({
       setFormError(null);
       persistLastMemberLoginMethod(loginMethod);
       notify("로그인되었습니다.");
-      const safeReturnTo = sanitizeReturnTo(returnTo, "/");
-      const nextHref =
-        getMemberRequiredGateRedirect({
+      router.replace(
+        getMemberLoginCompletionHref({
           currentPath: "/auth/login",
-          returnTo: safeReturnTo,
+          returnTo,
           mustChangePassword: Boolean(data.mustChangePassword),
           requiresConsent: Boolean(data.requiresConsent),
           requiresEmailRegistration: Boolean(data.requiresEmailRegistration),
           requiresProfilePhotoUpdate: Boolean(data.requiresProfilePhotoUpdate),
-        }) ?? safeReturnTo;
-      router.replace(nextHref);
+        }),
+      );
     } finally {
       setPending(false);
     }
@@ -326,8 +327,7 @@ export default function LoginForm({
 
       <div className="flex min-w-0 items-center justify-between gap-3">
         <label className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={autoLogin}
             onChange={(event) => setAutoLogin(event.target.checked)}
             className="h-5 w-5 rounded border-border bg-surface-control text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"

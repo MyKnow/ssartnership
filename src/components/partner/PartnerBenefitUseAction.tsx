@@ -1,9 +1,13 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
+import { FOCUS_RING_ON_OVERLAY_CLASS_NAME } from "@/components/ui/focus-ring";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { cn } from "@/lib/cn";
 import { trackProductEvent } from "@/lib/product-events";
 import {
   getEffectivePartnerBenefitMaxApplyCount,
@@ -35,25 +39,10 @@ export default function PartnerBenefitUseAction({
   const maxUseCount = getEffectivePartnerBenefitMaxApplyCount(selectedBenefitItem?.maxApplyCount);
   const portalRoot = typeof document === "undefined" ? null : document.body;
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
+  const sheetRef = useRef<HTMLElement>(null);
+  const closeDialog = useCallback(() => setIsOpen(false), []);
+  useBodyScrollLock(isOpen);
+  useDialogFocus({ open: isOpen, containerRef: sheetRef, onClose: closeDialog });
 
   function openDialog() {
     setSelectedBenefit("");
@@ -141,11 +130,13 @@ export default function PartnerBenefitUseAction({
               }}
             >
               <section
+                ref={sheetRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={`${dialogId}-title`}
+                tabIndex={-1}
                 data-partner-benefit-use-sheet
-                className="max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-[2rem] border border-x-0 border-b-0 border-border bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-overlay sm:max-w-lg sm:rounded-[1.5rem] sm:border sm:p-6"
+                className="max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain focus:outline-hidden rounded-t-[2rem] border border-x-0 border-b-0 border-border bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-overlay sm:max-w-lg sm:rounded-[1.5rem] sm:border sm:p-6"
               >
                 <div
                   data-partner-benefit-use-sheet-handle
@@ -166,9 +157,12 @@ export default function PartnerBenefitUseAction({
                   </div>
                   <button
                     type="button"
-                    className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border text-xl text-muted-foreground hover:bg-surface-muted"
+                    className={cn(
+                      "inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-xl text-muted-foreground hover:bg-surface-muted",
+                      FOCUS_RING_ON_OVERLAY_CLASS_NAME,
+                    )}
                     aria-label="혜택 이용하기 닫기"
-                    onClick={() => setIsOpen(false)}
+                    onClick={closeDialog}
                   >
                     ×
                   </button>

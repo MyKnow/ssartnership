@@ -16,6 +16,7 @@ import {
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import type { AdminPartnerFileDraft } from "@/lib/admin-partner-file-import";
 import type { AdminPartnerFileParseResult } from "@/lib/admin-partner-file-import";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 type CreateMode = "single" | "csv";
 
@@ -62,7 +63,7 @@ function buildFieldErrors(state: PartnerCreateFormState) {
     return undefined;
   }
   const focusField = partnerFormFocusByError[state.errorCode];
-  const message = partnerFormErrorMessages[state.errorCode];
+  const message = pickAllowedEntry<string>(partnerFormErrorMessages, state.errorCode);
   if (!focusField || !message) {
     return undefined;
   }
@@ -107,7 +108,7 @@ export default function AdminPartnerCreateWorkspace({
       : undefined;
   const formError =
     state.status === "error" && state.errorCode && !fieldErrors
-      ? partnerFormErrorMessages[state.errorCode] ??
+      ? pickAllowedEntry<string>(partnerFormErrorMessages, state.errorCode) ??
         "제휴처를 추가하지 못했습니다. 입력값을 확인해 주세요."
       : null;
 

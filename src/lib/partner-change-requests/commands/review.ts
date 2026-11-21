@@ -22,6 +22,7 @@ import {
   type PartnerChangeRequestRow,
   wrapPartnerChangeRequestDbError,
 } from "../shared.ts";
+import { logServerError } from "../../server-log.ts";
 
 export async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
   const auditContext = requirePartnerChangeRequestAuditContext(
@@ -112,10 +113,7 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
     collectPartnerChangeRequestRequestedMediaUrls(summary),
   );
   await deletePartnerMediaUrls(removedMediaUrls).catch((cleanupError) => {
-    console.error(
-      "[partner-change-request] approved media cleanup failed",
-      cleanupError,
-    );
+    logServerError("[partner-change-request] approved media cleanup failed", cleanupError);
   });
 
   const approved = await fetchRequestSummary(supabase, input.requestId);
@@ -141,10 +139,7 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
         mapUrl: approved.requestedMapUrl,
       });
     } catch (error) {
-      console.error(
-        "[partner-change-request] public transition notification failed",
-        error,
-      );
+      logServerError("[partner-change-request] public transition notification failed", error);
     }
   }
 
@@ -228,10 +223,7 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
   await deletePartnerMediaUrls(
     requestedMediaUrls.filter((url) => !currentMediaUrls.includes(url)),
   ).catch((cleanupError) => {
-    console.error(
-      "[partner-change-request] rejected media cleanup failed",
-      cleanupError,
-    );
+    logServerError("[partner-change-request] rejected media cleanup failed", cleanupError);
   });
 
   return rejected;

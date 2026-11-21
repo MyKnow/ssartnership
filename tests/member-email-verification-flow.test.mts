@@ -435,7 +435,7 @@ test("별도 이메일 인증 화면은 전송 후 이메일 고정·만료 타�
   assert.match(view, /step <= currentStep \? "bg-primary" : "bg-border"/);
   assert.match(view, /변경할 이메일을 입력해 주세요/);
   assert.match(view, /const hasValidEmail = isValidEmail\(email\.trim\(\)\.toLowerCase\(\)\)/);
-  assert.match(view, /resendRemainingSeconds > 0 \|\| !hasValidEmail/);
+  assert.match(view, /resendRemainingSeconds > 0\s*\|\|\s*!hasValidEmail/);
   assert.match(view, /재전송 \$\{resendRemainingSeconds\}초/);
   assert.doesNotMatch(
     view,
@@ -445,7 +445,7 @@ test("별도 이메일 인증 화면은 전송 후 이메일 고정·만료 타�
   assert.match(view, /<Pencil aria-hidden="true" size=\{18\} \/>/);
   assert.match(
     view,
-    /const hasCompleteCode = \/\^\\d\{6\}\$\/\.test\(code\)/,
+    /const hasCompleteCode = isSixDigitCode\(code\)/,
   );
   assert.match(view, /codeRemainingSeconds === 0 \|\| !hasCompleteCode/);
   assert.match(view, /codeRemainingSeconds === 0/);

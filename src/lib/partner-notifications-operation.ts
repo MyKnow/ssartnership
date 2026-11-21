@@ -5,7 +5,7 @@ import type {
 import {
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPortalHref,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 
 function truncateText(value: string, limit = 80) {
   const trimmed = value.trim();

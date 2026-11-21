@@ -67,14 +67,14 @@ authority: normative
 - session secret, service role key, Mattermost Sender AES key, SMTP credential, VAPID key, CRON_SECRET을 새 환경으로 안전하게 이전한다.
 - auth security log와 admin audit log에서 민감 데이터가 새로 노출되지 않는지 확인한다.
 - image proxy/upload sign, Push subscription, cron, partner billing API는 별도 보안 리뷰를 수행한다.
-- Preview sync sanitizer가 새 schema에서도 password material을 제거하는지 검증한다.
+- Production→Preview 사본 정제(`scripts/self-host-environments/sanitize.mjs`)가 새 schema에서도 password·자격증명 material을 제거하고 미검토 비밀 열에서 실패하는지 검증한다.
 
 ### Operations
 
-- `main`/`dev` branch와 Production/Preview 연결을 유지한다.
-- migration ordering과 schema snapshot policy를 유지한다.
-- GitHub Actions 또는 대체 CI에서 lockfile, public readiness, Storybook, preview sync 역할을 보존한다.
-- release path가 `npm run release`를 대체한다면 version bump, Storybook gate, push behavior를 명시한다.
+- `main`/`dev` branch와 자체 호스팅 Production/Preview 연결을 유지한다.
+- migration ordering과 schema snapshot policy를 유지한다. `supabase/migrations`가 단일 진실이고 `schema.sql`은 파생 스냅샷이다.
+- GitHub Actions 또는 대체 CI에서 lockfile, public readiness, 이미지 게시와 수신기 계약을 보존한다.
+- release path가 `npm run release`를 대체한다면 version bump, 로컬 변경 게이트(`prepush`), push behavior를 명시한다.
 
 ## 새 기술 스택으로 옮길 때의 의사결정 기록 대상
 
@@ -85,7 +85,7 @@ authority: normative
 - server action을 REST/RPC API로 바꿀지.
 - repository interface를 유지할지, query layer를 다른 패턴으로 대체할지.
 - auth/session을 custom HMAC cookie에서 auth provider/session store로 바꿀지.
-- Vercel hosting/analytics/speed insights를 유지할지.
+- ~~Vercel hosting/analytics/speed insights를 유지할지.~~ 종결: PVE 자체 호스팅이 유일한 운영 정본이고 Vercel 경로는 유지하지 않는다([리팩토링 기본 결정 D1](../plans/active/refactor-program-2026-10.md#기본-결정)). Web Vitals는 자체 호스팅 수집 경로를 쓴다.
 - Tailwind v4/design token 체계를 유지할지.
 - Storybook/Playwright/Node test runner를 유지할지.
 
@@ -103,7 +103,7 @@ git diff --check
 ```bash
 npx tsc --noEmit --pretty false
 npx eslint <changed-files>
-node --test tests/<focused-test>.test.mts
+node --import ./tests/alias-register.mjs --test tests/<focused-test>.test.mts
 ```
 
 라우트, auth, public UX가 바뀐 경우:

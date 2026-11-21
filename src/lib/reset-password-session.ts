@@ -1,9 +1,7 @@
 import crypto from "crypto";
-import {
-  createHmacDigest,
-  splitSignedToken,
-  verifyHmacDigest,
-} from "./hmac.js";
+import { openSignedPayload, signPayloadWith } from "./hmac.js";
+import { buildSessionCookieOptions } from "./session-cookies.ts";
+import { readSessionSecret } from "./session-secrets.ts";
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 export const RESET_PASSWORD_COMPLETION_COOKIE_NAME =
@@ -23,32 +21,16 @@ export type ResetPasswordCompletionTokenPayload = {
 };
 
 function getSecret() {
-  const secret = process.env.RESET_PASSWORD_SESSION_SECRET ?? process.env.USER_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("RESET_PASSWORD_SESSION_SECRET 또는 USER_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  if (secret.length < 32) {
-    throw new Error("RESET_PASSWORD_SESSION_SECRET는 최소 32자 이상이어야 합니다.");
-  }
-  return secret;
+  return readSessionSecret("reset-password-completion");
 }
 
 function signPayload(payload: string) {
-  const secret = getSecret();
-  const signature = createHmacDigest(payload, secret, "hex");
-  return `${payload}.${signature}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
 function parsePayload(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
+  const payload = openSignedPayload(token, getSecret(), "hex");
+  if (!payload) {
     return null;
   }
   try {
@@ -102,13 +84,7 @@ export function verifyResetPasswordCompletionToken(token: string) {
 export function getResetPasswordCompletionCookieOptions(
   maxAge = RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS,
 ) {
-  return {
-    httpOnly: true,
-    maxAge,
-    path: "/",
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-  };
+  return buildSessionCookieOptions(maxAge);
 }
 
 export function decodeResetPasswordCompletionCookieValue(rawValue: string) {

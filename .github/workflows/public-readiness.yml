@@ -33,7 +33,6 @@ jobs:
       run_smoke: ${{ steps.policy.outputs.run_smoke }}
       run_release: ${{ steps.policy.outputs.run_release }}
       run_job: ${{ steps.policy.outputs.run_job }}
-      requires_vercel: ${{ steps.policy.outputs.requires_vercel }}
       target_sha: ${{ steps.policy.outputs.target_sha }}
 
     steps:

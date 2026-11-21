@@ -6,6 +6,10 @@ import {
   findMmUserDirectoryEntryByUsername,
 } from "@/lib/mm-directory";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  MEMBER_EMAIL_RECOVERY_SELECT,
+  MEMBER_LOGIN_SELECT,
+} from "@/lib/members/projections";
 
 export type LoginMember = {
   id: string;
@@ -26,10 +30,6 @@ export type LoginMemberResolution = {
   member: LoginMember;
   authenticationMethod: LoginMemberAuthenticationMethod;
 };
-
-const MEMBER_LOGIN_SELECT =
-  "id,password_hash,password_salt,must_change_password,email_verified_at,mattermost_login_disabled_at";
-const MEMBER_EMAIL_RECOVERY_SELECT = `${MEMBER_LOGIN_SELECT},auth_session_version`;
 
 async function findActiveMemberByMattermostDirectoryId(directoryId: string) {
   const supabase = getSupabaseAdminClient();

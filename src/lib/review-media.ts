@@ -1,6 +1,7 @@
 import { sanitizeHttpUrl } from "./validation.ts";
 import { assertExistingImageManifestUrls } from "./image-upload/policy.ts";
 import { extractPublicStorageObjectPath } from "./public-storage-url.ts";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const REVIEW_MEDIA_BUCKET = "review-media";
 export const REVIEW_IMAGE_ASPECT_RATIO = 1;
@@ -84,7 +85,7 @@ function parseReviewMediaEntry(value: unknown): ReviewMediaManifestEntry | null 
   if (entry.kind === "upload") {
     if (
       typeof entry.uploadId !== "string"
-      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.uploadId)
+      || !isUuidFormat(entry.uploadId)
     ) {
       return null;
     }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useNow } from "@/hooks/useNow";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -24,6 +26,7 @@ import {
   getSelectableSsafyYears,
   SSAFY_STAFF_YEAR,
 } from "@/lib/ssafy-year";
+import { isSixDigitCode, SIX_DIGIT_CODE_LENGTH } from "@/lib/validation";
 
 type Purpose = "signup" | "reset_password";
 
@@ -69,7 +72,7 @@ export default function MattermostCodeVerificationForm({
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState<string | null>(null);
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useNow(Boolean(codeExpiresAt));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<"username" | "generation", string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -97,12 +100,6 @@ export default function MattermostCodeVerificationForm({
     ? "인증 코드가 만료되었습니다."
     : `인증 코드 만료까지 ${formatMattermostCodeRemainingTime(codeRemainingSeconds)} 남음`;
 
-  useEffect(() => {
-    if (!codeExpiresAt) return;
-
-    const intervalId = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(intervalId);
-  }, [codeExpiresAt]);
 
   function focusFirstField(nextErrors: Partial<Record<"username" | "generation", string>>) {
     if (nextErrors.generation) {
@@ -156,7 +153,7 @@ export default function MattermostCodeVerificationForm({
       return;
     }
     const normalizedCode = code.replace(/\s/g, "");
-    if (!/^\d{6}$/.test(normalizedCode)) {
+    if (!isSixDigitCode(normalizedCode)) {
       setError("6자리 숫자 인증 코드를 입력해 주세요.");
       codeRef.current?.focus();
       return;
@@ -200,9 +197,9 @@ export default function MattermostCodeVerificationForm({
               ref={codeRef}
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={SIX_DIGIT_CODE_LENGTH}
               value={code}
-              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, SIX_DIGIT_CODE_LENGTH))}
               placeholder="000000"
               aria-describedby={codeTimerId}
               aria-invalid={Boolean(error) || undefined}

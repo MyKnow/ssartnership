@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getMockMemberById,
@@ -26,12 +27,14 @@ import {
   type PolicyKind,
   type PolicyReviewItem,
   type RequiredPolicyMap,
+  type RequiredPolicyVersions,
 } from "@/lib/policy-documents";
 
 export * from "@/lib/policy-documents";
 
 const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
+const POLICY_VERSION_SELECT = "kind,version";
 const MEMBER_POLICY_CONSENT_SELECT = "kind,version,agreed_at";
 
 export const policyDocumentDataAccess = selectRuntimeDataAccess({
@@ -74,7 +77,7 @@ const mockPolicyDocuments: PolicyDocument[] = [
     updated_at: "2026-01-01T00:00:00.000Z",
   },
   {
-    id: "mock-policy-marketing-v1",
+    id: "70000000-0000-4000-8000-000000000001",
     kind: "marketing",
     version: 1,
     title: "마케팅 정보 수신 동의",
@@ -186,6 +189,62 @@ export async function getActiveRequiredPolicies() {
   // 인증/동의 가드는 현재 활성 버전과 즉시 일치해야 하므로 캐시하지 않는다.
   return queryActiveRequiredPolicies();
 }
+
+async function queryActiveRequiredPolicyVersions(): Promise<RequiredPolicyVersions> {
+  assertPolicyDocumentDataAccessAvailable();
+  if (useMockPolicies) {
+    const policies = await queryActiveRequiredPolicies();
+    return {
+      service: policies.service.version,
+      privacy: policies.privacy.version,
+    };
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("policy_documents")
+    .select(POLICY_VERSION_SELECT)
+    .in("kind", [...REQUIRED_POLICY_KINDS])
+    .eq("is_active", true);
+
+  if (error) {
+    throw wrapPolicyDocumentDbError(
+      error,
+      "활성 정책 버전을 불러오지 못했습니다.",
+    );
+  }
+
+  const versions: Partial<RequiredPolicyVersions> = {};
+  for (const row of (data ?? []) as Array<{ kind: string; version: number }>) {
+    if (!isRequiredPolicyKind(row.kind) || typeof row.version !== "number") {
+      continue;
+    }
+    const previous = versions[row.kind];
+    if (previous === undefined || row.version > previous) {
+      versions[row.kind] = row.version;
+    }
+  }
+
+  for (const kind of REQUIRED_POLICY_KINDS) {
+    if (versions[kind] === undefined) {
+      throw new PolicyDocumentError(
+        "not_found",
+        `${getPolicyKindLabel(kind)}의 활성 버전이 없습니다.`,
+      );
+    }
+  }
+
+  return versions as RequiredPolicyVersions;
+}
+
+/**
+ * Active required-policy versions for the member gate. The layout runs on
+ * every page view, so it reads only `kind,version` (never the policy body)
+ * and memoizes per request. It still reads the database on each request, so
+ * a newly activated version applies immediately.
+ */
+export const getActiveRequiredPolicyVersions = cache(
+  queryActiveRequiredPolicyVersions,
+);
 
 async function queryPolicyDocumentByKind(
   kind: PolicyKind,
@@ -378,64 +437,28 @@ export async function recordMarketingPolicyConsent(input: {
     return input.agreed ? agreedAt : null;
   }
 
-  const { upsertMemberPushPreferences } = await import("@/lib/push/preferences");
-  const supabase = getSupabaseAdminClient();
-
-  if (!input.agreed) {
-    const pushPreferences = await upsertMemberPushPreferences(input.memberId, {
-      marketingEnabled: false,
-    });
-
-    if (!pushPreferences) {
-      throw new PolicyDocumentError(
-        "db_error",
-        "회원 마케팅 알림 설정을 갱신하지 못했습니다.",
-      );
+  if (input.agreed && !input.activePolicy) {
+    throw new PolicyDocumentError(
+      "not_found", "마케팅 정보 수신 동의의 활성 버전이 없습니다.",
+    );
+  }
+  const { updateMemberNotificationPreferences } = await import("@/lib/notification-preferences");
+  const { NotificationPolicyConflictError } = await import("@/lib/notifications/preference-patch");
+  try {
+    await updateMemberNotificationPreferences(input.memberId, {
+      marketingEnabled: input.agreed,
+      ...(input.agreed && input.activePolicy ? {
+        marketingPolicyId: input.activePolicy.id,
+        marketingPolicyVersion: input.activePolicy.version,
+      } : {}),
+    }, { ipAddress: input.ipAddress, userAgent: input.userAgent });
+  } catch (error) {
+    if (error instanceof NotificationPolicyConflictError) {
+      throw new PolicyDocumentError("invalid_request", error.message);
     }
-
-    return null;
+    throw new PolicyDocumentError("db_error", "회원 마케팅 동의 내역을 저장하지 못했습니다.");
   }
-
-  if (!input.activePolicy) {
-    throw new PolicyDocumentError(
-      "not_found",
-      "마케팅 정보 수신 동의의 활성 버전이 없습니다.",
-    );
-  }
-
-  const [row] = [
-    {
-      member_id: input.memberId,
-      policy_document_id: input.activePolicy.id,
-      kind: input.activePolicy.kind,
-      version: input.activePolicy.version,
-      agreed_at: agreedAt,
-      ip_address: input.ipAddress ?? null,
-      user_agent: input.userAgent ?? null,
-    },
-  ];
-
-  const [{ error: consentError }, pushPreferences] = await Promise.all([
-    supabase.from("member_policy_consents").upsert([row], {
-      onConflict: "member_id,policy_document_id",
-    }),
-    upsertMemberPushPreferences(input.memberId, { marketingEnabled: true }),
-  ]);
-
-  if (consentError) {
-    throw wrapPolicyDocumentDbError(
-      consentError,
-      "회원 마케팅 동의 내역을 저장하지 못했습니다.",
-    );
-  }
-  if (!pushPreferences) {
-    throw new PolicyDocumentError(
-      "db_error",
-      "회원 마케팅 알림 설정을 갱신하지 못했습니다.",
-    );
-  }
-
-  return agreedAt;
+  return input.agreed ? agreedAt : null;
 }
 
 export async function recordRequiredPolicyConsent(input: {

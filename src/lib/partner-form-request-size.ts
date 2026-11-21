@@ -2,8 +2,13 @@ const FORM_DATA_PART_OVERHEAD_BYTES = 512;
 const DIRECT_IMAGE_FIELD_NAMES = new Set(["thumbnailFile", "galleryFiles"]);
 
 /**
- * Keep the Server Action limit below Vercel's Function request limit while
- * leaving room for multipart boundaries and field metadata.
+ * Mirrors `experimental.serverActions.bodySizeLimit` ("4mb") in next.config.ts,
+ * the limit Next.js itself enforces on Server Action bodies in the
+ * self-hosted Node server. The edge Caddy accepts up to 64MB, so the binding
+ * limit is this Server Action cap, not the proxy. Images bypass it through
+ * private staging uploads, and the small cap keeps multipart parsing memory
+ * bounded on the single self-hosted app instance. Raise both values together
+ * only with a measured need (for example server-side XLSX parsing).
  */
 export const PARTNER_FORM_SERVER_ACTION_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
 export const PARTNER_FORM_MULTIPART_SAFETY_BUFFER_BYTES = 128 * 1024;

@@ -681,31 +681,8 @@ export async function collectDoctorDiagnostics({
           "WARN",
           "cloud_authentication",
           "Cloud authentication",
-          "A cloud-backed profile is selected; provider login cannot be proven without a network mutation.",
-          "Confirm the reviewed Supabase and Vercel credentials before cloud operations.",
-        ),
-  );
-
-  const vercelProject = join(root, ".vercel", "project.json");
-  diagnostics.push(
-    existsSync(vercelProject)
-      ? diagnostic(
-          "PASS",
-          "project_linking",
-          "Project linking",
-          "A local Vercel project link exists.",
-          "No action required.",
-        )
-      : diagnostic(
-          usesMock ? "PASS" : "WARN",
-          "project_linking",
-          "Project linking",
-          usesMock
-            ? "Project linking is not required for the local mock profile."
-            : "A local Vercel project link is not present.",
-          usesMock
-            ? "No action required."
-            : "Use the repository-scoped Vercel command only when deployment work requires it.",
+          "A Supabase-backed profile is selected; the self-hosted credentials cannot be proven without a network request.",
+          "Confirm the reviewed self-hosted Supabase values from the environment's app.env before running remote operations.",
         ),
   );
 

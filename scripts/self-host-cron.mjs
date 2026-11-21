@@ -5,11 +5,14 @@ import {
   formatCronScheduleList,
   getSafeCronErrorCode,
   invokeSelfHostCron,
-  loadCronSchedules,
+  loadCronScheduleCatalog,
   SelfHostCronError,
 } from "./lib/self-host-cron.mjs";
 
-const DEFAULT_CONFIG_URL = new URL("../vercel.json", import.meta.url);
+const DEFAULT_CONFIG_URL = new URL(
+  "../deploy/self-host-operations/production-cron/schedules.json",
+  import.meta.url,
+);
 
 export function parseSelfHostCronArguments(argv) {
   if (argv.length === 1 && argv[0] === "--list") {
@@ -25,7 +28,7 @@ export function parseSelfHostCronArguments(argv) {
 
 function readScheduleConfig(readFile, configUrl) {
   try {
-    return loadCronSchedules(readFile(configUrl));
+    return loadCronScheduleCatalog(readFile(configUrl)).scheduled;
   } catch (error) {
     if (error instanceof SelfHostCronError) throw error;
     throw new SelfHostCronError("CRON_SCHEDULE_CONFIG_INVALID");

@@ -1,6 +1,7 @@
 import type { ImageUploadDraftValue } from "@/lib/image-upload/draft";
 import { MANUAL_MEMBER_IMPORT_LIMITS, isManualMemberImportSafeFilename } from "./shared";
 import type { ManualMemberImportEditableRow } from "./rows";
+import { isUuidFormat } from "@/lib/uuid";
 
 const ROWS_KEY = "manualMemberRows";
 const PHOTOS_KEY = "manualMemberPhotos";
@@ -8,7 +9,6 @@ const BATCH_KEY = "manualMemberBatch";
 // Do not include "file" in this key: the generic Draft sanitizer deliberately
 // drops any top-level file/certificate-related values.
 const IGNORED_ZIP_PHOTOS_KEY = "manualMemberIgnoredZipPhotoNames";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type ManualMemberImportDraftBatch = {
   batchId: string;
@@ -88,7 +88,7 @@ function isDraftPhoto(value: unknown): value is ManualMemberImportDraftPhoto {
     && photo.contentType.length <= 128
     && typeof photo.sourceName === "string"
     && photo.sourceName.length <= 255
-    && (photo.uploadId === undefined || (typeof photo.uploadId === "string" && UUID_PATTERN.test(photo.uploadId)));
+    && (photo.uploadId === undefined || isUuidFormat(photo.uploadId));
 }
 
 function readPhotos(value: ImageUploadDraftValue | undefined) {
@@ -106,7 +106,7 @@ function readBatch(value: ImageUploadDraftValue | undefined, now: number) {
   const parsed = parseJson(value);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
   const batch = parsed as Record<string, unknown>;
-  if (typeof batch.batchId !== "string" || !UUID_PATTERN.test(batch.batchId)) return null;
+  if (!isUuidFormat(batch.batchId)) return null;
   if (typeof batch.expiresAt !== "string" || Number.isNaN(Date.parse(batch.expiresAt))) return null;
   return Date.parse(batch.expiresAt) > now
     ? { batchId: batch.batchId, expiresAt: batch.expiresAt }

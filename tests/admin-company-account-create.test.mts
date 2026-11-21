@@ -60,7 +60,7 @@ test("partner account create rollback failure is surfaced as an uncertain cleanu
   assert.match(actionSource, /partner_account_create_uncertain/);
   assert.match(
     actionSource,
-    /console\.error\("\[admin\] partner account cleanup failed", cleanupError\);/,
+    /logServerError\("\[admin\] partner account cleanup failed", cleanupError\);/,
   );
   assert.match(
     errorSource,

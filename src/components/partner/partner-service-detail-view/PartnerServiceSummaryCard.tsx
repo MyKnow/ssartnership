@@ -31,7 +31,7 @@ export default function PartnerServiceSummaryCard({
   mapLink?: string | null;
   metrics?: PartnerPortalServiceMetrics;
 }) {
-  const categoryBadgeClass = "px-2 py-0.5 text-[10px] tracking-[0.06em]";
+  const categoryBadgeClass = "px-2 py-0.5 text-xs tracking-[0.06em]";
   const serviceMode = getPartnerServiceMode(context.partnerLocation);
   const isOnlineService = serviceMode === "online";
   const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);

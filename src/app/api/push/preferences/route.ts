@@ -1,3 +1,3 @@
 export const runtime = "nodejs";
 
-export { POST } from "../../notifications/preferences/route";
+export { PATCH, POST } from "../../notifications/preferences/route";

@@ -138,3 +138,50 @@ test("configured cycle settings follow early-start overrides", async () => {
   assert.equal(overview.nextSemesterStartLabel, "2028년 1월 1일");
   assert.equal(overview.nextCohortStartLabel, "2028년 7월 1일");
 });
+
+test("조기 시작 대상 기수는 기존 수동 기준이 아니라 달력 기수에서 계산해 누적되지 않는다", async () => {
+  const {
+    getSsafyCycleEarlyStartTargetYear,
+    isSsafyCycleEarlyStartApplied,
+    normalizeSsafyCycleSettings,
+  } = await cycleModulePromise;
+  const now = new Date("2027-06-20T00:00:00+09:00");
+
+  const automatic = normalizeSsafyCycleSettings({
+    anchor_year: 14,
+    anchor_calendar_year: 2025,
+    anchor_month: 7,
+  });
+  assert.equal(getSsafyCycleEarlyStartTargetYear(automatic, now), 18);
+  assert.equal(isSsafyCycleEarlyStartApplied(automatic, now), false);
+
+  const earlyStarted = normalizeSsafyCycleSettings({
+    anchor_year: 14,
+    anchor_calendar_year: 2025,
+    anchor_month: 7,
+    manual_current_year: 18,
+    manual_reason: "early_start",
+  });
+  assert.equal(getSsafyCycleEarlyStartTargetYear(earlyStarted, now), 18);
+  assert.equal(isSsafyCycleEarlyStartApplied(earlyStarted, now), true);
+
+  const afterCalendarCatchUp = new Date("2027-07-02T00:00:00+09:00");
+  assert.equal(getSsafyCycleEarlyStartTargetYear(earlyStarted, afterCalendarCatchUp), 19);
+  assert.equal(isSsafyCycleEarlyStartApplied(earlyStarted, afterCalendarCatchUp), false);
+});
+
+test("조기 시작 액션은 달력 기준 대상 기수를 쓰고 이미 적용된 경우 다시 쓰지 않는다", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const [action, view] = await Promise.all([
+    readFile(
+      new URL("../src/app/admin/(protected)/_actions/cycle-actions.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../src/components/admin/AdminCycleView.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(action, /const targetYear = getSsafyCycleEarlyStartTargetYear\(settings, now\);/);
+  assert.match(action, /if \(isSsafyCycleEarlyStartApplied\(settings, now\)\) \{\s*redirect\("\/admin\/cycle\?status=early-start-already"\);/);
+  assert.doesNotMatch(action, /const targetYear = currentYear \+ 1;/);
+  assert.match(view, /disabled=\{earlyStartApplied\}/);
+});

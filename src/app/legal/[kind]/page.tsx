@@ -9,6 +9,7 @@ import {
   getPolicyKindLabel,
   isPolicyKind,
 } from "@/lib/policy-documents.server";
+import { createCanonicalAlternates } from "@/lib/seo";
 import { SITE_NAME } from "@/lib/site";
 
 type PageProps = {
@@ -43,6 +44,8 @@ export async function generateMetadata({
 
   return {
     title: `${getPolicyKindLabel(resolved.kind)} | ${SITE_NAME}`,
+    // Version queries show past revisions of the same policy document.
+    alternates: createCanonicalAlternates(`/legal/${resolved.kind}`),
   };
 }
 

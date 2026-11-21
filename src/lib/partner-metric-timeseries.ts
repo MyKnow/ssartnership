@@ -6,7 +6,7 @@ import {
   fetchPartnerMetricRollupRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "./partner-metric-rollups.ts";
-import { isPartnerPortalMock } from "./partner-portal.ts";
+import { isPartnerPortalMock } from "./partner-auth/portal.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;

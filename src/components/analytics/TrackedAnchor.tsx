@@ -1,6 +1,6 @@
 'use client';
 
-import type { ProductEventName } from '@/lib/event-catalog';
+import type { ClientProductEventName } from '@/lib/product-event-contract';
 import { trackProductEvent } from '@/lib/product-events';
 
 export default function TrackedAnchor({
@@ -22,7 +22,7 @@ export default function TrackedAnchor({
   rel?: string;
   ariaLabel?: string;
   title?: string;
-  eventName: ProductEventName;
+  eventName: ClientProductEventName;
   targetType?: string | null;
   targetId?: string | null;
   properties?: Record<string, unknown> | null;

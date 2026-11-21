@@ -11,3 +11,5 @@ last_verified: 2026-08-29
 - [ADR-0001: Mattermost 직접 연동](./ADR-0001-direct-mattermost-integration.md)
 
 ADR은 Context, Decision, Alternatives, Consequences, Status를 기록한다. 채택된 결정을 바꿀 때 기존 파일을 덮어써 역사를 지우지 않고 새 ADR에서 대체 관계를 선언한다.
+
+- [ADR-0002: 15기 이후 서비스 연속성 (Proposed)](./ADR-0002-cohort-service-continuity.md)

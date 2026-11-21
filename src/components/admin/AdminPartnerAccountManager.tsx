@@ -3,6 +3,6 @@ import AdminPartnerAccountManagerContent from "@/components/admin/partner-accoun
 export type {
   AdminPartnerAccount,
   AdminPartnerAccountCompany,
-} from "@/components/admin/partner-account-manager/types";
+} from "@/lib/admin-partner-account-types";
 
 export default AdminPartnerAccountManagerContent;

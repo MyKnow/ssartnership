@@ -777,7 +777,7 @@
     {
       "id": 15,
       "type": "row",
-      "title": "VM 자원 · 바이트와 비율을 함께 확인",
+      "title": "앱 준비 상태 · edge 오류 · 예약 작업 · 배포 수신기",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -789,7 +789,7 @@
     },
     {
       "id": 16,
-      "title": "CPU 사용률",
+      "title": "앱 의존성 준비 상태",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -798,6 +798,303 @@
       "gridPos": {
         "x": 0,
         "y": 28,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ssartnership_app_ready_success{environment=~\"$environment\"}",
+          "legendFormat": "{{environment}} · {{dependency}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "decimals": 2,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "장애",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "정상",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "DB 연결 사용률",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 28,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (environment,vm) (pg_stat_database_numbackends{environment=~\"$environment\"}) / on(environment,vm) max by (environment,vm) (pg_settings_max_connections{environment=~\"$environment\"})",
+          "legendFormat": "{{environment}} · {{vm}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "데이터 없음",
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 18,
+      "title": "공개 edge 5xx 비율 · 5분",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 28,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(caddy_http_request_duration_seconds_count{job=\"caddy\",handler=\"reverse_proxy\",code=~\"5..\"}[5m])) / sum(rate(caddy_http_request_duration_seconds_count{job=\"caddy\",handler=\"reverse_proxy\"}[5m]))",
+          "legendFormat": "edge",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "데이터 없음",
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 19,
+      "title": "운영 예약 작업 · 마지막 성공 경과",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - ssartnership_production_cron_last_success_seconds{environment=~\"$environment\"}",
+          "legendFormat": "{{cron}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "데이터 없음",
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "배포 수신기 · 마지막 성공 경과",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 35,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - ssartnership_release_receiver_last_success_seconds{environment=~\"$environment\"}",
+          "legendFormat": "{{environment}} · {{vm}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "데이터 없음",
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "VM 자원 · 바이트와 비율을 함께 확인",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "title": "CPU 사용률",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
         "w": 8,
         "h": 7
       },
@@ -842,7 +1139,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 23,
       "title": "가용 메모리",
       "type": "timeseries",
       "datasource": {
@@ -851,7 +1148,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 28,
+        "y": 43,
         "w": 8,
         "h": 7
       },
@@ -896,7 +1193,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 24,
       "title": "메모리 여유 비율",
       "type": "timeseries",
       "datasource": {
@@ -905,7 +1202,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 28,
+        "y": 43,
         "w": 8,
         "h": 7
       },
@@ -950,7 +1247,7 @@
       }
     },
     {
-      "id": 19,
+      "id": 25,
       "title": "파일시스템 여유 공간",
       "type": "timeseries",
       "datasource": {
@@ -959,7 +1256,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 50,
         "w": 12,
         "h": 7
       },
@@ -1004,7 +1301,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 26,
       "title": "파일시스템 여유 비율",
       "type": "timeseries",
       "datasource": {
@@ -1013,7 +1310,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 35,
+        "y": 50,
         "w": 12,
         "h": 7
       },
@@ -1058,20 +1355,20 @@
       }
     },
     {
-      "id": 21,
+      "id": 27,
       "type": "row",
       "title": "물리 PVE · 같은 호스트에 있는 백업 디스크와 구분",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 42,
+        "y": 57,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 22,
+      "id": 28,
       "title": "PVE CPU 사용률",
       "type": "timeseries",
       "datasource": {
@@ -1080,7 +1377,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 43,
+        "y": 58,
         "w": 8,
         "h": 7
       },
@@ -1125,7 +1422,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 29,
       "title": "PVE 가용 메모리",
       "type": "timeseries",
       "datasource": {
@@ -1134,7 +1431,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 43,
+        "y": 58,
         "w": 8,
         "h": 7
       },
@@ -1179,7 +1476,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 30,
       "title": "PVE 루트 여유 공간",
       "type": "timeseries",
       "datasource": {
@@ -1188,7 +1485,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 43,
+        "y": 58,
         "w": 8,
         "h": 7
       },
@@ -1233,7 +1530,7 @@
       }
     },
     {
-      "id": 25,
+      "id": 31,
       "title": "Thin pool 데이터 사용률",
       "type": "timeseries",
       "datasource": {
@@ -1242,7 +1539,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 65,
         "w": 6,
         "h": 7
       },
@@ -1287,7 +1584,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 32,
       "title": "Thin pool 메타데이터 사용률",
       "type": "timeseries",
       "datasource": {
@@ -1296,7 +1593,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 50,
+        "y": 65,
         "w": 6,
         "h": 7
       },
@@ -1341,7 +1638,7 @@
       }
     },
     {
-      "id": 27,
+      "id": 33,
       "title": "시스템 NVMe SMART",
       "type": "stat",
       "datasource": {
@@ -1350,7 +1647,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 50,
+        "y": 65,
         "w": 6,
         "h": 7
       },
@@ -1410,7 +1707,7 @@
       }
     },
     {
-      "id": 28,
+      "id": 34,
       "title": "같은 호스트의 백업 SATA SMART",
       "type": "stat",
       "datasource": {
@@ -1419,7 +1716,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 50,
+        "y": 65,
         "w": 6,
         "h": 7
       },
@@ -1479,20 +1776,20 @@
       }
     },
     {
-      "id": 29,
+      "id": 35,
       "type": "row",
       "title": "Production 백업 · 스냅샷 방식 / 연속 PITR 아님",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 57,
+        "y": 72,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 30,
+      "id": 36,
       "title": "최신 백업 경과",
       "type": "stat",
       "datasource": {
@@ -1501,7 +1798,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 58,
+        "y": 73,
         "w": 8,
         "h": 7
       },
@@ -1547,7 +1844,7 @@
       }
     },
     {
-      "id": 31,
+      "id": 37,
       "title": "Mac 사본의 백업 경과",
       "type": "stat",
       "datasource": {
@@ -1556,7 +1853,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 58,
+        "y": 73,
         "w": 8,
         "h": 7
       },
@@ -1602,7 +1899,7 @@
       }
     },
     {
-      "id": 32,
+      "id": 38,
       "title": "같은 PVE 사본의 백업 경과",
       "type": "stat",
       "datasource": {
@@ -1611,7 +1908,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 58,
+        "y": 73,
         "w": 8,
         "h": 7
       },
@@ -1657,7 +1954,7 @@
       }
     },
     {
-      "id": 33,
+      "id": 39,
       "title": "PVE 사본 확인 경과",
       "type": "stat",
       "datasource": {
@@ -1666,7 +1963,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 65,
+        "y": 80,
         "w": 8,
         "h": 7
       },
@@ -1712,7 +2009,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 40,
       "title": "백업 지표 갱신 경과",
       "type": "stat",
       "datasource": {
@@ -1721,7 +2018,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 65,
+        "y": 80,
         "w": 8,
         "h": 7
       },
@@ -1767,7 +2064,7 @@
       }
     },
     {
-      "id": 35,
+      "id": 41,
       "title": "복원 검증 경과",
       "type": "stat",
       "datasource": {
@@ -1776,7 +2073,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 65,
+        "y": 80,
         "w": 8,
         "h": 7
       },
@@ -1822,7 +2119,7 @@
       }
     },
     {
-      "id": 36,
+      "id": 42,
       "title": "최근 백업 작업 결과",
       "type": "stat",
       "datasource": {
@@ -1831,7 +2128,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 72,
+        "y": 87,
         "w": 8,
         "h": 7
       },
@@ -1891,7 +2188,7 @@
       }
     },
     {
-      "id": 37,
+      "id": 43,
       "title": "백업 작업 종료 시각",
       "type": "stat",
       "datasource": {
@@ -1900,7 +2197,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 72,
+        "y": 87,
         "w": 8,
         "h": 7
       },
@@ -1946,7 +2243,7 @@
       }
     },
     {
-      "id": 38,
+      "id": 44,
       "title": "최근 복원 검증 시각",
       "type": "stat",
       "datasource": {
@@ -1955,7 +2252,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 72,
+        "y": 87,
         "w": 8,
         "h": 7
       },
@@ -2001,20 +2298,20 @@
       }
     },
     {
-      "id": 39,
+      "id": 45,
       "type": "row",
       "title": "사용자 체감 성능 · 최근 15분 / 최소 5개 표본",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 79,
+        "y": 94,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 40,
+      "id": 46,
       "title": "LCP p75",
       "type": "timeseries",
       "datasource": {
@@ -2023,7 +2320,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 80,
+        "y": 95,
         "w": 8,
         "h": 7
       },
@@ -2068,7 +2365,7 @@
       }
     },
     {
-      "id": 41,
+      "id": 47,
       "title": "INP p75",
       "type": "timeseries",
       "datasource": {
@@ -2077,7 +2374,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 80,
+        "y": 95,
         "w": 8,
         "h": 7
       },
@@ -2122,7 +2419,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 48,
       "title": "CLS p75",
       "type": "timeseries",
       "datasource": {
@@ -2131,7 +2428,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 80,
+        "y": 95,
         "w": 8,
         "h": 7
       },
@@ -2176,7 +2473,7 @@
       }
     },
     {
-      "id": 43,
+      "id": 49,
       "title": "LCP 최근 표본 수",
       "type": "stat",
       "datasource": {
@@ -2185,7 +2482,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 87,
+        "y": 102,
         "w": 8,
         "h": 7
       },
@@ -2231,7 +2528,7 @@
       }
     },
     {
-      "id": 44,
+      "id": 50,
       "title": "INP 최근 표본 수",
       "type": "stat",
       "datasource": {
@@ -2240,7 +2537,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 87,
+        "y": 102,
         "w": 8,
         "h": 7
       },
@@ -2286,7 +2583,7 @@
       }
     },
     {
-      "id": 45,
+      "id": 51,
       "title": "CLS 최근 표본 수",
       "type": "stat",
       "datasource": {
@@ -2295,7 +2592,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 87,
+        "y": 102,
         "w": 8,
         "h": 7
       },
@@ -2341,20 +2638,20 @@
       }
     },
     {
-      "id": 46,
+      "id": 52,
       "type": "row",
       "title": "감시 · 알림 자체 상태",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 94,
+        "y": 109,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 47,
+      "id": 53,
       "title": "발송기 설정",
       "type": "stat",
       "datasource": {
@@ -2363,7 +2660,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 95,
+        "y": 110,
         "w": 8,
         "h": 7
       },
@@ -2423,7 +2720,7 @@
       }
     },
     {
-      "id": 48,
+      "id": 54,
       "title": "운영자 PWA 푸시",
       "type": "stat",
       "datasource": {
@@ -2432,7 +2729,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 95,
+        "y": 110,
         "w": 8,
         "h": 7
       },
@@ -2492,7 +2789,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 55,
       "title": "운영자 푸시 구독 수",
       "type": "stat",
       "datasource": {
@@ -2501,7 +2798,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 95,
+        "y": 110,
         "w": 8,
         "h": 7
       },
@@ -2547,7 +2844,7 @@
       }
     },
     {
-      "id": 50,
+      "id": 56,
       "title": "최근 1시간 발송 결과 · 제공자 접수 기준",
       "type": "timeseries",
       "datasource": {
@@ -2556,7 +2853,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 102,
+        "y": 117,
         "w": 12,
         "h": 7
       },
@@ -2601,7 +2898,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 57,
       "title": "수집 대상 · 마지막 수집 경과",
       "type": "timeseries",
       "datasource": {
@@ -2610,7 +2907,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 102,
+        "y": 117,
         "w": 12,
         "h": 7
       },
@@ -2655,7 +2952,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 58,
       "title": "PVE 호스트 수집 경과",
       "type": "stat",
       "datasource": {
@@ -2664,7 +2961,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 109,
+        "y": 124,
         "w": 8,
         "h": 7
       },
@@ -2710,7 +3007,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 59,
       "title": "외부 heartbeat 연동",
       "type": "stat",
       "datasource": {
@@ -2719,7 +3016,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 109,
+        "y": 124,
         "w": 8,
         "h": 7
       },
@@ -2779,7 +3076,7 @@
       }
     },
     {
-      "id": 54,
+      "id": 60,
       "title": "독립 회선 HTTPS 감시",
       "type": "stat",
       "datasource": {
@@ -2788,7 +3085,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 109,
+        "y": 124,
         "w": 8,
         "h": 7
       },

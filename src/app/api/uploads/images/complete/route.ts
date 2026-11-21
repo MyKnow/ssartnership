@@ -18,6 +18,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -102,11 +103,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, uploads });
   } catch (error) {
     await recordImageUploadAttempt("complete", { ...rateLimitContext, success: false });
-    console.error("[image-upload/complete]", {
-      purpose: parsed.purpose,
-      actor: actorResult.actor.kind,
-      error: error instanceof Error ? error.message : "unknown",
-    });
+    logServerError("[image-upload/complete]", error, { purpose: parsed.purpose, actor: actorResult.actor.kind });
     const isProcessing = error instanceof ImageUploadError
       && error.code === "upload_processing";
     const isUnavailable = error instanceof ImageUploadError

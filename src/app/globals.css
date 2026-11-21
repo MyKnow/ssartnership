@@ -1,3 +1,7 @@
+/*! Pretendard Variable (dynamic-subset, self-hosted from the "pretendard" package)
+ * Copyright (c) 2021 Kil Hyung-jin, with Reserved Font Name Pretendard.
+ * Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+ */
 @import "tailwindcss";
 @import "react-easy-crop/react-easy-crop.css";
 @source "..";
@@ -22,7 +26,10 @@
   --primary-emphasis: #172d53;
   --primary-soft: #e6edf8;
   --primary-foreground: #f7fbff;
+  --focus-ring: #213b68;
   --accent: #1ea6d7;
+  --info: #075985;
+  --info-soft: #e0f2fe;
   --success: #0b665f;
   --warning: #92400e;
   --danger: #a12f49;
@@ -31,12 +38,12 @@
   --hero-to: #2c4b7e;
   --hero-foreground: #f8fbff;
   --hero-muted: rgba(230, 238, 252, 0.82);
-  --radius-control: 1rem;
-  --radius-input: 1rem;
-  --radius-card: 1.5rem;
-  --radius-panel: 1.875rem;
-  --radius-overlay: 2.25rem;
-  --radius-pill: 999px;
+  --shape-radius-control: 1rem;
+  --shape-radius-input: 1rem;
+  --shape-radius-card: 1.5rem;
+  --shape-radius-panel: 1.875rem;
+  --shape-radius-overlay: 2.25rem;
+  --shape-radius-pill: 999px;
   --shadow-flat: 0 1px 2px rgba(17, 24, 39, 0.04);
   --shadow-raised:
     0 20px 48px rgba(24, 36, 61, 0.09),
@@ -65,6 +72,38 @@
   --category-preview-dark-border: #3a4c69;
   --category-preview-dark-foreground: #eef5ff;
   --category-preview-dark-muted: #9fb0c9;
+
+  /* Partner·Admin portal v2 (Figma "05 · 파트너 v2 디자인 시스템").
+   * Names match the Figma variables' codeSyntax. v2 is light-only by design,
+   * so html.dark does not override these. */
+  --partner-v2-color-canvas: #f5f7fa;
+  --partner-v2-color-surface: #ffffff;
+  --partner-v2-color-sidebar: #172335;
+  --partner-v2-color-nav-active: #263d65;
+  --partner-v2-color-nav-text: #bbc6d8;
+  --partner-v2-color-on-dark: #f4f7fc;
+  --partner-v2-color-text: #182230;
+  --partner-v2-color-muted: #5c6c82;
+  --partner-v2-color-subtle: #8592a3;
+  --partner-v2-color-border: #e2e7ef;
+  --partner-v2-color-border-strong: #7e8ca0;
+  --partner-v2-color-grid: #edf0f5;
+  --partner-v2-color-previous: #71839d;
+  --partner-v2-color-blue: #2563eb;
+  --partner-v2-color-blue-soft: #eff5ff;
+  --partner-v2-color-hover: #1d4ed8;
+  --partner-v2-color-pressed: #1e40af;
+  --partner-v2-color-success: #147d64;
+  --partner-v2-color-success-soft: #e8f6ef;
+  --partner-v2-color-warning: #8e5a10;
+  --partner-v2-color-warning-soft: #fff5df;
+  --partner-v2-color-danger: #b42318;
+  --partner-v2-color-danger-soft: #fef3f2;
+  --partner-v2-color-disabled-bg: #edf0f5;
+  --partner-v2-color-disabled-text: #8592a3;
+  --partner-v2-radius-badge: 6px;
+  --partner-v2-radius-control: 8px;
+  --partner-v2-radius-panel: 12px;
 }
 
 html.dark {
@@ -85,7 +124,10 @@ html.dark {
   --primary-emphasis: #f2f7ff;
   --primary-soft: rgba(44, 67, 106, 0.42);
   --primary-foreground: #07101d;
+  --focus-ring: #d7e4ff;
   --accent: #6fd3ff;
+  --info: #7dd3fc;
+  --info-soft: #0c2d43;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #fb7185;
@@ -120,6 +162,23 @@ html.dark {
 }
 
 @theme inline {
+  /* Portal v2 desktop shell (sidebar 240px) starts at 1200px. A named
+   * breakpoint keeps rem-based sorting with md; `min-[1200px]:` is emitted
+   * before `md:` and loses to it. */
+  --breakpoint-pv2-desktop: 75rem;
+
+  --radius-pill: var(--shape-radius-pill);
+
+  --radius-overlay: var(--shape-radius-overlay);
+
+  --radius-panel: var(--shape-radius-panel);
+
+  --radius-card: var(--shape-radius-card);
+
+  --radius-input: var(--shape-radius-input);
+
+  --radius-control: var(--shape-radius-control);
+
   --color-background: var(--background);
   --color-background-muted: var(--background-muted);
   --color-surface: var(--surface);
@@ -138,10 +197,42 @@ html.dark {
   --color-primary-emphasis: var(--primary-emphasis);
   --color-primary-soft: var(--primary-soft);
   --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--focus-ring);
   --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+
+  --radius-pv2-badge: var(--partner-v2-radius-badge);
+  --radius-pv2-control: var(--partner-v2-radius-control);
+  --radius-pv2-panel: var(--partner-v2-radius-panel);
+  --color-pv2-canvas: var(--partner-v2-color-canvas);
+  --color-pv2-surface: var(--partner-v2-color-surface);
+  --color-pv2-sidebar: var(--partner-v2-color-sidebar);
+  --color-pv2-nav-active: var(--partner-v2-color-nav-active);
+  --color-pv2-nav-text: var(--partner-v2-color-nav-text);
+  --color-pv2-on-dark: var(--partner-v2-color-on-dark);
+  --color-pv2-text: var(--partner-v2-color-text);
+  --color-pv2-muted: var(--partner-v2-color-muted);
+  --color-pv2-subtle: var(--partner-v2-color-subtle);
+  --color-pv2-border: var(--partner-v2-color-border);
+  --color-pv2-border-strong: var(--partner-v2-color-border-strong);
+  --color-pv2-grid: var(--partner-v2-color-grid);
+  --color-pv2-previous: var(--partner-v2-color-previous);
+  --color-pv2-blue: var(--partner-v2-color-blue);
+  --color-pv2-blue-soft: var(--partner-v2-color-blue-soft);
+  --color-pv2-hover: var(--partner-v2-color-hover);
+  --color-pv2-pressed: var(--partner-v2-color-pressed);
+  --color-pv2-success: var(--partner-v2-color-success);
+  --color-pv2-success-soft: var(--partner-v2-color-success-soft);
+  --color-pv2-warning: var(--partner-v2-color-warning);
+  --color-pv2-warning-soft: var(--partner-v2-color-warning-soft);
+  --color-pv2-danger: var(--partner-v2-color-danger);
+  --color-pv2-danger-soft: var(--partner-v2-color-danger-soft);
+  --color-pv2-disabled-bg: var(--partner-v2-color-disabled-bg);
+  --color-pv2-disabled-text: var(--partner-v2-color-disabled-text);
   --font-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR",
     "Apple SD Gothic Neo", sans-serif;
 }
@@ -178,7 +269,7 @@ html.dark {
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top right, rgba(30, 166, 215, 0.08), transparent 24%),
     radial-gradient(circle at bottom left, rgba(33, 59, 104, 0.08), transparent 30%),
@@ -190,6 +281,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/*
+ * 설치형 앱에서 당겨서 새로고침이 실수로 일어나면 페이지가 다시 열려 작성 중인 입력이
+ * 사라집니다. standalone 화면에서만 문서 끝의 당김·튕김을 막고, 일반 브라우저 탭의
+ * 동작은 그대로 둡니다.
+ */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
 /* 브라우저의 보이는 영역과 홈 인디케이터 위에 설치 안내를 배치합니다. */
 .pwa-visit-recommendation {
   bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) + 1rem);
@@ -197,6 +300,12 @@ body {
 
 .pwa-visit-recommendation-content {
   max-height: max(0px, calc(100svh - env(safe-area-inset-top, 0px) - max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) - 7rem));
+}
+
+/* 제휴처 확인 PIN은 비밀번호 저장 대상이 되지 않도록 text 입력을 쓰고 화면에서만 가립니다. */
+.pin-mask {
+  -webkit-text-security: disc;
+  letter-spacing: 0.3em;
 }
 
 /* 입력 중에는 검색과 키보드를 가리지 않고, 앱 하단 탐색과도 함께 뜨지 않습니다. */
@@ -233,12 +342,27 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
   body:has([data-partner-detail-mobile-action-bar]) [data-toast-viewport] {
     bottom: calc(env(safe-area-inset-bottom) + 6rem);
   }
+
+  /* 관리자 모바일 하단 탐색(높이 3.5rem) 위로 토스트를 띄웁니다. */
+  body:has([data-admin-mobile-navigation]) [data-toast-viewport] {
+    bottom: calc(env(safe-area-inset-bottom) + 4.75rem);
+  }
 }
 
 @media (min-width: 768px) {
   body:has([data-partner-detail-desktop-action-fab]) [data-toast-viewport] {
     bottom: 6rem;
   }
+}
+
+/* 플로팅 제출 버튼과 토스트가 겹치지 않게 합니다. base는 하단 1.25rem + 높이 3.5rem,
+   raised는 관리자 하단 탐색 위(하단 5rem + 높이 3rem)에 뜬 버튼입니다. */
+body:has([data-floating-submit-button]) [data-toast-viewport] {
+  bottom: calc(env(safe-area-inset-bottom) + 6rem);
+}
+
+body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
+  bottom: calc(env(safe-area-inset-bottom) + 9rem);
 }
 
 * {
@@ -290,6 +414,100 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
 }
 
 @layer utilities {
+  /* Portal v2 root: light-only canvas with the v2 type scale. */
+  .portal-v2 {
+    color-scheme: light;
+    background-color: var(--partner-v2-color-canvas);
+    color: var(--partner-v2-color-text);
+    letter-spacing: 0;
+  }
+
+  /* 아직 v2 컴포넌트로 옮기지 않은 화면이 포털 안에서도 v2 색·형태를 따르도록
+   * 기존 의미 토큰을 v2 값으로 다시 매핑한다. 포털 밖(공개 사이트)과 다크 모드는
+   * 건드리지 않는다. `[data-portal-v2-scope]`는 body로 포털된 Modal이 같은 매핑을 받는 용도다. */
+  .portal-v2,
+  [data-portal-v2-scope] {
+    --background: var(--partner-v2-color-canvas);
+    --background-muted: var(--partner-v2-color-grid);
+    --surface: var(--partner-v2-color-surface);
+    --surface-muted: var(--partner-v2-color-grid);
+    --surface-inset: var(--partner-v2-color-grid);
+    --surface-control: var(--partner-v2-color-surface);
+    --surface-elevated: var(--partner-v2-color-surface);
+    --surface-overlay: var(--partner-v2-color-surface);
+    --border: var(--partner-v2-color-border);
+    --border-strong: var(--partner-v2-color-border-strong);
+    --foreground: var(--partner-v2-color-text);
+    --foreground-soft: var(--partner-v2-color-text);
+    --muted-foreground: var(--partner-v2-color-muted);
+    --primary: var(--partner-v2-color-blue);
+    --primary-emphasis: var(--partner-v2-color-hover);
+    --primary-soft: var(--partner-v2-color-blue-soft);
+    --primary-foreground: var(--partner-v2-color-surface);
+    --focus-ring: var(--partner-v2-color-blue);
+    --accent: var(--partner-v2-color-blue);
+    --info: var(--partner-v2-color-blue);
+    --info-soft: var(--partner-v2-color-blue-soft);
+    --success: var(--partner-v2-color-success);
+    --warning: var(--partner-v2-color-warning);
+    --danger: var(--partner-v2-color-danger);
+    --shape-radius-control: var(--partner-v2-radius-control);
+    --shape-radius-input: var(--partner-v2-radius-control);
+    --shape-radius-card: var(--partner-v2-radius-panel);
+    --shape-radius-panel: var(--partner-v2-radius-panel);
+    --shape-radius-overlay: var(--partner-v2-radius-panel);
+    --shadow-flat: none;
+    --shadow-raised: none;
+    --shadow-floating: none;
+  }
+
+  /* 포털 안의 기존 텍스트 클래스를 v2 타입 스케일에 맞춘다(대문자·넓은 자간 제거). */
+  .portal-v2 .ui-kicker {
+    @apply text-xs leading-[1.125rem] font-medium normal-case tracking-normal;
+  }
+
+  .portal-v2 .ui-display,
+  .portal-v2 .ui-page-title {
+    @apply text-[1.375rem] leading-8 font-bold tracking-normal sm:text-[1.625rem] sm:leading-[2.375rem];
+  }
+
+  .portal-v2 .ui-section-title {
+    @apply text-lg leading-7 font-semibold tracking-normal;
+  }
+
+  .portal-v2 .ui-body {
+    @apply text-sm leading-[1.375rem];
+  }
+
+  .portal-v2 .ui-caption {
+    @apply text-xs leading-[1.125rem] tracking-normal sm:text-xs;
+  }
+
+  /* Portal v2 type scale (Figma Text Styles "Partner v2 / *"). */
+  .pv2-title {
+    @apply text-[1.375rem] leading-8 font-bold sm:text-[1.625rem] sm:leading-[2.375rem];
+  }
+
+  .pv2-heading {
+    @apply text-lg leading-7 font-bold;
+  }
+
+  .pv2-body {
+    @apply text-sm leading-[1.375rem] font-normal;
+  }
+
+  .pv2-label {
+    @apply text-sm leading-[1.375rem] font-medium;
+  }
+
+  .pv2-caption {
+    @apply text-xs leading-[1.125rem] font-normal;
+  }
+
+  .pv2-metric {
+    @apply text-[1.75rem] leading-10 font-bold tabular-nums;
+  }
+
   .ui-page-shell {
     width: 100%;
     max-width: min(var(--grid-max), calc(100vw - 1.5rem));
@@ -326,7 +544,7 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow-flat);
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
     backdrop-filter: blur(14px);
   }
 
@@ -334,14 +552,14 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
     background: var(--surface-inset);
     box-shadow: none;
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
   }
 
   .ui-panel-elevated {
     border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
     background: var(--surface-elevated);
     box-shadow: var(--shadow-raised);
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
     backdrop-filter: blur(18px);
   }
 
@@ -371,7 +589,7 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
 
   .category-chip-preview-light,
   .category-chip-preview-dark {
-    border-radius: var(--radius-control);
+    border-radius: var(--shape-radius-control);
   }
 
   .category-chip-preview-light {
@@ -403,22 +621,6 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     border: 1px solid var(--border);
     background: var(--surface-control);
     box-shadow: var(--shadow-flat);
-  }
-
-  .rounded-input {
-    border-radius: var(--radius-input);
-  }
-
-  .rounded-card {
-    border-radius: var(--radius-card);
-  }
-
-  .rounded-panel {
-    border-radius: var(--radius-panel);
-  }
-
-  .rounded-overlay {
-    border-radius: var(--radius-overlay);
   }
 
   .shadow-flat {
@@ -497,6 +699,10 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     min-height: calc(6.5rem + env(safe-area-inset-top));
   }
 
+  .bottom-safe-toast {
+    bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+
   .bottom-safe-bottom-5 {
     bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
   }
@@ -528,6 +734,11 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     /* Keep the standard declaration last through production optimization. */
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  /* 실패 토스트는 아이콘과 danger 테두리로 성공·안내 토스트와 구분합니다. */
+  .ui-toast-glass[data-toast-tone="error"] {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   }
 
   .site-mobile-nav-glass {

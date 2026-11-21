@@ -6,11 +6,10 @@ const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("Mattermost 비활성 회원은 로컬 비밀번호 세션으로 로그인하고 이메일 게이트 상태를 받는다", async () => {
-  const [authentication, loginRoute, legacyLoginRoute, userAuth, loginForm] =
+  const [authentication, loginRoute, userAuth, loginForm] =
     await Promise.all([
       read("src/lib/member-authentication.ts"),
       read("src/app/api/auth/login/route.ts"),
-      read("src/app/api/mm/login/route.ts"),
       read("src/lib/user-auth.ts"),
       read("src/components/auth/LoginForm.tsx"),
     ]);
@@ -25,11 +24,9 @@ test("Mattermost 비활성 회원은 로컬 비밀번호 세션으로 로그인�
     /disabledMember\?\.mattermost_login_disabled_at[\s\S]+authenticationMethod: "manual"/,
   );
 
-  for (const source of [loginRoute, legacyLoginRoute]) {
-    assert.match(source, /requiresMemberEmailRegistration/);
-    assert.match(source, /requiresEmailRegistration/);
-  }
-  assert.match(legacyLoginRoute, /authenticationMethod: resolvedLogin\.authenticationMethod/);
+  assert.match(loginRoute, /requiresMemberEmailRegistration/);
+  assert.match(loginRoute, /requiresEmailRegistration/);
+  assert.match(loginRoute, /authenticationMethod: resolvedLogin\.authenticationMethod/);
   assert.match(
     userAuth,
     /email_verified_at,mattermost_login_disabled_at/,

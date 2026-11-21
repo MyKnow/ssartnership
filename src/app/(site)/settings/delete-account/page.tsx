@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import MemberAccountDeletionView from "@/components/settings/MemberAccountDeletionView";
 import Container from "@/components/ui/Container";
 import { getHeaderSession } from "@/lib/header-session";
+import { getMemberRecentAuthRequirement } from "@/lib/member-recent-auth.server";
 import { SITE_NAME } from "@/lib/site";
 import { getMemberAccountDeletionNavigation } from "@/lib/site-navigation";
 import { getSignedUserSession } from "@/lib/user-auth";
@@ -33,7 +34,10 @@ export default async function DeleteAccountPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(deletionHref)}`);
   }
 
-  const headerSession = await getHeaderSession(session.userId);
+  const [headerSession, recentAuthRequirement] = await Promise.all([
+    getHeaderSession(session.userId),
+    getMemberRecentAuthRequirement(session),
+  ]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -41,7 +45,10 @@ export default async function DeleteAccountPage({
       <main>
         <Container className="pb-16 pt-10" size="wide">
           <div className="mx-auto w-full max-w-2xl">
-            <MemberAccountDeletionView settingsHref={settingsHref} />
+            <MemberAccountDeletionView
+              settingsHref={settingsHref}
+              recentAuthRequirement={recentAuthRequirement}
+            />
           </div>
         </Container>
       </main>

@@ -84,6 +84,53 @@ export function normalizePartnerBenefitItems(
   });
 }
 
+/**
+ * Bridge for partners whose benefits still live only in the legacy
+ * `partners.benefits` text array without `partner_benefits` rows. The
+ * synthetic id is `legacy-benefit-{partnerId}-{n}` (1-based) so benefit-use
+ * links stay stable until the rows are backfilled; admin form drafts that
+ * have no partner yet use `legacy-benefit-{n}`. Build and parse these ids only
+ * through the helpers below.
+ */
+export const LEGACY_PARTNER_BENEFIT_ID_PREFIX = "legacy-benefit-";
+
+export function getLegacyPartnerBenefitId(
+  index: number,
+  partnerId?: string | null,
+) {
+  const position = index + 1;
+  return partnerId
+    ? `${LEGACY_PARTNER_BENEFIT_ID_PREFIX}${partnerId}-${position}`
+    : `${LEGACY_PARTNER_BENEFIT_ID_PREFIX}${position}`;
+}
+
+export function isLegacyPartnerBenefitId(id: string) {
+  return id.startsWith(LEGACY_PARTNER_BENEFIT_ID_PREFIX);
+}
+
+/** 1-based position encoded in a partner-scoped legacy id, or `null`. */
+export function parseLegacyPartnerBenefitPosition(id: string, partnerId: string) {
+  const prefix = `${LEGACY_PARTNER_BENEFIT_ID_PREFIX}${partnerId}-`;
+  const normalizedId = id.trim();
+  if (!normalizedId.startsWith(prefix)) {
+    return null;
+  }
+  const position = Number(normalizedId.slice(prefix.length));
+  return Number.isSafeInteger(position) && position >= 1 ? position : null;
+}
+
+export function buildLegacyPartnerBenefitItems(
+  titles: readonly string[],
+  partnerId?: string | null,
+): PartnerBenefit[] {
+  return normalizePartnerBenefitItems(
+    titles.map((title, index) => ({
+      id: getLegacyPartnerBenefitId(index, partnerId),
+      title,
+    })),
+  );
+}
+
 export function partnerBenefitItemsToTitles(items: readonly PartnerBenefit[]) {
   return items.map((item) => item.title);
 }
@@ -108,14 +155,8 @@ export function resolvePartnerBenefitById(
     return directMatch;
   }
 
-  const prefix = `legacy-benefit-${partnerId}-`;
-  const normalizedId = id.trim();
-  if (!normalizedId.startsWith(prefix)) {
-    return null;
-  }
-
-  const legacyIndex = Number(normalizedId.slice(prefix.length));
-  if (!Number.isSafeInteger(legacyIndex) || legacyIndex < 1) {
+  const legacyIndex = parseLegacyPartnerBenefitPosition(id, partnerId);
+  if (legacyIndex === null) {
     return null;
   }
 

@@ -44,14 +44,13 @@ export default defineConfig({
       reportsDirectory: path.join(dirname, ".tmp", "coverage", "unit"),
       include: [
         "src/components/partner-registration/registration-steps.ts",
-        "src/lib/admin-dashboard-scope.ts",
         "src/lib/admin-ia.ts",
         "src/lib/admin-member-detail.ts",
         "src/lib/content-budget.ts",
         "src/lib/e2e-mutation-mode.ts",
         "src/lib/home-directory-state.ts",
         "src/lib/partner-billing-action-errors.ts",
-        "src/lib/partner-portal-paths.ts",
+        "src/lib/partner-auth/portal-paths.ts",
       ],
       thresholds: {
         statements: 80,

@@ -13,8 +13,8 @@ import {
 } from "@/lib/partner-registration";
 import {
   getCompanyScopedPortalHref,
-} from "@/lib/partner-portal-paths";
-import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import {
@@ -24,6 +24,7 @@ import {
   resolvePartnerRegistrationMediaPayload,
 } from "@/lib/partner-registration-submit.server";
 import { getSafePartnerRegistrationError } from "@/lib/partner-registration-safe-errors";
+import { logServerError } from "@/lib/server-log";
 
 export async function createPartnerPortalBrandRegistrationRequestAction(
   _prevState: PartnerRegistrationActionState = PARTNER_REGISTRATION_INITIAL_ACTION_STATE,
@@ -94,7 +95,7 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
       branches,
     });
   } catch (error) {
-    console.error("[partner-portal:brand-registration] insert failed", error);
+    logServerError("[partner-portal:brand-registration] insert failed", error);
     const safeError = getSafePartnerRegistrationError(
       error,
       "제휴처 추가 신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",

@@ -54,3 +54,48 @@ export function splitSignedToken(token) {
     token.slice(separatorIndex + 1),
   ];
 }
+
+/**
+ * Appends an HMAC signature to an already-serialized payload. The wire format
+ * is `<payload>.<digest>` and must stay stable because every issued session,
+ * recovery, and QR token depends on it.
+ *
+ * @param {string} payload
+ * @param {string} secret
+ * @param {HmacDigestEncoding} [encoding="hex"]
+ * @returns {string}
+ */
+export function signPayloadWith(
+  payload,
+  secret,
+  encoding = "hex",
+) {
+  return `${payload}.${createHmacDigest(payload, secret, encoding)}`;
+}
+
+/**
+ * Returns the signed payload only when the signature matches in constant time.
+ *
+ * @param {string} token
+ * @param {string} secret
+ * @param {HmacDigestEncoding} [encoding="hex"]
+ * @returns {string | null}
+ */
+export function openSignedPayload(
+  token,
+  secret,
+  encoding = "hex",
+) {
+  if (typeof token !== "string" || !secret) {
+    return null;
+  }
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return null;
+  }
+  const [payload, signature] = signedToken;
+  if (!payload || !signature) {
+    return null;
+  }
+  return verifyHmacDigest(payload, signature, secret, encoding) ? payload : null;
+}

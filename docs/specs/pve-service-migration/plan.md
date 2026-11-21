@@ -1,8 +1,8 @@
 ---
 title: Production·Preview PVE 이전 기술 계획
 type: implementation-plan
-status: active
-authority: normative
+status: completed
+authority: evidence
 ---
 
 # 기술 계획
@@ -19,7 +19,7 @@ Grafana에 디렉터리를 bind mount할 때 비밀이 없는 provisioning·dash
 
 `deploy/pve/compose.relay.yaml`은 기존 수신기가 사용하는 loopback 앱 포트를 유지하면서 운영 VM의 요청을 컨테이너 네트워크로 전달한다. `relay-firewall.service`를 Docker보다 먼저 실행하고, 원본 목적지 포트별로 운영 VM 주소만 허용한다. 다른 방화벽 chain을 비우지 않는다. 공유기 DHCP 예약과 실제 guest 주소를 함께 확인한다.
 
-`compose.operations.yaml`의 Caddy 프로젝트 이름은 기존 자동 복구 도구가 사용하는 `ssartnership-edge`를 유지한다. `edge.Caddyfile`의 `PVE_PUBLIC_SERVICES_READY` 기본값은 0이며 앱·API 네 주소에 준비 중 503 응답을 반환한다. 두 환경의 최종 원본 snapshot 대조와 schema 검증 후에만 1로 변경하여 Caddy를 재생성한다. 이 값을 여는 순간부터 원본으로의 무조건 복귀를 금지하는 상태를 먼저 기록한다.
+`compose.operations.yaml`의 Caddy 프로젝트 이름은 기존 자동 복구 도구가 사용하는 `ssartnership-edge`를 유지한다. `edge.Caddyfile`의 `PVE_PUBLIC_SERVICES_READY` 기본값은 0이며 앱·API 네 주소에 준비 중 503 응답을 반환한다. 두 환경의 최종 원본 snapshot 대조와 schema 검증 후에만 1로 변경하여 Caddy를 재생성한다. 이 값을 여는 순간부터 원본으로의 무조건 복귀를 금지하는 상태를 먼저 기록한다. 공개 전환이 끝난 뒤 [Issue #531](https://github.com/MyKnow/ssartnership/issues/531)에서 이 게이트를 제거했다. 환경 변수가 빠져도 공개 origin이 503으로 닫히지 않으며, 다시 점검 창이 필요하면 Caddyfile에 임시 응답을 넣고 validate 후 reload한다.
 
 최초 이전에서는 MALMOA guest의 접근 정책을 유지하려고 `compose.legacy-relay.yaml`과 `legacy-relay-firewall.service`로 노트북의 private 9080 포트를 운영 VM에만 허용하고 MALMOA 두 환경·ClayFarm을 전달했다. 2026-10-02 [Issue #526](https://github.com/MyKnow/ssartnership/issues/526)의 후속 전환에서는 MALMOA를 공용 ingress VM에서 직접 연결하고 노트북 handler와 접근 허용을 제거했다. 이어 사용자 요청으로 ClayFarm API·노트북 relay·전용 firewall unit과 저장소의 legacy relay 배포 템플릿을 제거했다. 현재 경로·ClayFarm 종료 및 보존 범위·복구 절차는 [자체 호스팅 운영 문서](../../operations/runbooks/self-hosting.md#malmoa의-pve-직접-연결)를 기준으로 한다.
 

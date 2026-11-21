@@ -1,16 +1,21 @@
 import {
+  AdStatusTransitionError,
+  canDeleteAdCouponWithStatus,
+  canTransitionAdCampaignStatus,
+  canTransitionAdCouponStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
-  isAdCouponRedeemable,
   normalizeAdChannelsForTier,
   summarizeAdPackageMetrics,
   type AdPackageMetricEvent,
 } from "@/lib/ad-packages";
 import {
   assertValidAdCouponCodeBatch,
+  getAvailableCouponUsage,
   getCouponIssueCountSnapshot,
   getMemberIssueCountSnapshot,
   isMemberIssueLimitReached,
+  selectAvailableCouponsForMember,
 } from "@/lib/ad-coupon-domain";
 import {
   hashCouponVerificationPassword,
@@ -28,17 +33,17 @@ import type {
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  DeleteAdCouponResult,
   DuplicateAdCouponInput,
   IssueAdCouponInput,
   IssueAdCouponResult,
   ListAvailableCouponsForMemberInput,
   ListIssuedCouponsForMemberInput,
   PreparedAdminCampaigns,
-  RedeemAdCouponInput,
   RedeemAdCouponIssueInput,
   RedeemAdCouponIssueResult,
-  RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
+  UpdateAdCampaignStatusResult,
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 
@@ -66,35 +71,12 @@ function cloneCoupon(coupon: AdCoupon): AdCoupon {
   };
 }
 
-function cloneRedemption(redemption: AdCouponRedemption): AdCouponRedemption {
-  return { ...redemption };
-}
-
-function getTime(value: string) {
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
-}
-
 function toAvailableCoupon(
   coupon: AdCoupon,
   memberUsedCount: number,
 ): AvailableAdCoupon | null {
-  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
-  const remainingGlobalUses =
-    typeof coupon.usageLimit === "number"
-      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
-      : null;
-
-  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
-    return null;
-  }
-
-  return {
-    coupon: cloneCoupon(coupon),
-    memberUsedCount,
-    remainingMemberUses,
-    remainingGlobalUses,
-  };
+  const usage = getAvailableCouponUsage(coupon, memberUsedCount);
+  return usage ? { ...usage, coupon: cloneCoupon(usage.coupon) } : null;
 }
 
 function createMockCampaigns(): AdCampaign[] {
@@ -330,7 +312,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
       return [];
     }
 
-    return this.coupons
+    const candidates = this.coupons
       .filter((coupon) => partnerIds.has(coupon.partnerId))
       .map((coupon) => ({
         coupon: {
@@ -339,54 +321,16 @@ export class MockAdPackageRepository implements AdPackageRepository {
         },
         campaign: this.campaigns.find((campaign) => campaign.id === coupon.campaignId),
         memberUsedCount: this.countCouponRedemptions(coupon.id, input.memberId),
-      }))
-      .filter(({ coupon, campaign }) =>
-        isAdCouponDownloadable({
-          coupon,
-          campaign,
-          now,
-        }),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getCouponIssueCountSnapshot({
-            couponId: coupon.id,
-            limits: {
-              daily: coupon.dailyIssueLimit,
-              weekly: coupon.weeklyIssueLimit,
-              monthly: coupon.monthlyIssueLimit,
-            },
-            records: this.issues,
-            now,
-          }),
-        ),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getMemberIssueCountSnapshot({
-            couponId: coupon.id,
-            memberId: input.memberId,
-            limits: {
-              daily: coupon.perMemberDailyIssueLimit,
-              weekly: coupon.perMemberWeeklyIssueLimit,
-              monthly: coupon.perMemberMonthlyIssueLimit,
-            },
-            records: this.issues,
-            now,
-          }),
-        ),
-      )
-      .map(({ coupon, memberUsedCount }) =>
-        toAvailableCoupon(coupon, memberUsedCount),
-      )
-      .filter((item): item is AvailableAdCoupon => Boolean(item))
-      .sort((left, right) => {
-        const endDiff = getTime(left.coupon.endsAt) - getTime(right.coupon.endsAt);
-        if (endDiff !== 0) {
-          return endDiff;
-        }
-        return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
-      });
+      }));
+
+    return selectAvailableCouponsForMember({
+      candidates,
+      couponIssueRecords: this.issues,
+      memberIssueRecords: this.issues.filter(
+        (issue) => issue.memberId === input.memberId,
+      ),
+      now,
+    }).map((item) => ({ ...item, coupon: cloneCoupon(item.coupon) }));
   }
 
   async createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign> {
@@ -414,13 +358,26 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return cloneCampaign(campaign);
   }
 
-  async updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void> {
+  async updateCampaignStatus(
+    input: UpdateAdCampaignStatusInput,
+  ): Promise<UpdateAdCampaignStatusResult> {
+    const current = this.campaigns.find((campaign) => campaign.id === input.campaignId);
+    if (!current) {
+      return { ok: false, reason: "not_found" };
+    }
+    if (!canTransitionAdCampaignStatus(current.status, input.status)) {
+      return { ok: false, reason: "invalid_transition", from: current.status };
+    }
+    if (current.status === input.status) {
+      return { ok: true };
+    }
     const now = isoNow();
     this.campaigns = this.campaigns.map((campaign) =>
       campaign.id === input.campaignId
         ? { ...campaign, status: input.status, updatedAt: now }
         : campaign,
     );
+    return { ok: true };
   }
 
   async createCoupon(input: CreateAdCouponInput): Promise<AdCoupon> {
@@ -492,6 +449,11 @@ export class MockAdPackageRepository implements AdPackageRepository {
         throw new Error("같은 제휴처의 캠페인만 연결할 수 있습니다.");
       }
     }
+    // Same transition table as the Supabase repository (ended is terminal).
+    const nextStatus = input.status ?? "draft";
+    if (!canTransitionAdCouponStatus(existing.status, nextStatus)) {
+      throw new AdStatusTransitionError("coupon", existing.status, nextStatus);
+    }
 
     const redemptionType = input.redemptionType ?? existing.redemptionType;
     if (redemptionType === "onsite" && !input.onsitePassword && !this.couponPasswords.has(existing.id)) {
@@ -516,7 +478,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
       redemptionType,
       discountLabel: input.discountLabel ?? "",
       terms: [...(input.terms ?? [])],
-      status: input.status ?? "draft",
+      status: nextStatus,
       startsAt: input.startsAt,
       endsAt: input.endsAt,
       downloadStartsAt: input.downloadStartsAt ?? input.startsAt,
@@ -572,20 +534,24 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return cloneCoupon(duplicate);
   }
 
-  async deleteCoupon(couponId: string) {
-    if (!this.coupons.some((coupon) => coupon.id === couponId)) {
+  async deleteCoupon(couponId: string): Promise<DeleteAdCouponResult> {
+    const coupon = this.coupons.find((item) => item.id === couponId);
+    if (!coupon) {
       throw new Error("쿠폰을 찾을 수 없습니다.");
     }
     if (
       this.issues.some((issue) => issue.couponId === couponId) ||
       this.redemptions.some((redemption) => redemption.couponId === couponId)
     ) {
-      return { ok: false, reason: "usage_history" } as const;
+      return { ok: false, reason: "usage_history" };
+    }
+    if (!canDeleteAdCouponWithStatus(coupon.status)) {
+      return { ok: false, reason: "active" };
     }
     this.coupons = this.coupons.filter((coupon) => coupon.id !== couponId);
     this.couponCodes.delete(couponId);
     this.couponPasswords.delete(couponId);
-    return { ok: true } as const;
+    return { ok: true };
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {
@@ -810,84 +776,6 @@ export class MockAdPackageRepository implements AdPackageRepository {
       couponId: coupon.id,
       issueId: issue.id,
       assignedCode: issue.assignedCode,
-    };
-  }
-
-  async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
-    const coupon = this.coupons.find((item) => item.id === input.couponId);
-    if (!coupon) {
-      return {
-        ok: false,
-        reason: "not_found",
-        message: "쿠폰을 찾을 수 없습니다.",
-      };
-    }
-
-    const usedCount = this.countCouponRedemptions(coupon.id);
-    const campaign = this.campaigns.find((item) => item.id === coupon.campaignId);
-    const couponWithCount = { ...coupon, usedCount };
-    if (coupon.redemptionType === "onsite") {
-      return {
-        ok: false,
-        reason: "onsite_verification_required",
-        message: "현장형 쿠폰은 쿠폰함의 제휴처 확인 화면에서 사용해 주세요.",
-        coupon: cloneCoupon(couponWithCount),
-      };
-    }
-    if (!isAdCouponRedeemable({ coupon: couponWithCount, campaign })) {
-      return {
-        ok: false,
-        reason: usedCount >= (coupon.usageLimit ?? Number.POSITIVE_INFINITY)
-          ? "usage_limit"
-          : "inactive",
-        message: "현재 사용할 수 없는 쿠폰입니다.",
-        coupon: cloneCoupon(couponWithCount),
-      };
-    }
-
-    if (
-      input.memberId &&
-      this.redemptions.filter(
-        (redemption) =>
-          redemption.couponId === coupon.id &&
-          redemption.memberId === input.memberId,
-      ).length >= coupon.perMemberLimit
-    ) {
-      return {
-        ok: false,
-        reason: "member_limit",
-        message: "이미 사용할 수 있는 횟수를 모두 사용했습니다.",
-        coupon: cloneCoupon(couponWithCount),
-      };
-    }
-
-    const redemption: AdCouponRedemption = {
-      id: `redemption-${crypto.randomUUID()}`,
-      couponId: coupon.id,
-      campaignId: coupon.campaignId,
-      partnerId: coupon.partnerId,
-      memberId: input.memberId ?? null,
-      sessionId: input.sessionId ?? null,
-      redemptionCode: coupon.code,
-      createdAt: isoNow(),
-    };
-    this.redemptions = [redemption, ...this.redemptions];
-    this.events = [
-      {
-        eventName: "coupon_redeem",
-        campaignId: coupon.campaignId,
-        couponId: coupon.id,
-      },
-      ...this.events,
-    ];
-
-    return {
-      ok: true,
-      coupon: {
-        ...cloneCoupon(coupon),
-        usedCount: usedCount + 1,
-      },
-      redemption: cloneRedemption(redemption),
     };
   }
 

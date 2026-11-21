@@ -38,8 +38,9 @@ test("알림 템플릿 액션은 예측 가능한 입력 오류를 throw하거�
     readFile(pagePath, "utf8"),
   ]);
 
-  assert.match(actions, /error=invalid_request/);
-  assert.match(actions, /error=save_failed/);
+  assert.match(actions, /redirectAdminActionError\(PATH, "invalid_request"\)/);
+  assert.match(actions, /redirectAdminActionError\(PATH, "save_failed"\)/);
+  assert.doesNotMatch(actions, /\?error=/);
   assert.doesNotMatch(actions, /getSafeAdminMessage/);
   assert.doesNotMatch(actions, /throw new Error\("알림 (?:채널|템플릿 대상)/);
   assert.match(page, /getNotificationTemplateFeedback/);

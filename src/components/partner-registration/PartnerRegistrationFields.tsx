@@ -34,7 +34,7 @@ export function PartnerRegistrationField({
         ) : (
           <span
             aria-label="선택 입력"
-            className="inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-surface-control px-1.5 text-[10px] font-semibold leading-none tracking-normal text-muted-foreground"
+            className="inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-surface-control px-1.5 text-xs font-semibold leading-none tracking-normal text-muted-foreground"
           >
             선택
           </span>

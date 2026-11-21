@@ -63,22 +63,22 @@ async function AdminPushContent({
           items={[
             {
               label: "회원 대상",
-              value: `${readModel.memberCount.toLocaleString()}명`,
+              value: `${readModel.memberCount.toLocaleString("ko-KR")}명`,
               hint: "개인·기수·캠퍼스 기준",
             },
             {
               label: "제휴처 대상",
-              value: `${readModel.partnerCount.toLocaleString()}개`,
+              value: `${readModel.partnerCount.toLocaleString("ko-KR")}개`,
               hint: "신규 제휴/종료 임박 연결",
             },
             {
               label: "최근 로그",
-              value: `${recentLogCount.toLocaleString()}건`,
+              value: `${recentLogCount.toLocaleString("ko-KR")}건`,
               hint: "최근 30일 운영 로그",
             },
             {
               label: "자동 규칙",
-              value: `${automaticSummaryCount.toLocaleString()}개`,
+              value: `${automaticSummaryCount.toLocaleString("ko-KR")}개`,
               hint: "예약/자동 발송 요약",
             },
           ]}

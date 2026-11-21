@@ -20,21 +20,12 @@ import {
   redirectAdminActionError,
   revalidatePartnerCompanyData,
 } from "./shared-helpers";
-import type { PartnerCompanyCrudInput, PartnerCompanyRow } from "./shared-types";
-
-function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
-  if (!row) {
-    return null;
-  }
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description ?? null,
-    is_active: row.is_active ?? true,
-    managed_campus_slugs: row.managed_campus_slugs ?? [],
-  } satisfies PartnerCompanyRow;
-}
+import type { PartnerCompanyCrudInput } from "./shared-types";
+import {
+  PARTNER_COMPANY_SELECT,
+  normalizePartnerCompanyRow,
+  type PartnerCompanyRow,
+} from "@/lib/partner-admin/company-account-rows";
 
 export async function createCategoryAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "create", {
@@ -153,7 +144,7 @@ export async function createPartnerCompanyAction(formData: FormData) {
       is_active: payload.isActive,
       managed_campus_slugs: managedCampusSlugs,
     })
-    .select("id,name,slug,description,is_active,managed_campus_slugs")
+    .select(PARTNER_COMPANY_SELECT)
     .single();
 
   if (error) {
@@ -202,7 +193,7 @@ export async function updatePartnerCompanyAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: existingCompany, error: companyError } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active,managed_campus_slugs,created_at,updated_at")
+    .select(`${PARTNER_COMPANY_SELECT},created_at,updated_at`)
     .eq("id", payload.companyId)
     .maybeSingle();
 
@@ -295,7 +286,7 @@ export async function deletePartnerCompanyAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: existingCompany, error: companyError } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active,managed_campus_slugs")
+    .select(PARTNER_COMPANY_SELECT)
     .eq("id", companyId)
     .maybeSingle();
 
@@ -328,7 +319,11 @@ export async function deletePartnerCompanyAction(formData: FormData) {
     .eq("id", companyId);
 
   if (deleteError) {
-    redirectAdminActionError("/admin/companies", "company_invalid_request");
+    // Invoices restrict company deletion so billing records are never erased.
+    redirectAdminActionError(
+      "/admin/companies",
+      deleteError.code === "23503" ? "company_has_billing_records" : "company_invalid_request",
+    );
   }
 
   await logAdminAction("partner_company_delete", {

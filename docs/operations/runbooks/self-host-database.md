@@ -21,7 +21,7 @@ npm run self-host:database -- status --env-file .tmp/self-host/data.env
 npm run self-host:database -- smoke --env-file .tmp/self-host/data.env
 ```
 
-`up`의 성공, migration 적용 수, smoke의 대표 RPC·권한·파일 결과를 각각 기록한다. `migrate`를 다시 실행했을 때 기존 파일의 checksum을 확인하고 중복 적용하지 않아야 한다. 실패한 파일을 건너뛰거나 과거 migration을 수정하지 않는다. 컨테이너 재시작 후 같은 데이터·파일이 남아 있는지도 확인한다.
+`up`의 성공, migration 적용 수, smoke의 대표 RPC·권한·파일 결과를 각각 기록한다. smoke는 anon 키의 테이블 읽기·쓰기·RPC 호출 거부와, 읽기 전용 transaction에서 센 브라우저 역할 노출 함수·테이블 수 0을 함께 확인한다. `migrate`를 다시 실행했을 때 기존 파일의 checksum을 확인하고 중복 적용하지 않아야 한다. 실패한 파일을 건너뛰거나 과거 migration을 수정하지 않는다. 컨테이너 재시작 후 같은 데이터·파일이 남아 있는지도 확인한다.
 
 이 `up`은 백업 overlay를 아직 도입하지 않은 초기 환경 전용이다. 백업을 활성화한 뒤에는 [운영 overlay의 canonical 시작 명령](./self-host-operations.md)을 사용하여 기본 DB 이미지로 재생성하거나 WAL 설정을 제거하지 않는다.
 
@@ -39,7 +39,7 @@ node -- deploy/self-host/write-local-runtime-env.mjs --data-env-file .tmp/self-h
 
 ## Preview와 임시 환경
 
-현재 클라우드에는 별도 운영 프로젝트와 지속형 Preview 프로젝트가 있다. 두 환경의 분리를 그대로 유지하는 것이 우선이며, 임시 테스트 환경은 필요할 때 별도 Compose 프로젝트로 생성한다.
+운영과 지속형 Preview는 PVE 자체 호스팅에서 분리 운영한다. 두 환경의 분리를 그대로 유지하는 것이 우선이며, 임시 테스트 환경은 필요할 때 별도 Compose 프로젝트로 생성한다.
 
 ```bash
 npm run self-host:database -- init --env-file .tmp/self-host/preview.env --project ssartnership-preview --port 58001
@@ -48,13 +48,13 @@ npm run self-host:database -- migrate --env-file .tmp/self-host/preview.env
 npm run self-host:database -- down --env-file .tmp/self-host/preview.env
 ```
 
-독립 포트·난수 비밀·named volume을 사용하므로 종료 후에도 해당 환경의 데이터가 남는다. 기본 명령은 볼륨을 삭제하지 않는다. 불필요한 테스트 볼륨 정리는 정확한 환경과 복구 필요성을 확인한 별도 작업이다. 운영 자료 복제가 필요하면 기존 `sync:preview` sanitizer의 회원 비밀번호 hash/salt 제거 계약과 Storage 개인정보 범위를 적용한다. 현재 CLI는 운영 데이터를 자동 복사하지 않는다.
+독립 포트·난수 비밀·named volume을 사용하므로 종료 후에도 해당 환경의 데이터가 남는다. 기본 명령은 볼륨을 삭제하지 않는다. 불필요한 테스트 볼륨 정리는 정확한 환경과 복구 필요성을 확인한 별도 작업이다. 운영 자료 복제가 필요하면 [Production/Preview 격리와 데이터 복사](./self-host-environments.md)의 `prepare-copy`와 `sanitize.mjs` 계약(비밀 컬럼 센티넬 치환, 미검토 비밀 컬럼 fail-closed, 이메일 마스킹, 로그·시도·구독 테이블 비우기)과 Storage 범위를 적용한다. 폐기된 Cloud `sync:preview` sanitizer는 사용하지 않는다. 이 CLI는 운영 데이터를 자동 복사하지 않는다.
 
 ## 관리와 전환
 
 환경 생성·마이그레이션·상태·백업은 신뢰된 로컬 사용자 또는 SSH 운영자가 실행한다. 공개 Management API나 Docker 소켓을 제공하지 않는다. CI는 운영 비밀 없이 이미지를 만들고, 배포 운영자는 검증한 digest와 해당 환경 비밀을 적용한다. 서버 runner·registry·배포 이벤트 연결은 실제 서버 접근 후 검증한다.
 
-홈 서버 ingress 전환 전에는 신뢰 proxy와 client IP 전달 계약을 반드시 구현·검증한다. 현재 `src/lib/client-ip.ts`는 Vercel 밖에서 IP를 알 수 없으므로 일부 제한이 공통 `unknown` 대상으로 묶인다. 임의 `X-Forwarded-For`를 믿거나 `VERCEL=1`로 위장하여 해결하지 않는다.
+client IP는 [클라이언트 IP 신뢰 계약](../../security/client-ip-trust.md)에 따라 `SELF_HOST_MODE=real`에서 엣지·relay 체인이 기록한 `X-Forwarded-For` 첫 값만 신뢰한다. ingress 구성을 바꿀 때는 이 계약의 배포 체인 전제와 계약 테스트를 함께 확인한다. 앱 포트를 relay 밖으로 게시하거나 엣지에 `trusted_proxies`를 추가해 임의 전달 헤더를 믿게 만들지 않는다.
 
 로컬 데이터 Compose의 기본 network는 `internal: true`다. DB·REST·Storage는 이 내부망만 사용하고, loopback 포트 연결이 필요한 앱·gateway에만 별도 `edge` network를 연결한다. `edge`는 외부 송신이 가능하므로 운영에서는 방화벽·egress 정책과 SMTP·Mattermost·push 목적지를 별도로 검증한다. 로컬 앱 파일의 `.test` 연동 값은 실제 발송 성공의 근거가 아니다.
 

@@ -127,3 +127,78 @@ export const Loading: Story = {
 export const Error: Story = {
   render: () => <HomeDirectoryError />,
 };
+
+
+export const SavedPartners: Story = {
+  parameters: { nextjs: { appDirectory: true, navigation: { pathname: "/", query: { saved: "1" } } } },
+  render: ({ partners }) => (
+    <ToastProvider>
+      <HomeView categories={categories} partners={partners} viewerAuthenticated currentUserId="story-member-1"
+        partnerFavoriteStateById={{ [partners[0].id]: true }} loadedFavoritePartnerIds={partners.map((partner) => partner.id)} />
+    </ToastProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "즐겨찾기" })).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.getAllByTestId("partner-card")).toHaveLength(1);
+    await expect(canvas.getByRole("link", { name: /바디라인 역삼점 상세 보기/ })).toBeVisible();
+  },
+};
+
+export const EmptySavedPartners: Story = {
+  parameters: { nextjs: { appDirectory: true, navigation: { pathname: "/", query: { saved: "1" } } } },
+  render: ({ partners }) => (
+    <ToastProvider>
+      <HomeView categories={categories} partners={partners} viewerAuthenticated currentUserId="story-member-1"
+        partnerFavoriteStateById={{}} loadedFavoritePartnerIds={partners.map((partner) => partner.id)} />
+    </ToastProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("조건에 맞는 즐겨찾기가 없어요")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "전체 제휴처 보기" })).toBeVisible();
+  },
+};
+
+export const GuestSavedPartners: Story = {
+  parameters: { nextjs: { appDirectory: true, navigation: { pathname: "/", query: { saved: "1", category: "food" } } } },
+  render: ({ partners }) => (
+    <ToastProvider>
+      <HomeView categories={categories} partners={partners} viewerAuthenticated={false} currentUserId={null} />
+    </ToastProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const login = canvas.getByRole("link", { name: "로그인하기" });
+    await expect(login).toBeVisible();
+    const href = new URL(login.getAttribute("href")!, "https://example.com");
+    const returnTo = new URL(href.searchParams.get("returnTo")!, "https://example.com");
+    await expect(returnTo.searchParams.get("saved")).toBe("1");
+    await expect(returnTo.searchParams.get("category")).toBe("food");
+  },
+};
+
+/** #603: inspect comparison in the actual directory grid, not a lone card. */
+export const BenefitComparison: Story = {
+  args: {
+    partners: [
+      createPartner(41, { name: "바디라인 역삼점", category: "health", benefits: ["헬스 1개월 33,000원", "신규 등록 시 운동복 무료 대여"] }),
+      createPartner(42, { name: "오늘의 한 끼", benefits: ["평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인", "음료 무료 업그레이드", "추가 적립"] }),
+      createPartner(43, { name: "커리어 스튜디오", category: "education", benefits: ["취업 사진 패키지 20% 할인", "예약 시 의상 무료 대여"] }),
+      createPartner(44, { name: "역삼 캠퍼스 샐러드 바", benefits: ["샐러드 전 메뉴 10% 할인", "점심 세트 음료 무료 업그레이드"] }),
+    ],
+  },
+};
+
+export const BenefitComparisonList: Story = {
+  args: BenefitComparison.args,
+  parameters: {
+    nextjs: { appDirectory: true, navigation: { pathname: "/", query: { view: "list" } } },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByTestId("partner-card")).toHaveLength(4);
+    await expect(canvas.getByText("평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인")).toBeVisible();
+    await expect(canvas.getAllByText("적용 대상", { exact: true }).length).toBeGreaterThanOrEqual(4);
+  },
+};

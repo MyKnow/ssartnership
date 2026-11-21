@@ -1,9 +1,12 @@
-import Link from "next/link";
+import Image from "next/image";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import ShowcaseWithdrawButton from "@/components/project-showcase/ShowcaseWithdrawButton";
+import { SHOWCASE_PROJECT_HERO_IMAGE_SIZES } from "@/components/project-showcase/image-sizes";
 import Button from "@/components/ui/Button";
 import { getHeaderSession } from "@/lib/header-session";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { SHOWCASE_OWNER_STATUS_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import {
@@ -12,8 +15,14 @@ import {
   type ShowcaseProjectStatus,
 } from "@/lib/project-showcase/types";
 import { getSignedUserSession } from "@/lib/user-auth";
+import BackLink from "@/components/ui/BackLink";
 
 export const dynamic = "force-dynamic";
+
+// Member-only participation screens are never search results.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 const STATUS_GUIDANCE: Record<ShowcaseProjectStatus, string> = {
   pending: "운영진이 개발 참여 여부와 링크 접속을 확인하고 있어요. 확인 전에는 내용을 수정할 수 있어요.",
@@ -55,7 +64,7 @@ export default async function MyShowcaseProjectPage({
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-4xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
-        <Link href="/events/project-showcase/my" className="text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">← 내 참여로 돌아가기</Link>
+        <BackLink href="/events/project-showcase/my">내 참여로 돌아가기</BackLink>
 
         <section className="mt-7 grid gap-3 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="my-showcase-status-heading">
           <div className="flex flex-wrap items-center gap-2">
@@ -104,9 +113,14 @@ export default async function MyShowcaseProjectPage({
         ) : null}
 
         <article className="mt-6 overflow-hidden rounded-3xl border border-border bg-surface">
-          <div className="aspect-video w-full overflow-hidden bg-surface-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
+          <div className="relative aspect-video w-full overflow-hidden bg-surface-muted">
+            <Image
+              src={getCachedImageUrl(project.imageUrl)}
+              alt={`${project.title} 대표 이미지`}
+              fill
+              sizes={SHOWCASE_PROJECT_HERO_IMAGE_SIZES}
+              className="object-cover"
+            />
           </div>
           <div className="grid gap-6 p-5 sm:p-8">
             <div>

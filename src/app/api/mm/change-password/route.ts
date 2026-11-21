@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { revalidateMemberGatePaths } from "@/lib/member-gate-revalidation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
 import { hashPassword, isValidPassword, verifyPassword } from "@/lib/password";
@@ -91,11 +91,11 @@ export async function POST(request: Request) {
     }
     const payload = await parseMemberAuthJsonBody<{
       currentPassword?: string;
-      nextPassword?: string;
+      nextPassword?: unknown;
     }>(request);
-    const currentPassword = String(payload.currentPassword ?? "").trim();
-    const nextPassword = String(payload.nextPassword ?? "").trim();
-    if (!currentPassword || !nextPassword) {
+    const currentPassword = String(payload?.currentPassword ?? "").trim();
+    const nextPassword = payload?.nextPassword;
+    if (!currentPassword || nextPassword === undefined || nextPassword === null || nextPassword === "") {
       await logAuthSecurity({
         ...context,
         eventName: "member_password_change",
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       await delayMemberAuthAttempt("change-password");
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
-    if (!isValidPassword(nextPassword)) {
+    if (typeof nextPassword !== "string" || !isValidPassword(nextPassword)) {
       await logAuthSecurity({
         ...context,
         eventName: "member_password_change",
@@ -210,10 +210,7 @@ export async function POST(request: Request) {
     await setUserSession(session.userId, false, {
       freshAuthentication: true,
     });
-    revalidatePath("/auth/change-password");
-    revalidatePath("/auth/consent");
-    revalidatePath("/certification");
-    revalidatePath("/");
+    revalidateMemberGatePaths();
     await recordMemberAuthAttempt("change-password", throttleContext, true);
     await logAuthSecurity({
       ...context,

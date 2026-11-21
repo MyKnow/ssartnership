@@ -7,7 +7,7 @@ import type {
   PartnerNotificationEntry,
   PartnerNotificationTone,
 } from "@/lib/partner-notification-contract";
-import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-auth/portal-paths";
 
 function formatPeriod(
   start: string | null | undefined,

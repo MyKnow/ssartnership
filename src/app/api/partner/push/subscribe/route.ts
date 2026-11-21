@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import { isPushConfigured } from "@/lib/push";
 import { upsertOperationalPushSubscription } from "@/lib/operational-notifications";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
@@ -11,6 +11,7 @@ import { MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES } from "@/lib/request-body-limit"
 import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -23,10 +24,11 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   if (!isPushConfigured()) {
     return NextResponse.json({ message: "서버 알림 설정이 아직 완료되지 않았습니다." }, { status: 503 });
   }
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-push-subscribe] request failed", error);
+      logServerError("[partner-push-subscribe] request failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

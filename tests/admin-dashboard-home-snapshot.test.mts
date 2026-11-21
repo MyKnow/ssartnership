@@ -65,7 +65,10 @@ test("관리 홈 snapshot은 권한 범위를 포함한 짧은 서버 캐시를 
   );
 
   assert.match(source, /unstable_cache/);
-  assert.match(source, /ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(
+    source,
+    /ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS =\s*ADMIN_READ_BURST_CACHE_SECONDS/,
+  );
   assert.match(source, /getCachedAdminDashboardHomeSnapshot\(\{/);
   assert.match(source, /managedCampusSlugs: getManagedCampusFilterValues\(account\)/);
 });
@@ -82,6 +85,9 @@ test("기수 설정은 짧은 서버 캐시를 사용하고 cycle 변경 시 즉
   assert.match(settingsSource, /unstable_cache/);
   assert.match(settingsSource, /revalidate: SSAFY_CYCLE_SETTINGS_CACHE_SECONDS/);
   assert.match(settingsSource, /tags: \[SSAFY_CYCLE_SETTINGS_CACHE_TAG\]/);
-  assert.match(settingsSource, /const SSAFY_CYCLE_SETTINGS_CACHE_SECONDS = 60/);
-  assert.match(helpersSource, /revalidateTag\("ssafy-cycle-settings", "max"\)/);
+  assert.match(
+    settingsSource,
+    /const SSAFY_CYCLE_SETTINGS_CACHE_SECONDS = SLOW_CHANGING_DATA_CACHE_SECONDS/,
+  );
+  assert.match(helpersSource, /revalidateTag\(SSAFY_CYCLE_SETTINGS_CACHE_TAG, "max"\)/);
 });

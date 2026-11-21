@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -35,10 +35,11 @@ export async function PATCH(
     return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getPartnerSession().catch(() => null);
-  if (!session || session.mustChangePassword) {
-    return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   const { reviewId } = await context.params;
   let body: unknown = {};

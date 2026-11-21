@@ -10,7 +10,7 @@ type MemberEmailSecurityLogContext = {
 };
 
 type MemberEmailSecurityFlow = "verification" | "recovery";
-type MemberEmailSecurityStage = "send" | "verify";
+type MemberEmailSecurityStage = "send" | "verify" | "change_notice";
 type MemberEmailSecurityStatus = "success" | "failure" | "blocked";
 
 type MemberEmailSecurityLogInput = {

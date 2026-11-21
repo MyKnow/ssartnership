@@ -16,6 +16,20 @@ export function getPreferenceKey(type: PushNotificationType) {
   }
 }
 
+/**
+ * 회원 전체/기수/캠퍼스 대상 즉시 발송(sendPushToAudience)은 인앱 수신자를
+ * 대상 전원으로 붙이고 마케팅 동의 기록을 확인하지 않는다. 광고성 알림은
+ * 수신 동의·철회를 확인하는 관리자 캠페인 발송(sendAdminNotificationCampaign)만 쓴다.
+ */
+export function assertAudiencePushPayloadType(type: PushNotificationType) {
+  if (type === "marketing") {
+    throw new PushError(
+      "invalid_request",
+      "광고성 알림은 수신 동의를 확인하는 관리자 알림 발송에서만 보낼 수 있습니다.",
+    );
+  }
+}
+
 export function sanitizeNotificationUrl(value?: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) {

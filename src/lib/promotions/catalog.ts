@@ -71,6 +71,8 @@ export type EventCampaign = {
   endsAt: string;
   heroImageSrc: string;
   heroImageAlt: string;
+  /** 1200x630 raster for og:image. Crawlers reject SVG heroes. */
+  shareImageSrc?: string;
   conditions: EventCondition[];
   rules: string[];
 };

@@ -6,7 +6,7 @@ import {
   isPartnerCompanySelectionPath,
   shouldShowPartnerPortalMobileNavigation,
   shouldUsePartnerPortalDashboardShell,
-} from "../src/lib/partner-portal-layout.ts";
+} from "../src/lib/partner-auth/portal-layout.ts";
 
 describe("partner portal layout", () => {
   it("keeps the company selection page outside the dashboard shell", () => {

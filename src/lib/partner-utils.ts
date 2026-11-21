@@ -1,3 +1,5 @@
+import { getKstDateString } from "@/lib/datetime";
+
 export function parseDate(value?: string | null) {
   if (!value) {
     return null;
@@ -11,14 +13,8 @@ export function parseDate(value?: string | null) {
   return new Date(`${value}T00:00:00`);
 }
 
-export function getKstDateString() {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const year = kst.getUTCFullYear();
-  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(kst.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+// KST 날짜 계산은 datetime.ts 한 곳에 두고 기존 import 경로는 재노출로 유지한다.
+export { getKstDateString };
 
 export type PartnerPeriodState = "upcoming" | "active" | "expired";
 

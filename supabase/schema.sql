@@ -13,7 +13,7 @@ create table if not exists categories (
   description text,
   color text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 alter table categories add column if not exists color text;
@@ -3376,6 +3376,7 @@ create table if not exists public.partner_benefits (
   constraint partner_benefits_partner_title_unique unique (partner_id, title)
 );
 create index if not exists partner_benefits_partner_order_idx on public.partner_benefits(partner_id, display_order, id);
+create unique index if not exists partner_benefits_partner_title_unique_idx on public.partner_benefits(partner_id, title);
 alter table public.partner_benefits enable row level security;
 alter table public.partner_benefit_usages add column if not exists benefit_id uuid references public.partner_benefits(id) on delete set null;
 create index if not exists partner_benefit_usages_benefit_verified_at_idx on public.partner_benefit_usages(benefit_id, verified_at desc);
@@ -5487,31 +5488,12 @@ create index if not exists partner_notification_recipients_account_created_idx
   on partner_notification_recipients(account_id, created_at desc);
 create index if not exists partner_notification_deliveries_notification_idx
   on partner_notification_deliveries(notification_id);
-create index if not exists members_year_created_at_idx
-  on members(year desc, created_at desc);
 create index if not exists members_created_at_idx
   on members(created_at desc);
 create index if not exists members_display_name_idx
   on members(display_name);
-create index if not exists members_year_campus_display_name_idx
-  on members(year, campus, display_name);
 create index if not exists members_campus_display_name_idx
   on members(campus, display_name);
-create index if not exists members_admin_permission_id_idx
-  on members(admin_permission_id)
-  where admin_permission_id is not null;
-create index if not exists members_admin_managed_campus_slugs_idx
-  on members using gin(admin_managed_campus_slugs)
-  where cardinality(admin_managed_campus_slugs) > 0;
-create unique index if not exists members_ssafy_sub_key
-  on members(ssafy_sub)
-  where ssafy_sub is not null;
-create unique index if not exists members_ssafy_mattermost_user_id_key
-  on members(ssafy_mattermost_user_id)
-  where ssafy_mattermost_user_id is not null;
-create index if not exists members_ssafy_track_idx
-  on members(ssafy_track)
-  where ssafy_track is not null;
 create index if not exists partner_companies_managed_campus_slugs_idx
   on partner_companies using gin(managed_campus_slugs);
 create index if not exists partners_managed_campus_slugs_idx
@@ -5842,6 +5824,16 @@ create unique index if not exists ad_coupon_issues_active_member_idx
   on ad_coupon_issues(coupon_id, member_id) where status = 'issued';
 create index if not exists ad_coupon_issues_member_coupon_issued_idx
   on ad_coupon_issues(coupon_id, member_id, issued_at desc);
+create index if not exists ad_coupon_issues_member_created_idx
+  on ad_coupon_issues(member_id, issued_at desc);
+create index if not exists ad_coupon_issues_coupon_created_idx
+  on ad_coupon_issues(coupon_id, issued_at desc);
+create index if not exists ad_coupon_codes_available_idx
+  on ad_coupon_codes(coupon_id, created_at)
+  where status = 'available';
+create index if not exists ad_coupon_redemptions_issue_idx
+  on ad_coupon_redemptions(issue_id, created_at desc)
+  where issue_id is not null;
 
 create or replace function public.issue_ad_coupon(
   p_coupon_id uuid,
@@ -6165,6 +6157,39 @@ create index if not exists promotion_slides_event_slug_idx
   on promotion_slides(event_slug);
 create index if not exists promotion_slides_ad_campaign_idx
   on promotion_slides(ad_campaign_id);
+
+-- 20260501000000_promotion_events.sql / 20260501001000_promotion_slides.sql
+create or replace function set_promotion_events_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists promotion_events_set_updated_at on promotion_events;
+create trigger promotion_events_set_updated_at
+before update on promotion_events
+for each row
+execute function set_promotion_events_updated_at();
+
+create or replace function public.set_promotion_slides_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists promotion_slides_set_updated_at on public.promotion_slides;
+create trigger promotion_slides_set_updated_at
+before update on public.promotion_slides
+for each row
+execute function public.set_promotion_slides_updated_at();
 
 create table if not exists event_reward_draws (
   id uuid primary key default uuid_generate_v4(),
@@ -8079,60 +8104,13 @@ begin
 end;
 $$;
 
-drop function if exists public.update_partner_immediate_fields_with_audit(
-  uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text,
-  text, text, text, text, jsonb
-);
-
-create or replace function public.update_partner_immediate_fields_with_audit(
-  p_partner_id uuid, p_company_ids uuid[], p_thumbnail text, p_images text[],
-  p_tags text[], p_benefit_action_type text, p_benefit_action_link text,
-  p_benefit_use_max_count integer, p_reservation_link text, p_inquiry_link text,
-  p_actor_type text, p_actor_id text, p_request_id text, p_path text,
-  p_user_agent text, p_ip_address text, p_properties jsonb
-)
-returns table (company_id uuid, previous_thumbnail text, previous_images text[])
-language plpgsql security invoker set search_path = public as $$
-declare partner_row public.partners%rowtype;
-begin
-  if p_actor_type <> 'partner' or nullif(btrim(coalesce(p_actor_id, '')), '') is null then raise exception 'partner_immediate_update_invalid_audit_principal'; end if;
-  if nullif(btrim(coalesce(p_request_id, '')), '') is null then raise exception 'partner_immediate_update_missing_request_context'; end if;
-  if coalesce(array_length(p_company_ids, 1), 0) = 0 then raise exception 'partner_immediate_update_missing_company_scope'; end if;
-  if p_benefit_action_type not in ('certification', 'external_link', 'onsite', 'none') then raise exception 'partner_immediate_update_invalid_benefit_action_type'; end if;
-  if p_benefit_action_type = 'external_link' and nullif(btrim(coalesce(p_benefit_action_link, '')), '') is null then raise exception 'partner_immediate_update_missing_benefit_action_link'; end if;
-  if p_benefit_use_max_count is not null and p_benefit_use_max_count < 1 then raise exception 'partner_immediate_update_invalid_benefit_use_max_count'; end if;
-  if p_benefit_action_type <> 'certification' and p_benefit_use_max_count is not null then raise exception 'partner_immediate_update_invalid_benefit_use_max_count'; end if;
-  if jsonb_typeof(coalesce(p_properties, '{}'::jsonb)) <> 'object' then raise exception 'partner_immediate_update_invalid_audit_properties'; end if;
-  select * into partner_row from public.partners where id = p_partner_id for update;
-  if not found then raise exception 'partner_immediate_update_partner_not_found'; end if;
-  if partner_row.company_id is null or not (partner_row.company_id = any(p_company_ids)) or not exists (
-    select 1 from public.partner_account_companies access
-    where access.account_id::text = p_actor_id and access.company_id = partner_row.company_id and access.is_active = true
-  ) then raise exception 'partner_immediate_update_forbidden'; end if;
-  if partner_row.thumbnail is not distinct from p_thumbnail and partner_row.images is not distinct from coalesce(p_images, '{}'::text[])
-    and partner_row.tags is not distinct from coalesce(p_tags, '{}'::text[]) and partner_row.benefit_action_type is not distinct from p_benefit_action_type
-    and partner_row.benefit_action_link is not distinct from p_benefit_action_link and partner_row.benefit_use_max_count is not distinct from p_benefit_use_max_count
-    and partner_row.reservation_link is not distinct from p_reservation_link
-    and partner_row.inquiry_link is not distinct from p_inquiry_link then raise exception 'partner_immediate_update_no_changes'; end if;
-  update public.partners set thumbnail = p_thumbnail, images = coalesce(p_images, '{}'::text[]), tags = coalesce(p_tags, '{}'::text[]),
-    benefit_action_type = p_benefit_action_type, benefit_action_link = p_benefit_action_link,
-    benefit_use_max_count = p_benefit_use_max_count, reservation_link = p_reservation_link,
-    inquiry_link = p_inquiry_link, updated_at = now()
-  where id = partner_row.id;
-  insert into public.admin_audit_logs (request_id, actor_type, actor_id, action, path, target_type, target_id, properties, user_agent, ip_address)
-  values (p_request_id, p_actor_type, p_actor_id, 'partner_portal_immediate_update', p_path, 'partner', partner_row.id::text, coalesce(p_properties, '{}'::jsonb), p_user_agent, p_ip_address);
-  return query select partner_row.company_id, partner_row.thumbnail, partner_row.images;
-end;
-$$;
+-- The 20260722104701 integer benefit-use-count signature was replaced by the
+-- 20260722142117 jsonb benefit-items contract above; the stale copy is omitted.
 
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from public;
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from anon;
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from authenticated;
 grant execute on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) to service_role;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from public;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from anon;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from authenticated;
-grant execute on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) to service_role;
 
 -- 20260715004318_add_manual_member_reissue_setup_guard.sql
 create or replace function public.reissue_manual_member_initial_setup(
@@ -9607,6 +9585,264 @@ revoke all on function public.approve_graduate_verification(uuid, uuid, text, te
 revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from authenticated;
 grant execute on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) to service_role;
 
+-- 20260512115334_ux_db_query_performance.sql: base summary RPC that the
+-- following contract block rewrites through pg_get_functiondef().
+create or replace function public.get_admin_logs_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone,
+  input_bucket_ms bigint
+)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  with params as (
+    select
+      input_start as start_at,
+      input_end as end_at,
+      greatest(coalesce(input_bucket_ms, 60000), 60000)::bigint as bucket_ms
+  ),
+  product_logs as materialized (
+    select
+      'product'::text as group_name,
+      event_logs.event_name::text as name,
+      null::text as status,
+      event_logs.actor_type::text as actor_type,
+      coalesce(
+        nullif('@' || members.mm_username, '@'),
+        nullif(members.display_name, ''),
+        nullif(event_logs.actor_id, ''),
+        case when event_logs.actor_type = 'guest' then '비로그인 사용자' end
+      ) as actor_label,
+      event_logs.ip_address::text as ip_address,
+      event_logs.path::text as path,
+      event_logs.created_at
+    from public.event_logs
+    left join public.members
+      on event_logs.actor_type = 'member'
+     and members.id::text = event_logs.actor_id
+    cross join params
+    where event_logs.created_at >= params.start_at
+      and event_logs.created_at <= params.end_at
+  ),
+  audit_logs as materialized (
+    select
+      'audit'::text as group_name,
+      admin_audit_logs.action::text as name,
+      null::text as status,
+      'admin'::text as actor_type,
+      coalesce(nullif(admin_audit_logs.actor_id, ''), 'admin') as actor_label,
+      admin_audit_logs.ip_address::text as ip_address,
+      admin_audit_logs.path::text as path,
+      admin_audit_logs.created_at
+    from public.admin_audit_logs
+    cross join params
+    where admin_audit_logs.created_at >= params.start_at
+      and admin_audit_logs.created_at <= params.end_at
+  ),
+  security_logs as materialized (
+    select
+      'security'::text as group_name,
+      auth_security_logs.event_name::text as name,
+      auth_security_logs.status::text as status,
+      auth_security_logs.actor_type::text as actor_type,
+      coalesce(
+        nullif('@' || members.mm_username, '@'),
+        nullif(members.display_name, ''),
+        nullif(auth_security_logs.identifier, ''),
+        nullif(auth_security_logs.actor_id, ''),
+        case when auth_security_logs.actor_type = 'guest' then '비로그인 사용자' end
+      ) as actor_label,
+      auth_security_logs.ip_address::text as ip_address,
+      auth_security_logs.path::text as path,
+      auth_security_logs.created_at
+    from public.auth_security_logs
+    left join public.members
+      on auth_security_logs.actor_type = 'member'
+     and members.id::text = auth_security_logs.actor_id
+    cross join params
+    where auth_security_logs.created_at >= params.start_at
+      and auth_security_logs.created_at <= params.end_at
+  ),
+  unified_logs as materialized (
+    select * from product_logs
+    union all
+    select * from audit_logs
+    union all
+    select * from security_logs
+  ),
+  bucket_series as (
+    select
+      generate_series(
+        0,
+        greatest(
+          ceil(extract(epoch from (params.end_at - params.start_at)) * 1000 / params.bucket_ms)::integer - 1,
+          0
+        )
+      ) as bucket_index
+    from params
+  ),
+  bucketed_logs as materialized (
+    select
+      floor(extract(epoch from (unified_logs.created_at - params.start_at)) * 1000 / params.bucket_ms)::integer as bucket_index,
+      unified_logs.group_name
+    from unified_logs
+    cross join params
+  ),
+  buckets as (
+    select
+      (params.start_at + ((bucket_series.bucket_index * params.bucket_ms)::double precision * interval '1 millisecond')) as bucket_start,
+      least(
+        params.end_at,
+        params.start_at + (((bucket_series.bucket_index + 1) * params.bucket_ms)::double precision * interval '1 millisecond')
+      ) as bucket_end,
+      count(*) filter (where bucketed_logs.group_name = 'product')::bigint as product_count,
+      count(*) filter (where bucketed_logs.group_name = 'audit')::bigint as audit_count,
+      count(*) filter (where bucketed_logs.group_name = 'security')::bigint as security_count,
+      count(bucketed_logs.group_name)::bigint as total_count
+    from bucket_series
+    cross join params
+    left join bucketed_logs
+      on bucketed_logs.bucket_index = bucket_series.bucket_index
+    group by bucket_series.bucket_index, params.start_at, params.end_at, params.bucket_ms
+    order by bucket_series.bucket_index
+  )
+  select jsonb_build_object(
+    'counts',
+    jsonb_build_object(
+      'product', (select count(*) from product_logs),
+      'audit', (select count(*) from audit_logs),
+      'security', (select count(*) from security_logs)
+    ),
+    'securityStatusCounts',
+    jsonb_build_object(
+      'success', (select count(*) from security_logs where status = 'success'),
+      'failure', (select count(*) from security_logs where status = 'failure'),
+      'blocked', (select count(*) from security_logs where status = 'blocked')
+    ),
+    'buckets',
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'start', bucket_start,
+            'end', bucket_end,
+            'product', product_count,
+            'audit', audit_count,
+            'security', security_count,
+            'total', total_count
+          )
+          order by bucket_start
+        )
+        from buckets
+      ),
+      '[]'::jsonb
+    ),
+    'availableNames',
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object('group', group_name, 'name', name)
+          order by group_name, name
+        )
+        from (
+          select distinct group_name, name
+          from unified_logs
+          where name is not null
+        ) names
+      ),
+      '[]'::jsonb
+    ),
+    'actorOptions',
+    coalesce(
+      (
+        select jsonb_agg(actor_type order by actor_type)
+        from (
+          select distinct actor_type
+          from unified_logs
+          where actor_type is not null
+        ) actors
+      ),
+      '[]'::jsonb
+    ),
+    'topProductEvents',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('name', name, 'count', event_count) order by event_count desc, name)
+        from (
+          select name, count(*)::bigint as event_count
+          from product_logs
+          group by name
+          order by event_count desc, name
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topAuditActions',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('name', name, 'count', action_count) order by action_count desc, name)
+        from (
+          select name, count(*)::bigint as action_count
+          from audit_logs
+          group by name
+          order by action_count desc, name
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topActors',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('label', actor_label, 'count', actor_count) order by actor_count desc, actor_label)
+        from (
+          select actor_label, count(*)::bigint as actor_count
+          from unified_logs
+          where actor_label is not null
+            and actor_label <> '비로그인 사용자'
+          group by actor_label
+          order by actor_count desc, actor_label
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topIps',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('label', ip_address, 'count', ip_count) order by ip_count desc, ip_address)
+        from (
+          select ip_address, count(*)::bigint as ip_count
+          from unified_logs
+          where ip_address is not null
+          group by ip_address
+          order by ip_count desc, ip_address
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topPaths',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('label', path, 'count', path_count) order by path_count desc, path)
+        from (
+          select path, count(*)::bigint as path_count
+          from unified_logs
+          where path is not null
+          group by path
+          order by path_count desc, path
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    )
+  );
+$$;
+
 do $$
 declare
   page_definition text;
@@ -10136,20 +10372,8 @@ set marketing_enabled = excluded.marketing_enabled,
 where public.push_preferences.marketing_enabled
   is distinct from excluded.marketing_enabled;
 
-create or replace function public.ensure_single_member_super_admin()
-returns trigger
-language plpgsql
-as $$
-declare super_admin_count integer;
-begin
-  if new.admin_permission_id = 'super_admin' and coalesce(new.mm_username, '') <> 'myknow' then
-    raise exception 'only myknow member can hold super_admin permission';
-  end if;
-  select count(*) into super_admin_count from public.members where admin_permission_id = 'super_admin';
-  if super_admin_count > 1 then raise exception 'only one super_admin member is allowed'; end if;
-  return new;
-end;
-$$;
+-- ensure_single_member_super_admin() was dropped by 20260713204059; the
+-- pre-contract copy that used to sit here is omitted from the snapshot.
 
 -- Schema snapshot sync: normalized member domain (2026-07-13).
 
@@ -12994,6 +13218,9 @@ create index if not exists image_upload_sessions_signed_url_expiry_idx
 create index if not exists image_upload_sessions_final_path_idx
   on public.image_upload_sessions(final_bucket, final_path)
   where final_path is not null;
+create index if not exists image_upload_sessions_source_path_idx
+  on public.image_upload_sessions(source_storage_path)
+  where source_storage_path is not null;
 create index if not exists image_upload_sessions_owner_active_quota_idx
   on public.image_upload_sessions(owner_kind, owner_id, expires_at)
   where status in ('signed', 'processing', 'ready', 'attaching');
@@ -13438,12 +13665,17 @@ revoke all on table public.partner_benefit_usages from public;
 revoke all on table public.partner_benefit_usages from anon;
 revoke all on table public.partner_benefit_usages from authenticated;
 
+drop function if exists public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb);
 drop function if exists public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb);
+
+-- 20260723103348_fix_partner_benefit_usage_rpc_ambiguity.sql (current contract)
+-- The canonical usage RPC's partner benefit lookup must qualify partner_id.
+-- Otherwise PL/pgSQL resolves it against the RETURNS TABLE output variable.
 
 create or replace function public.record_partner_benefit_usage(
   p_partner_id uuid,
   p_member_id uuid,
-  p_benefit text,
+  p_benefit_id uuid,
   p_use_count integer,
   p_idempotency_key text,
   p_metadata jsonb default '{}'::jsonb
@@ -13452,6 +13684,7 @@ returns table (
   usage_id uuid,
   partner_id uuid,
   member_id uuid,
+  benefit_id uuid,
   benefit_snapshot text,
   use_count integer,
   verified_at timestamp with time zone,
@@ -13464,24 +13697,22 @@ set search_path = public
 as $$
 declare
   partner_row public.partners%rowtype;
+  benefit_row public.partner_benefits%rowtype;
   usage_row public.partner_benefit_usages%rowtype;
-  normalized_benefit text := trim(coalesce(p_benefit, ''));
-  normalized_idempotency_key text := trim(coalesce(p_idempotency_key, ''));
+  normalized_key text := trim(coalesce(p_idempotency_key, ''));
   current_kst_date date := (now() at time zone 'Asia/Seoul')::date;
   inserted_count integer := 0;
 begin
-  if p_partner_id is null or p_member_id is null then
+  if p_partner_id is null or p_member_id is null or p_benefit_id is null then
     raise exception 'partner_benefit_usage_subject_required';
-  end if;
-  if char_length(normalized_benefit) < 1 or char_length(normalized_benefit) > 500 then
-    raise exception 'partner_benefit_usage_benefit_invalid';
   end if;
   if p_use_count is null or p_use_count < 1 then
     raise exception 'partner_benefit_usage_use_count_invalid';
   end if;
-  if char_length(normalized_idempotency_key) < 16 or char_length(normalized_idempotency_key) > 128 then
+  if char_length(normalized_key) < 16 or char_length(normalized_key) > 128 then
     raise exception 'partner_benefit_usage_idempotency_key_invalid';
   end if;
+
   select * into partner_row from public.partners where id = p_partner_id;
   if not found then raise exception 'partner_benefit_usage_partner_not_found'; end if;
   if trim(coalesce(partner_row.location, '')) = '온라인' then
@@ -13493,54 +13724,66 @@ begin
   if partner_row.period_end is not null and partner_row.period_end < current_kst_date then
     raise exception 'partner_benefit_usage_period_inactive';
   end if;
-  if partner_row.benefit_use_max_count is not null
-    and p_use_count > partner_row.benefit_use_max_count then
+
+  select * into benefit_row
+  from public.partner_benefits benefit
+  where benefit.id = p_benefit_id and benefit.partner_id = p_partner_id;
+  if not found then raise exception 'partner_benefit_usage_benefit_not_found'; end if;
+  if p_use_count > coalesce(benefit_row.max_apply_count, 1) then
     raise exception 'partner_benefit_usage_use_count_exceeded';
-  end if;
-  if not normalized_benefit = any(coalesce(partner_row.benefits, '{}'::text[])) then
-    raise exception 'partner_benefit_usage_benefit_not_found';
   end if;
   if not exists (select 1 from public.members where id = p_member_id) then
     raise exception 'partner_benefit_usage_member_not_found';
   end if;
-  select * into usage_row from public.partner_benefit_usages
-  where idempotency_key = normalized_idempotency_key for update;
+
+  select * into usage_row
+  from public.partner_benefit_usages
+  where idempotency_key = normalized_key
+  for update;
   if found then
-    if usage_row.partner_id <> p_partner_id or usage_row.member_id <> p_member_id
-       or usage_row.benefit_snapshot <> normalized_benefit
+    if usage_row.partner_id <> p_partner_id
+       or usage_row.member_id <> p_member_id
+       or usage_row.benefit_id is distinct from p_benefit_id
        or usage_row.use_count <> p_use_count then
       raise exception 'partner_benefit_usage_idempotency_conflict';
     end if;
     return query select usage_row.id, usage_row.partner_id, usage_row.member_id,
-      usage_row.benefit_snapshot, usage_row.use_count, usage_row.verified_at,
-      usage_row.created_at, false;
+      usage_row.benefit_id, usage_row.benefit_snapshot, usage_row.use_count,
+      usage_row.verified_at, usage_row.created_at, false;
     return;
   end if;
+
   insert into public.partner_benefit_usages (
-    partner_id, member_id, benefit_snapshot, use_count, idempotency_key, metadata
+    partner_id, member_id, benefit_id, benefit_snapshot, use_count,
+    idempotency_key, metadata
   ) values (
-    p_partner_id, p_member_id, normalized_benefit, p_use_count,
-    normalized_idempotency_key, coalesce(p_metadata, '{}'::jsonb)
+    p_partner_id, p_member_id, p_benefit_id, benefit_row.title, p_use_count,
+    normalized_key, coalesce(p_metadata, '{}'::jsonb)
   ) on conflict (idempotency_key) do nothing;
   get diagnostics inserted_count = row_count;
-  select * into usage_row from public.partner_benefit_usages
-  where idempotency_key = normalized_idempotency_key for update;
+
+  select * into usage_row
+  from public.partner_benefit_usages
+  where idempotency_key = normalized_key
+  for update;
   if not found then raise exception 'partner_benefit_usage_record_failed'; end if;
-  if usage_row.partner_id <> p_partner_id or usage_row.member_id <> p_member_id
-     or usage_row.benefit_snapshot <> normalized_benefit
+  if usage_row.partner_id <> p_partner_id
+     or usage_row.member_id <> p_member_id
+     or usage_row.benefit_id is distinct from p_benefit_id
      or usage_row.use_count <> p_use_count then
     raise exception 'partner_benefit_usage_idempotency_conflict';
   end if;
+
   return query select usage_row.id, usage_row.partner_id, usage_row.member_id,
-    usage_row.benefit_snapshot, usage_row.use_count, usage_row.verified_at,
-    usage_row.created_at, inserted_count > 0;
+    usage_row.benefit_id, usage_row.benefit_snapshot, usage_row.use_count,
+    usage_row.verified_at, usage_row.created_at, inserted_count > 0;
 end;
 $$;
 
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from public;
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from anon;
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from authenticated;
-grant execute on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) to service_role;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) from public;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) from anon;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) from authenticated;
+grant execute on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) to service_role;
 
 -- 개인정보가 포함될 수 있는 운영·보안 원본 로그는 1년만 보관하고,
 -- 이미 생성된 집계 테이블은 장기 보관한다. 보안 사고·분쟁은 보존 hold로 예외 처리한다.
@@ -13974,116 +14217,8 @@ revoke all on function public.soft_delete_member(uuid, jsonb) from anon;
 revoke all on function public.soft_delete_member(uuid, jsonb) from authenticated;
 grant execute on function public.soft_delete_member(uuid, jsonb) to service_role;
 
-create or replace function public.anonymize_deleted_member(p_member_id uuid)
-returns boolean
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  member_row public.members%rowtype;
-  mattermost_account_uuid uuid;
-  verification_request_uuid uuid;
-begin
-  select * into member_row
-  from public.members
-  where id = p_member_id
-    and deleted_at is not null
-    and deleted_at <= now() - interval '30 days'
-    and anonymized_at is null
-  for update;
-
-  if not found then
-    return false;
-  end if;
-
-  if not public.purge_deleted_member_wallet_data_for_anonymization(p_member_id) then
-    raise exception 'member_wallet_lifecycle_anonymization_gate_failed';
-  end if;
-
-  mattermost_account_uuid := member_row.mattermost_account_id;
-  select verification_request_id into verification_request_uuid
-  from public.graduate_profiles
-  where member_id = p_member_id;
-
-  delete from public.member_profile_images where member_id = p_member_id;
-  delete from public.member_ssafy_verifications where member_id = p_member_id;
-  delete from public.member_email_challenges where member_id = p_member_id;
-  delete from public.member_email_login_transitions where member_id = p_member_id;
-  delete from public.member_password_action_tokens where member_id = p_member_id;
-
-  -- The normalized member contract dropped this legacy table. Keep cleanup
-  -- compatible with a lagging environment without making it a dependency of
-  -- the current Production function.
-  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
-    execute 'delete from public.member_auth_identities where member_id = $1'
-      using p_member_id;
-  end if;
-
-  delete from public.graduate_profiles where member_id = p_member_id;
-
-  update public.graduate_verification_requests as request
-  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
-      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
-      legal_name = '탈퇴한 수료생',
-      document_number_hmac = null,
-      certificate_storage_path = null,
-      certificate_sha256 = null,
-      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
-      review_note = null,
-      rejection_reason = null,
-      status = case
-        when request.request_kind = 'existing_member_recovery'
-          and request.recovery_member_id = p_member_id
-          and request.status = 'approved'
-        then 'withdrawn'
-        else request.status
-      end,
-      recovery_member_id = case
-        when request.recovery_member_id = p_member_id then null
-        else request.recovery_member_id
-      end,
-      updated_at = now()
-  where request.id = verification_request_uuid
-     or request.recovery_member_id = p_member_id;
-
-  update public.members
-  set email = null,
-      email_normalized = null,
-      email_verified_at = null,
-      manual_login_id = null,
-      password_hash = null,
-      password_salt = null,
-      must_change_password = false,
-      display_name = '탈퇴한 회원',
-      campus = null,
-      staff_source_generation = null,
-      mattermost_account_id = null,
-      mattermost_login_disabled_at = null,
-      mattermost_login_disabled_reason = null,
-      auth_session_version = auth_session_version + 1,
-      anonymized_at = now(),
-      updated_at = now()
-  where id = p_member_id;
-
-  if mattermost_account_uuid is not null then
-    delete from public.mm_user_directory directory
-    where directory.id = mattermost_account_uuid
-      and not exists (
-        select 1
-        from public.members linked_member
-        where linked_member.mattermost_account_id = directory.id
-      );
-  end if;
-
-  return true;
-end;
-$$;
-
-revoke all on function public.anonymize_deleted_member(uuid) from public;
-revoke all on function public.anonymize_deleted_member(uuid) from anon;
-revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
-grant execute on function public.anonymize_deleted_member(uuid) to service_role;
+-- anonymize_deleted_member(uuid): the current contract is the
+-- 20261005030746_harden_privileges_retention_and_lifecycle.sql snapshot.
 
 -- Source: 20260821001338_add_admin_member_password_reset.sql
 -- Keep table-constraint mutations before the read-model parity section so
@@ -16513,6 +16648,152 @@ end;
 $$;
 
 commit;
+
+-- Snapshot of 20261017194758_add_remote_mcp_oauth_and_review_receipts.sql
+-- OAuth credentials are opaque random values; only SHA-256 hashes are stored.
+create table public.mcp_oauth_clients (
+  id uuid primary key,
+  value jsonb not null,
+  created_at timestamptz not null default now()
+);
+create table public.mcp_oauth_records (
+  key text primary key,
+  value jsonb not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint mcp_record_key_check check (key ~ '^(grant|code|access|refresh|review|quota):[a-zA-Z0-9_-]{1,128}$')
+);
+create index mcp_oauth_records_expiry_idx on public.mcp_oauth_records(expires_at);
+alter table public.mcp_oauth_clients enable row level security;
+alter table public.mcp_oauth_records enable row level security;
+revoke all on table public.mcp_oauth_clients from public, anon, authenticated;
+revoke all on table public.mcp_oauth_records from public, anon, authenticated;
+grant select, insert, update, delete on public.mcp_oauth_clients, public.mcp_oauth_records to service_role;
+
+create function public.mcp_create_grant(p_grant jsonb, p_code jsonb)
+returns void language plpgsql security invoker set search_path = pg_catalog, public as $$
+begin
+  if p_code->>'grantId' is distinct from p_grant->>'id' then raise exception 'mcp_invalid_grant'; end if;
+  insert into public.mcp_oauth_records(key,value,expires_at) values
+    ('grant:'||(p_grant->>'id'),p_grant,to_timestamp((p_grant->>'expiresAt')::numeric/1000)),
+    ('code:'||(p_code->>'hash'),p_code,to_timestamp((p_code->>'expiresAt')::numeric/1000));
+  -- Bound expired auth material retention; refresh tombstones outlive the token family.
+  delete from public.mcp_oauth_records where key in
+    (select key from public.mcp_oauth_records where expires_at < now()-interval '30 days' order by expires_at limit 500);
+end;
+$$;
+
+create function public.mcp_exchange_credential(p_input jsonb)
+returns jsonb language plpgsql security invoker set search_path = pg_catalog, public as $$
+declare c public.mcp_oauth_records%rowtype; g public.mcp_oauth_records%rowtype; k text;
+begin
+  if p_input->>'kind' not in ('code','refresh') then return null; end if;
+  k := (p_input->>'kind')||':'||(p_input->>'hash');
+  select * into c from public.mcp_oauth_records where key=k for update;
+  if not found or c.expires_at <= now() then return null; end if;
+  select * into g from public.mcp_oauth_records where key='grant:'||(c.value->>'grantId') for update;
+  if not found or g.expires_at <= now() or coalesce((g.value->>'revoked')::boolean,false)
+    or g.value->>'clientId' is distinct from p_input->>'clientId'
+    or g.value->>'resource' is distinct from p_input->>'resource' then return null; end if;
+  if p_input->>'kind'='code' and (c.value->>'challenge' is distinct from p_input->>'challenge'
+    or c.value->>'redirectUri' is distinct from p_input->>'redirectUri') then return null; end if;
+  if coalesce((c.value->>'consumed')::boolean,false) then
+    if p_input->>'kind'='refresh' then
+      update public.mcp_oauth_records set value=jsonb_set(value,'{revoked}','true') where key=g.key;
+    end if;
+    return null;
+  end if;
+  if p_input->'access'->>'grantId' is distinct from g.value->>'id'
+    or p_input->'refresh'->>'grantId' is distinct from g.value->>'id' then return null; end if;
+  update public.mcp_oauth_records set value=jsonb_set(value,'{consumed}','true') where key=k;
+  insert into public.mcp_oauth_records(key,value,expires_at) values
+    ('access:'||(p_input->'access'->>'hash'),p_input->'access',least(g.expires_at,to_timestamp((p_input->'access'->>'expiresAt')::numeric/1000))),
+    ('refresh:'||(p_input->'refresh'->>'hash'),p_input->'refresh',g.expires_at);
+  return g.value;
+end;
+$$;
+
+create function public.mcp_revoke_grant(p_admin_id uuid,p_id uuid)
+returns void language sql security invoker set search_path = pg_catalog, public as $$
+  update public.mcp_oauth_records set value=jsonb_set(value,'{revoked}','true')
+  where key='grant:'||p_id::text and value->>'adminId'=p_admin_id::text;
+$$;
+
+create function public.mcp_approve_review(p_admin_id uuid,p_id uuid)
+returns boolean language plpgsql security invoker set search_path = pg_catalog, public as $$
+begin
+  update public.mcp_oauth_records set value=jsonb_set(value,'{approved}','true')
+  where key='review:'||p_id::text and value->>'adminId'=p_admin_id::text and expires_at>now();
+  return found;
+end;
+$$;
+
+create function public.mcp_commit_review(p_admin_id uuid,p_grant_id uuid,p_client_id uuid,p_id uuid)
+returns text language plpgsql security invoker set search_path = pg_catalog, public as $$
+declare g public.mcp_oauth_records%rowtype; r public.mcp_oauth_records%rowtype;
+  f public.showcase_feedback%rowtype; a public.admin_profiles%rowtype; snapshot jsonb;
+begin
+  select * into g from public.mcp_oauth_records where key='grant:'||p_grant_id::text for update;
+  if not found or g.expires_at<=now() or coalesce((g.value->>'revoked')::boolean,false)
+    or g.value->>'adminId' is distinct from p_admin_id::text or g.value->>'clientId' is distinct from p_client_id::text
+    or not coalesce((g.value->'scopes' ? 'showcase:moderate'),false) then return 'forbidden'; end if;
+  select * into a from public.admin_profiles where member_id=p_admin_id for share;
+  if not found or not a.is_active or a.permission_template_key='regional_partner_manager'
+    or a.permission_version is distinct from (g.value->>'permissionVersion')::integer then return 'forbidden'; end if;
+  perform 1 from public.admin_permission_templates where key=a.permission_template_key
+    and coalesce((permissions #>> '{events,update}')::boolean,false) for share;
+  if not found then return 'forbidden'; end if;
+  snapshot := public.get_admin_session_snapshot(p_admin_id);
+  if snapshot is null or not coalesce((snapshot->>'is_active')::boolean,false)
+    or coalesce((snapshot->>'must_change_password')::boolean,true) then return 'forbidden'; end if;
+  select * into r from public.mcp_oauth_records where key='review:'||p_id::text for update;
+  if not found or r.expires_at<=now() or r.value->>'adminId' is distinct from p_admin_id::text
+    or r.value->>'grantId' is distinct from p_grant_id::text or r.value->>'clientId' is distinct from p_client_id::text
+    or not coalesce((r.value->>'approved')::boolean,false) then return 'forbidden'; end if;
+  if coalesce((r.value->>'executed')::boolean,false) then return 'replayed'; end if;
+  select * into f from public.showcase_feedback where id=(r.value->>'feedbackId')::uuid for update;
+  if not found or (f.hidden_at is not null) is distinct from (r.value->>'previousHidden')::boolean
+    or encode(sha256(convert_to(f.body,'UTF8')),'hex') is distinct from r.value->>'previousBodyHash' then return 'conflict'; end if;
+  -- Reuse the existing business RPC. Mutation, receipt and audit share one transaction.
+  perform public.set_showcase_feedback_hidden(f.id,p_admin_id,(r.value->>'hidden')::boolean);
+  insert into public.admin_audit_logs(actor_type,actor_id,action,path,target_type,target_id,properties)
+    values ('admin',p_admin_id::text,'showcase_feedback_visibility_update','/api/mcp','showcase_feedback',f.id::text,
+      jsonb_build_object('hidden',(r.value->>'hidden')::boolean,'channel','mcp','reviewId',p_id));
+  update public.mcp_oauth_records set value=jsonb_set(value,'{executed}','true') where key=r.key;
+  return 'executed';
+end;
+$$;
+
+revoke all on function public.mcp_create_grant(jsonb,jsonb), public.mcp_exchange_credential(jsonb), public.mcp_revoke_grant(uuid,uuid), public.mcp_approve_review(uuid,uuid), public.mcp_commit_review(uuid,uuid,uuid,uuid) from public, anon, authenticated;
+grant execute on function public.mcp_create_grant(jsonb,jsonb), public.mcp_exchange_credential(jsonb), public.mcp_revoke_grant(uuid,uuid), public.mcp_approve_review(uuid,uuid), public.mcp_commit_review(uuid,uuid,uuid,uuid) to service_role;
+
+-- Atomic, cross-worker minute quota; keys contain SHA-256 digests, never addresses/tokens.
+create function public.mcp_consume_quota(p_key text,p_limit integer)
+returns boolean language plpgsql security invoker set search_path = pg_catalog, public as $$
+declare r public.mcp_oauth_records%rowtype; n integer; allowed boolean;
+begin
+  if p_key is null or p_limit is null or p_key !~ '^[a-f0-9]{64}$' or p_limit not between 1 and 1000 then return false; end if;
+  insert into public.mcp_oauth_records(key,value,expires_at)
+    values ('quota:'||p_key,jsonb_build_object('count',0),now()+interval '1 minute') on conflict (key) do nothing;
+  select * into r from public.mcp_oauth_records where key='quota:'||p_key for update;
+  n := case when r.expires_at<=now() then 0 else (r.value->>'count')::integer end;
+  allowed := n<p_limit;
+  if allowed then
+    update public.mcp_oauth_records set value=jsonb_build_object('count',n+1),
+      expires_at=case when r.expires_at<=now() then now()+interval '1 minute' else r.expires_at end where key=r.key;
+  end if;
+  -- Lock the current bucket first; the expiry index bounds each concurrent sweep.
+  -- Credential/review records and refresh-replay tombstones have separate retention.
+  delete from public.mcp_oauth_records stale using (
+    select expired.key from public.mcp_oauth_records expired
+    where expired.expires_at<=now() and expired.key like 'quota:%'
+    order by expired.expires_at limit 500 for update skip locked
+  ) garbage where stale.key=garbage.key;
+  return allowed;
+end;
+$$;
+revoke all on function public.mcp_consume_quota(text,integer) from public, anon, authenticated;
+grant execute on function public.mcp_consume_quota(text,integer) to service_role;
 
 -- Preview catalog parity: administrator read models and their supporting indexes.
 
@@ -22360,3 +22641,2697 @@ revoke all on function public.approve_graduate_verification(uuid, uuid, text, te
 revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from anon;
 revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from authenticated;
 grant execute on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) to service_role;
+
+-- Snapshot of 20261005030746_harden_privileges_retention_and_lifecycle.sql
+-- RF-02 (#535): privilege defaults, retention/purge, member anonymization
+-- scope, project showcase terminal-state guards, partner metric actor filter,
+-- public media bucket limits and audit-preserving foreign keys.
+--
+-- Self-host receivers never apply DDL. The operator applies this file
+-- manually after a verified backup; every statement is forward-only and the
+-- previous application image keeps working against the resulting schema.
+
+-- Retention ------------------------------------------------------------------
+-- Defaults are documented in docs/security/data-lifecycle.md and stay in effect
+-- until the operator confirms or replaces them in a later migration. Holds can
+-- protect every group, including the new ones.
+alter table public.log_retention_holds
+  drop constraint if exists log_retention_holds_group_check;
+alter table public.log_retention_holds
+  add constraint log_retention_holds_group_check
+  check (log_group in (
+    'event_logs',
+    'admin_audit_logs',
+    'auth_security_logs',
+    'push_message_logs',
+    'push_delivery_logs',
+    'partner_benefit_usages',
+    'rate_limit_attempts',
+    'notification_deliveries',
+    'image_upload_sessions',
+    'platform_active_identities',
+    'partner_metric_unique_visitors'
+  ));
+
+create or replace function public.log_retention_hold_active(
+  p_log_group text,
+  p_recorded_at timestamp with time zone
+)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select exists (
+    select 1
+    from public.log_retention_holds hold
+    where hold.log_group = p_log_group
+      and (hold.expires_at is null or hold.expires_at > now())
+      and p_recorded_at >= hold.start_at
+      and p_recorded_at < hold.end_at
+  );
+$$;
+
+create or replace function public.purge_expired_operational_logs(
+  input_cutoff timestamp with time zone default now() - interval '1 year'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  cutoff timestamp with time zone := coalesce(input_cutoff, now() - interval '1 year');
+  attempt_cutoff timestamp with time zone := now() - interval '30 days';
+  delivery_cutoff timestamp with time zone := now() - interval '180 days';
+  upload_session_cutoff timestamp with time zone := now() - interval '30 days';
+  identifier_cutoff_date date := (now() at time zone 'Asia/Seoul')::date - 400;
+  attempt_table text;
+  affected integer := 0;
+  event_log_count integer := 0;
+  admin_audit_log_count integer := 0;
+  auth_security_log_count integer := 0;
+  push_message_log_count integer := 0;
+  push_delivery_log_count integer := 0;
+  partner_benefit_usage_count integer := 0;
+  rate_limit_attempt_count integer := 0;
+  notification_delivery_count integer := 0;
+  admin_notification_delivery_count integer := 0;
+  partner_notification_delivery_count integer := 0;
+  image_upload_session_count integer := 0;
+  platform_active_identity_count integer := 0;
+  partner_metric_unique_visitor_count integer := 0;
+begin
+  -- The guard prevents an accidental caller from reducing the log policy below one year.
+  if cutoff > now() - interval '1 year' then
+    raise exception 'log_retention_cutoff_must_be_at_least_one_year_old';
+  end if;
+
+  -- Raw operational logs: one year.
+  delete from public.event_logs
+  where created_at < cutoff
+    and not public.log_retention_hold_active('event_logs', event_logs.created_at);
+  get diagnostics event_log_count = row_count;
+
+  delete from public.admin_audit_logs
+  where created_at < cutoff
+    and not public.log_retention_hold_active('admin_audit_logs', admin_audit_logs.created_at);
+  get diagnostics admin_audit_log_count = row_count;
+
+  delete from public.auth_security_logs
+  where created_at < cutoff
+    and not public.log_retention_hold_active('auth_security_logs', auth_security_logs.created_at);
+  get diagnostics auth_security_log_count = row_count;
+
+  delete from public.push_delivery_logs
+  where created_at < cutoff
+    and not public.log_retention_hold_active('push_delivery_logs', push_delivery_logs.created_at);
+  get diagnostics push_delivery_log_count = row_count;
+
+  delete from public.push_message_logs
+  where created_at < cutoff
+    and not public.log_retention_hold_active('push_message_logs', push_message_logs.created_at);
+  get diagnostics push_message_log_count = row_count;
+
+  delete from public.partner_benefit_usages
+  where created_at < cutoff
+    and not public.log_retention_hold_active('partner_benefit_usages', partner_benefit_usages.created_at);
+  get diagnostics partner_benefit_usage_count = row_count;
+
+  -- Rate-limit attempts: 30 days after the window started, never while blocked.
+  foreach attempt_table in array array[
+    'admin_login_attempts',
+    'member_auth_attempts',
+    'mattermost_sender_test_attempts',
+    'partner_auth_attempts',
+    'partner_registration_attempts',
+    'password_reset_attempts',
+    'suggestion_attempts'
+  ] loop
+    if pg_catalog.to_regclass(pg_catalog.format('public.%I', attempt_table)) is not null then
+      execute pg_catalog.format(
+        'delete from public.%I attempt
+         where attempt.first_attempt_at < $1
+           and (attempt.blocked_until is null or attempt.blocked_until < pg_catalog.now())
+           and not public.log_retention_hold_active(''rate_limit_attempts'', attempt.first_attempt_at)',
+        attempt_table
+      ) using attempt_cutoff;
+      get diagnostics affected = row_count;
+      rate_limit_attempt_count := rate_limit_attempt_count + affected;
+    end if;
+  end loop;
+
+  -- Finalized notification deliveries: 180 days. Member inbox rows
+  -- (member_notifications) and campaign headers are kept.
+  if pg_catalog.to_regclass('public.notification_deliveries') is not null then
+    delete from public.notification_deliveries delivery
+    using public.notifications campaign
+    where campaign.id = delivery.notification_id
+      and delivery.status in ('sent', 'failed', 'skipped')
+      and delivery.created_at < delivery_cutoff
+      and coalesce(campaign.metadata ->> 'campaignStatus', '') <> 'pending'
+      and not public.log_retention_hold_active('notification_deliveries', delivery.created_at);
+    get diagnostics notification_delivery_count = row_count;
+  end if;
+
+  if pg_catalog.to_regclass('public.admin_notification_deliveries') is not null then
+    delete from public.admin_notification_deliveries delivery
+    where delivery.status in ('sent', 'failed', 'skipped')
+      and delivery.created_at < delivery_cutoff
+      and not public.log_retention_hold_active('notification_deliveries', delivery.created_at);
+    get diagnostics admin_notification_delivery_count = row_count;
+  end if;
+
+  if pg_catalog.to_regclass('public.partner_notification_deliveries') is not null then
+    delete from public.partner_notification_deliveries delivery
+    where delivery.status in ('sent', 'failed', 'skipped')
+      and delivery.created_at < delivery_cutoff
+      and not public.log_retention_hold_active('notification_deliveries', delivery.created_at);
+    get diagnostics partner_notification_delivery_count = row_count;
+  end if;
+
+  -- Expired upload sessions (objects already removed): 30 days after expiry.
+  -- Attached sessions stay as the ledger of images still in use.
+  if pg_catalog.to_regclass('public.image_upload_sessions') is not null then
+    delete from public.image_upload_sessions upload_session
+    where upload_session.status = 'expired'
+      and upload_session.updated_at < upload_session_cutoff
+      and not public.log_retention_hold_active('image_upload_sessions', upload_session.updated_at);
+    get diagnostics image_upload_session_count = row_count;
+  end if;
+
+  -- Identifier ledgers: 400 days, longer than every admin activity window.
+  if pg_catalog.to_regclass('public.platform_active_identities') is not null then
+    delete from public.platform_active_identities identity_row
+    where identity_row.activity_date < identifier_cutoff_date
+      and not public.log_retention_hold_active(
+        'platform_active_identities',
+        identity_row.activity_date::timestamp at time zone 'Asia/Seoul'
+      );
+    get diagnostics platform_active_identity_count = row_count;
+  end if;
+
+  if pg_catalog.to_regclass('public.partner_metric_unique_visitors') is not null then
+    delete from public.partner_metric_unique_visitors visitor
+    where coalesce(
+        visitor.bucket_local_date,
+        visitor.bucket_local_start::date,
+        (visitor.created_at at time zone 'Asia/Seoul')::date
+      ) < identifier_cutoff_date
+      and not public.log_retention_hold_active('partner_metric_unique_visitors', visitor.created_at);
+    get diagnostics partner_metric_unique_visitor_count = row_count;
+  end if;
+
+  return jsonb_build_object(
+    'cutoff', cutoff,
+    'event_logs', event_log_count,
+    'admin_audit_logs', admin_audit_log_count,
+    'auth_security_logs', auth_security_log_count,
+    'push_delivery_logs', push_delivery_log_count,
+    'push_message_logs', push_message_log_count,
+    'partner_benefit_usages', partner_benefit_usage_count,
+    'rate_limit_attempts', rate_limit_attempt_count,
+    'notification_deliveries', notification_delivery_count,
+    'admin_notification_deliveries', admin_notification_delivery_count,
+    'partner_notification_deliveries', partner_notification_delivery_count,
+    'image_upload_sessions', image_upload_session_count,
+    'platform_active_identities', platform_active_identity_count,
+    'partner_metric_unique_visitors', partner_metric_unique_visitor_count
+  );
+end;
+$$;
+
+revoke all on function public.purge_expired_operational_logs(timestamp with time zone) from public;
+revoke all on function public.purge_expired_operational_logs(timestamp with time zone) from anon;
+revoke all on function public.purge_expired_operational_logs(timestamp with time zone) from authenticated;
+grant execute on function public.purge_expired_operational_logs(timestamp with time zone) to service_role;
+
+-- Member anonymization scope -------------------------------------------------
+-- members rows are anonymized in place, so FK cascades never fire on this path.
+-- Every member-linked table is either cleared here or explicitly retained
+-- (tests/member-anonymization-fk-coverage.test.mts keeps that list complete).
+create or replace function public.anonymize_deleted_member(p_member_id uuid)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  mattermost_account_uuid uuid;
+  verification_request_uuid uuid;
+begin
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is not null
+    and deleted_at <= now() - interval '30 days'
+    and anonymized_at is null
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  if not public.purge_deleted_member_wallet_data_for_anonymization(p_member_id) then
+    raise exception 'member_wallet_lifecycle_anonymization_gate_failed';
+  end if;
+
+  mattermost_account_uuid := member_row.mattermost_account_id;
+  select verification_request_id into verification_request_uuid
+  from public.graduate_profiles
+  where member_id = p_member_id;
+
+  delete from public.member_profile_images where member_id = p_member_id;
+  delete from public.member_email_challenges where member_id = p_member_id;
+  delete from public.member_email_login_transitions where member_id = p_member_id;
+  delete from public.member_password_action_tokens where member_id = p_member_id;
+
+  -- Legacy tables are cleaned only while they exist, so dropping them later
+  -- does not depend on replacing this function first.
+  if pg_catalog.to_regclass('public.member_ssafy_verifications') is not null then
+    execute 'delete from public.member_ssafy_verifications where member_id = $1'
+      using p_member_id;
+  end if;
+  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
+    execute 'delete from public.member_auth_identities where member_id = $1'
+      using p_member_id;
+  end if;
+
+  delete from public.graduate_profiles where member_id = p_member_id;
+
+  -- Settings, devices, inbox and member-only interactions.
+  delete from public.push_preferences where member_id = p_member_id;
+  delete from public.push_subscriptions where member_id = p_member_id;
+  delete from public.member_notifications where member_id = p_member_id;
+  delete from public.notification_deliveries where member_id = p_member_id;
+  delete from public.partner_favorites where member_id = p_member_id;
+  delete from public.partner_review_reactions where member_id = p_member_id;
+  delete from public.admin_push_subscriptions where admin_id = p_member_id;
+  delete from public.admin_notification_recipients where admin_id = p_member_id;
+  delete from public.admin_notification_preferences where admin_id = p_member_id;
+  delete from public.admin_notification_deliveries where admin_id = p_member_id;
+
+  -- Evidence rows stay, without the network identifiers or contact snapshots.
+  update public.member_policy_consents
+  set ip_address = null,
+      user_agent = null
+  where member_id = p_member_id
+    and (ip_address is not null or user_agent is not null);
+  update public.graduate_verification_uploads
+  set member_id = null
+  where member_id = p_member_id;
+  update public.push_delivery_logs
+  set member_id = null
+  where member_id = p_member_id;
+  update public.push_message_logs
+  set target_member_id = null
+  where target_member_id = p_member_id;
+  update public.manual_member_import_rows
+  set member_id = null,
+      display_name = null,
+      mm_username = null,
+      email = null,
+      email_normalized = null
+  where member_id = p_member_id;
+  update public.event_reward_winners
+  set display_name = '탈퇴한 회원',
+      mm_username = null,
+      campus = null
+  where member_id = p_member_id;
+
+  -- Project showcase: the same detachment the post-settlement purge applies.
+  delete from public.showcase_project_participants participant
+  using public.showcase_projects project
+  where project.id = participant.project_id
+    and project.owner_member_id = p_member_id
+    and participant.is_owner;
+  update public.showcase_registrations
+  set member_id = null,
+      student_number = null
+  where member_id = p_member_id;
+  update public.showcase_project_views set member_id = null where member_id = p_member_id;
+  update public.showcase_experiences set member_id = null where member_id = p_member_id;
+  update public.showcase_feedback set member_id = null where member_id = p_member_id;
+  update public.showcase_interests set member_id = null where member_id = p_member_id;
+  update public.showcase_candidate_exclusions set member_id = null where member_id = p_member_id;
+  update public.showcase_winners set member_id = null where member_id = p_member_id;
+  update public.showcase_projects set owner_member_id = null where owner_member_id = p_member_id;
+
+  update public.graduate_verification_requests as request
+  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
+      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
+      legal_name = '탈퇴한 수료생',
+      document_number_hmac = null,
+      certificate_storage_path = null,
+      certificate_sha256 = null,
+      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
+      review_note = null,
+      rejection_reason = null,
+      status = case
+        when request.request_kind = 'existing_member_recovery'
+          and request.recovery_member_id = p_member_id
+          and request.status = 'approved'
+        then 'withdrawn'
+        else request.status
+      end,
+      recovery_member_id = case
+        when request.recovery_member_id = p_member_id then null
+        else request.recovery_member_id
+      end,
+      updated_at = now()
+  where request.id = verification_request_uuid
+     or request.recovery_member_id = p_member_id;
+
+  update public.members
+  set email = null,
+      email_normalized = null,
+      email_verified_at = null,
+      manual_login_id = null,
+      password_hash = null,
+      password_salt = null,
+      must_change_password = false,
+      display_name = '탈퇴한 회원',
+      campus = null,
+      staff_source_generation = null,
+      mattermost_account_id = null,
+      mattermost_login_disabled_at = null,
+      mattermost_login_disabled_reason = null,
+      auth_session_version = auth_session_version + 1,
+      anonymized_at = now(),
+      updated_at = now()
+  where id = p_member_id;
+
+  if mattermost_account_uuid is not null then
+    delete from public.mm_user_directory directory
+    where directory.id = mattermost_account_uuid
+      and not exists (
+        select 1
+        from public.members linked_member
+        where linked_member.mattermost_account_id = directory.id
+      );
+  end if;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.anonymize_deleted_member(uuid) from public;
+revoke all on function public.anonymize_deleted_member(uuid) from anon;
+revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
+grant execute on function public.anonymize_deleted_member(uuid) to service_role;
+
+-- Project showcase terminal states -------------------------------------------
+-- Settlement starts the 30-day purge clock and closes the event for good: no
+-- schedule edit can reopen submission or experience, and projects can no
+-- longer be created, reviewed, edited or deleted. A withdrawn project never
+-- comes back. Identity detachment (purge, member anonymization) and FK
+-- set-null actions remain allowed.
+create or replace function public.showcase_assert_submission_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.settled_at is null
+      and event_row.submission_start_at <= now()
+      and now() < event_row.submission_end_at
+  ) then
+    raise exception 'showcase_submission_closed';
+  end if;
+end;
+$$;
+
+create or replace function public.showcase_assert_experience_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.settled_at is null
+      and event_row.experience_start_at <= now()
+      and now() < event_row.experience_end_at
+  ) then
+    raise exception 'showcase_experience_closed';
+  end if;
+end;
+$$;
+
+create or replace function public.showcase_guard_settled_event()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if old.settled_at is not null and (
+    new.settled_at is distinct from old.settled_at
+    or new.submission_start_at is distinct from old.submission_start_at
+    or new.submission_end_at is distinct from old.submission_end_at
+    or new.experience_start_at is distinct from old.experience_start_at
+    or new.experience_end_at is distinct from old.experience_end_at
+    or new.announcement_start_at is distinct from old.announcement_start_at
+    or new.announcement_end_at is distinct from old.announcement_end_at
+    or new.submitter_selection_count is distinct from old.submitter_selection_count
+    or new.experiencer_selection_count is distinct from old.experiencer_selection_count
+    or new.is_active is distinct from old.is_active
+  ) then
+    raise exception 'showcase_event_settled';
+  end if;
+  if old.purged_at is not null and new.purged_at is distinct from old.purged_at then
+    raise exception 'showcase_event_settled';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists showcase_events_guard_settled on public.showcase_events;
+create trigger showcase_events_guard_settled
+  before update on public.showcase_events
+  for each row execute function public.showcase_guard_settled_event();
+
+create or replace function public.showcase_guard_project_mutation()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+declare
+  event_settled boolean;
+begin
+  select event_row.settled_at is not null
+  into event_settled
+  from public.showcase_events event_row
+  where event_row.id = case when tg_op = 'DELETE' then old.event_id else new.event_id end;
+
+  if tg_op = 'UPDATE' then
+    if coalesce(event_settled, false)
+      and (pg_catalog.to_jsonb(new) - array['owner_member_id', 'image_upload_id', 'reviewed_by_admin_id', 'updated_at'])
+        is distinct from
+        (pg_catalog.to_jsonb(old) - array['owner_member_id', 'image_upload_id', 'reviewed_by_admin_id', 'updated_at']) then
+      raise exception 'showcase_event_settled';
+    end if;
+    if old.status = 'withdrawn' and new.status <> 'withdrawn' then
+      raise exception 'showcase_status_transition_invalid';
+    end if;
+    return new;
+  end if;
+
+  if coalesce(event_settled, false) then
+    raise exception 'showcase_event_settled';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists showcase_projects_guard_mutation on public.showcase_projects;
+create trigger showcase_projects_guard_mutation
+  before insert or update or delete on public.showcase_projects
+  for each row execute function public.showcase_guard_project_mutation();
+
+-- Settlement needs every initial draw that has a prize to award.
+create or replace function public.settle_showcase_event(
+  p_event_id uuid,
+  p_admin_id uuid
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  event_row public.showcase_events%rowtype;
+  settled timestamptz;
+begin
+  select * into event_row
+  from public.showcase_events
+  where id = p_event_id
+  for update;
+  if not found
+    or event_row.settled_at is not null
+    or event_row.announcement_start_at is null
+    or event_row.announcement_start_at > now() then
+    raise exception 'showcase_settlement_invalid';
+  end if;
+  if (
+    event_row.submitter_selection_count > 0
+    and not exists (
+      select 1 from public.showcase_draws draw
+      where draw.event_id = p_event_id
+        and draw.candidate_group = 'submitter'
+        and draw.draw_kind = 'initial'
+    )
+  ) or (
+    event_row.experiencer_selection_count > 0
+    and not exists (
+      select 1 from public.showcase_draws draw
+      where draw.event_id = p_event_id
+        and draw.candidate_group = 'experiencer'
+        and draw.draw_kind = 'initial'
+    )
+  ) then
+    raise exception 'showcase_settlement_draw_required';
+  end if;
+
+  update public.showcase_events
+  set settled_at = now(), settled_by_admin_id = p_admin_id
+  where id = p_event_id
+  returning settled_at into settled;
+  return settled;
+end;
+$$;
+
+-- The 30-day purge records its own audit row in the same transaction (AC-029).
+create or replace function public.purge_showcase_personal_data(p_event_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  settled timestamptz;
+  participant_count integer := 0;
+  registration_count integer := 0;
+  detached_count integer := 0;
+  affected integer := 0;
+begin
+  select settled_at into settled
+  from public.showcase_events
+  where id = p_event_id
+    and settled_at is not null
+    and settled_at <= now() - interval '30 days'
+    and purged_at is null
+  for update;
+  if not found then
+    return false;
+  end if;
+
+  delete from public.showcase_project_participants where event_id = p_event_id;
+  get diagnostics participant_count = row_count;
+  update public.showcase_registrations set member_id = null, student_number = null
+  where event_id = p_event_id and (member_id is not null or student_number is not null);
+  get diagnostics registration_count = row_count;
+  update public.showcase_project_views set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_experiences set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_feedback set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_interests set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_candidate_exclusions set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_winners set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_projects set owner_member_id = null where event_id = p_event_id and owner_member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_events set purged_at = now() where id = p_event_id;
+
+  insert into public.admin_audit_logs (
+    actor_type, actor_id, action, path, target_type, target_id, properties
+  ) values (
+    'system', 'system', 'showcase_personal_data_purge',
+    '/api/cron/purge-showcase-personal-data', 'showcase_event', p_event_id::text,
+    jsonb_build_object(
+      'settled_at', settled,
+      'participants_deleted', participant_count,
+      'registrations_detached', registration_count,
+      'member_links_detached', detached_count
+    )
+  );
+  return true;
+end;
+$$;
+
+do $showcase_guard_privileges$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.showcase_assert_submission_open(uuid)',
+    'public.showcase_assert_experience_open(uuid)',
+    'public.showcase_guard_settled_event()',
+    'public.showcase_guard_project_mutation()',
+    'public.settle_showcase_event(uuid, uuid)',
+    'public.purge_showcase_personal_data(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', signature);
+    execute format('grant execute on function %s to service_role', signature);
+  end loop;
+end;
+$showcase_guard_privileges$;
+
+-- Partner metric rollups -----------------------------------------------------
+-- The event_logs trigger and reconcile both call this function, so excluding
+-- admin/partner actors here covers new events and rebuilt history alike. The
+-- application fallback applies the same filter separately.
+create or replace function public.apply_partner_metric_event_rollups(
+  input_partner_id uuid,
+  input_event_name text,
+  input_actor_type text,
+  input_actor_id text,
+  input_session_id text,
+  input_created_at timestamp with time zone default now()
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  local_created_at timestamp without time zone;
+  resolved_visitor_key text;
+  inserted_count integer;
+begin
+  -- Operator traffic (admins previewing, partners checking their own page)
+  -- is not audience demand; it never reaches the partner-facing rollups.
+  if input_partner_id is null
+    or not is_partner_metric_event(input_event_name)
+    or input_actor_type in ('admin', 'partner') then
+    return;
+  end if;
+
+  local_created_at := date_trunc(
+    'hour',
+    timezone('Asia/Seoul', coalesce(input_created_at, now()))
+  );
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'total',
+    'Asia/Seoul',
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone)
+    where granularity = 'total'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    bucket_local_start,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'hour',
+    'Asia/Seoul',
+    local_created_at,
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_start)
+    where granularity = 'hour'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    bucket_local_date,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'day',
+    'Asia/Seoul',
+    local_created_at::date,
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_date)
+    where granularity = 'day'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    bucket_local_dow,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'weekday',
+    'Asia/Seoul',
+    extract(isodow from local_created_at)::smallint,
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_dow)
+    where granularity = 'weekday'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  if input_event_name = 'partner_detail_view' then
+    resolved_visitor_key := partner_metric_visitor_key(
+      input_actor_type,
+      input_actor_id,
+      input_session_id
+    );
+
+    if resolved_visitor_key is not null then
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'total',
+        'Asia/Seoul',
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, visitor_key)
+        where granularity = 'total'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'total',
+          'Asia/Seoul',
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone)
+          where granularity = 'total'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        bucket_local_start,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'hour',
+        'Asia/Seoul',
+        local_created_at,
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, bucket_local_start, visitor_key)
+        where granularity = 'hour'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          bucket_local_start,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'hour',
+          'Asia/Seoul',
+          local_created_at,
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_start)
+          where granularity = 'hour'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        bucket_local_date,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'day',
+        'Asia/Seoul',
+        local_created_at::date,
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, bucket_local_date, visitor_key)
+        where granularity = 'day'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          bucket_local_date,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'day',
+          'Asia/Seoul',
+          local_created_at::date,
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_date)
+          where granularity = 'day'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        bucket_local_dow,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'weekday',
+        'Asia/Seoul',
+        extract(isodow from local_created_at)::smallint,
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, bucket_local_dow, visitor_key)
+        where granularity = 'weekday'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          bucket_local_dow,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'weekday',
+          'Asia/Seoul',
+          extract(isodow from local_created_at)::smallint,
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_dow)
+          where granularity = 'weekday'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+    end if;
+  end if;
+end;
+$$;
+
+revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from public;
+revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from anon;
+revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from authenticated;
+grant execute on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) to service_role;
+
+-- Rebuild only partners whose rollups already counted operator traffic, and
+-- only while their raw history is complete: reconcile rebuilds from
+-- event_logs, which the one-year retention eventually trims. A partner whose
+-- PV total no longer matches its raw events is skipped and reported instead.
+do $reconcile_partner_metric_operator_traffic$
+declare
+  target_partner_id uuid;
+  rollup_total bigint;
+  raw_total bigint;
+  skipped integer := 0;
+begin
+  for target_partner_id in
+    select distinct partner_row.id
+    from public.event_logs event_row
+    join public.partners partner_row
+      on partner_row.id::text = event_row.target_id
+    where event_row.target_type = 'partner'
+      and event_row.target_id is not null
+      and event_row.actor_type in ('admin', 'partner')
+      and public.is_partner_metric_event(event_row.event_name)
+  loop
+    select coalesce(sum(rollup.metric_count), 0)
+    into rollup_total
+    from public.partner_metric_rollups rollup
+    where rollup.partner_id = target_partner_id
+      and rollup.metric_kind = 'pv'
+      and rollup.granularity = 'total'
+      and public.is_partner_metric_event(rollup.metric_name);
+
+    select count(*)
+    into raw_total
+    from public.event_logs event_row
+    where event_row.target_type = 'partner'
+      and event_row.target_id = target_partner_id::text
+      and public.is_partner_metric_event(event_row.event_name);
+
+    if rollup_total = raw_total then
+      perform public.reconcile_partner_metric_rollups(target_partner_id);
+    else
+      skipped := skipped + 1;
+    end if;
+  end loop;
+
+  if skipped > 0 then
+    raise notice 'partner_metric_operator_reconcile_skipped:%', skipped;
+  end if;
+end
+$reconcile_partner_metric_operator_traffic$;
+
+-- Public media buckets and read-path indexes ---------------------------------
+-- Every writer of these public buckets stores a server-normalized WebP through
+-- the image upload attach step (largest policy output: 10 MiB). Storage now
+-- rejects anything else even if a future writer bypasses that step.
+do $public_media_bucket_limits$
+begin
+  if pg_catalog.to_regclass('storage.buckets') is not null then
+    update storage.buckets
+    set file_size_limit = 10485760,
+        allowed_mime_types = array['image/webp']::text[]
+    where id in ('partner-media', 'review-media', 'promotion-slides');
+  end if;
+end
+$public_media_bucket_limits$;
+
+-- Admin member detail: security log page by member, newest first, with count.
+create index if not exists auth_security_logs_actor_created_at_idx
+  on public.auth_security_logs (actor_type, actor_id, created_at desc)
+  where actor_id is not null;
+
+-- Campus catalog filters use campus_slugs @> '{slug}'.
+create index if not exists partners_campus_slugs_idx
+  on public.partners using gin (campus_slugs);
+
+-- Billing records ------------------------------------------------------------
+-- Invoices are issued in Korea; the date must follow KST, not the UTC session.
+alter table public.partner_billing_invoices
+  alter column issue_date set default ((now() at time zone 'Asia/Seoul')::date);
+
+-- Financial records must survive partner or company cleanup. Partners are only
+-- hard-deleted to roll back a partner that was just created (no records yet);
+-- deleting a company with invoices now fails instead of erasing them.
+do $audit_preserving_foreign_keys$
+declare
+  target record;
+  existing_constraint text;
+begin
+  for target in
+    select *
+    from (values
+      ('partner_billing_invoices', 'partner_id', 'partners'),
+      ('partner_billing_invoices', 'company_id', 'partner_companies'),
+      ('partner_benefit_usages', 'partner_id', 'partners'),
+      ('ad_coupon_redemptions', 'partner_id', 'partners')
+    ) as foreign_key(table_name, column_name, referenced_table)
+  loop
+    if pg_catalog.to_regclass(pg_catalog.format('public.%I', target.table_name)) is null then
+      continue;
+    end if;
+    for existing_constraint in
+      select constraint_row.conname
+      from pg_catalog.pg_constraint constraint_row
+      join pg_catalog.pg_attribute attribute_row
+        on attribute_row.attrelid = constraint_row.conrelid
+       and attribute_row.attnum = constraint_row.conkey[1]
+      where constraint_row.contype = 'f'
+        and constraint_row.conrelid = pg_catalog.to_regclass(pg_catalog.format('public.%I', target.table_name))
+        and constraint_row.confrelid = pg_catalog.to_regclass(pg_catalog.format('public.%I', target.referenced_table))
+        and pg_catalog.array_length(constraint_row.conkey, 1) = 1
+        and attribute_row.attname = target.column_name
+    loop
+      execute pg_catalog.format(
+        'alter table public.%I drop constraint %I',
+        target.table_name,
+        existing_constraint
+      );
+    end loop;
+    execute pg_catalog.format(
+      'alter table public.%I add constraint %I foreign key (%I) references public.%I(id) on delete restrict',
+      target.table_name,
+      target.table_name || '_' || target.column_name || '_fkey',
+      target.column_name,
+      target.referenced_table
+    );
+  end loop;
+end
+$audit_preserving_foreign_keys$;
+
+-- Public schema privilege defaults --------------------------------------------
+-- The application reaches the database only through the service role. Remove
+-- every PUBLIC/anon/authenticated privilege that earlier migrations may have
+-- forgotten to revoke, then change the defaults so a future migration that
+-- forgets a revoke stays closed. Extension-owned routines keep their ACLs.
+do $public_routine_privileges$
+declare
+  routine record;
+begin
+  for routine in
+    select procedure_row.oid::regprocedure as signature
+    from pg_catalog.pg_proc procedure_row
+    join pg_catalog.pg_namespace namespace_row
+      on namespace_row.oid = procedure_row.pronamespace
+    where namespace_row.nspname = 'public'
+      and not exists (
+        select 1
+        from pg_catalog.pg_depend dependency
+        where dependency.classid = 'pg_catalog.pg_proc'::pg_catalog.regclass
+          and dependency.objid = procedure_row.oid
+          and dependency.deptype = 'e'
+      )
+    order by procedure_row.oid
+  loop
+    execute pg_catalog.format(
+      'revoke all on routine %s from public, anon, authenticated',
+      routine.signature
+    );
+    execute pg_catalog.format(
+      'grant execute on routine %s to service_role',
+      routine.signature
+    );
+  end loop;
+end
+$public_routine_privileges$;
+
+do $public_relation_privileges$
+declare
+  table_record record;
+  sequence_record record;
+begin
+  for table_record in
+    select schemaname, tablename
+    from pg_catalog.pg_tables
+    where schemaname = 'public'
+    order by tablename
+  loop
+    execute pg_catalog.format(
+      'alter table %I.%I enable row level security',
+      table_record.schemaname,
+      table_record.tablename
+    );
+    execute pg_catalog.format(
+      'revoke all on table %I.%I from public, anon, authenticated',
+      table_record.schemaname,
+      table_record.tablename
+    );
+  end loop;
+
+  for sequence_record in
+    select sequence_schema, sequence_name
+    from information_schema.sequences
+    where sequence_schema = 'public'
+    order by sequence_name
+  loop
+    execute pg_catalog.format(
+      'revoke all on sequence %I.%I from public, anon, authenticated',
+      sequence_record.sequence_schema,
+      sequence_record.sequence_name
+    );
+  end loop;
+end
+$public_relation_privileges$;
+
+-- Supabase grants anon/authenticated on every new public object by default.
+-- Per-schema revokes reverse those grants; PUBLIC EXECUTE on functions is a
+-- global default, so it is revoked per creating role. Only roles the migration
+-- runner may act for are changed.
+do $public_default_privileges$
+declare
+  owner_role text;
+begin
+  foreach owner_role in array array['postgres', 'supabase_admin'] loop
+    if exists (select 1 from pg_catalog.pg_roles where rolname = owner_role)
+      and pg_catalog.pg_has_role(current_user, owner_role, 'MEMBER') then
+      execute pg_catalog.format(
+        'alter default privileges for role %I revoke execute on functions from public',
+        owner_role
+      );
+      execute pg_catalog.format(
+        'alter default privileges for role %I in schema public revoke all on functions from anon, authenticated',
+        owner_role
+      );
+      execute pg_catalog.format(
+        'alter default privileges for role %I in schema public revoke all on tables from anon, authenticated',
+        owner_role
+      );
+      execute pg_catalog.format(
+        'alter default privileges for role %I in schema public revoke all on sequences from anon, authenticated',
+        owner_role
+      );
+      execute pg_catalog.format(
+        'alter default privileges for role %I in schema public grant execute on functions to service_role',
+        owner_role
+      );
+    end if;
+  end loop;
+end
+$public_default_privileges$;
+
+-- Fail the migration instead of leaving a browser-reachable object behind.
+do $verify_public_exposure$
+declare
+  exposed text;
+begin
+  select pg_catalog.string_agg(procedure_row.oid::regprocedure::text, ', ')
+  into exposed
+  from pg_catalog.pg_proc procedure_row
+  join pg_catalog.pg_namespace namespace_row
+    on namespace_row.oid = procedure_row.pronamespace
+  where namespace_row.nspname = 'public'
+    and not exists (
+      select 1
+      from pg_catalog.pg_depend dependency
+      where dependency.classid = 'pg_catalog.pg_proc'::pg_catalog.regclass
+        and dependency.objid = procedure_row.oid
+        and dependency.deptype = 'e'
+    )
+    and (
+      pg_catalog.has_function_privilege('anon', procedure_row.oid, 'EXECUTE')
+      or pg_catalog.has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')
+    );
+  if exposed is not null then
+    raise exception 'public_routine_exposed:%', exposed;
+  end if;
+
+  select pg_catalog.string_agg(pg_catalog.format('%I.%I', schemaname, tablename), ', ')
+  into exposed
+  from pg_catalog.pg_tables
+  where schemaname = 'public'
+    and (
+      not rowsecurity
+      or pg_catalog.has_table_privilege(
+        'anon',
+        pg_catalog.format('%I.%I', schemaname, tablename),
+        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+      )
+      or pg_catalog.has_table_privilege(
+        'authenticated',
+        pg_catalog.format('%I.%I', schemaname, tablename),
+        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+      )
+    );
+  if exposed is not null then
+    raise exception 'public_table_exposed:%', exposed;
+  end if;
+end
+$verify_public_exposure$;
+
+-- Snapshot of 20261005111738_publish_privacy_policy_v4.sql
+-- RF-02 (#535): privacy policy v4.
+-- One consolidated notice for the self-hosted service: what is collected,
+-- how long each group is kept (docs/security/data-lifecycle.md decision table),
+-- which outside services receive data, and how a member asks to see it.
+--
+-- Raising the active privacy version sends every member through the existing
+-- required-policy gate once. The operator chooses that moment by choosing when
+-- to apply this file, after the retention migration and the backup retention
+-- default are in effect. The content renderer understands "## " headings,
+-- "- " list blocks and plain paragraphs separated by blank lines only.
+
+update public.policy_documents
+set is_active = false,
+    updated_at = now()
+where kind = 'privacy'
+  and is_active = true;
+
+insert into public.policy_documents (
+  kind,
+  version,
+  title,
+  summary,
+  content,
+  is_active,
+  effective_at
+)
+values (
+  'privacy',
+  4,
+  '개인정보 수집·이용 및 처리방침',
+  '자체 호스팅 환경에서 회원·수료생·제휴처 정보를 처리하는 목적, 항목, 보유 기간, 외부 전송과 열람 요청 절차를 안내합니다.',
+  $$## 1. 처리 목적
+싸트너십은 아래 목적에 필요한 범위에서만 개인정보를 처리합니다.
+
+- 회원 가입, 본인·소속 확인(Mattermost 인증, 이메일 인증, 수료생 인증)과 계정 운영
+- 제휴 정보 제공, 제휴 혜택·쿠폰 사용 확인, 리뷰·즐겨찾기 기능
+- 웹 푸시·이메일·Mattermost 알림 발송과 Apple Wallet 회원 카드 갱신
+- 이벤트·프로젝트 쇼케이스 운영(참가 확인, 추첨, 경품 전달)
+- 제휴처 등록·파트너 계정 운영, 청구와 세금계산서 처리
+- 부정 이용 방지, 보안 사고 대응, 서비스 개선과 통계
+
+## 2. 수집 항목
+- 회원 정보: 이름, 기수 또는 운영진 여부, 캠퍼스, 로그인 아이디, 이메일 주소, 비밀번호 해시, Mattermost 사용자 ID·사용자명, 프로필 사진
+- 수료생 인증 정보: 이름, 기수, 캠퍼스, 이메일 주소, 교육이수증(PDF), 본인 사진, 검토 결과
+- 정책 동의 기록: 동의한 문서와 버전, 동의 시각, 동의할 때의 IP 주소와 user-agent
+- 서비스 이용 기록: 페이지 조회·클릭 같은 제품 이용 기록(IP 주소, user-agent, 세션 식별자 포함), 즐겨찾기, 리뷰 본문·사진·반응, 알림함 읽음·삭제 상태, 설정 변경 이력
+- 제휴 혜택·쿠폰 기록: 혜택을 사용한 회원, 제휴처, 선택한 혜택, 사용 시각, 쿠폰 발급·사용 기록
+- 알림 정보: 웹 푸시 구독 정보(구독 주소, 브라우저·기기 정보), 알림 수신 설정, 알림 발송 결과
+- Apple Wallet 회원 카드: 패스 일련번호, 기기 등록 식별자, 패스 갱신용 푸시 토큰
+- 쇼케이스·이벤트 정보: 참여 등록과 이름 공개 동의, 체험·관심·피드백 기록, 추첨·당첨과 경품 전달 기록
+- 쇼케이스 경품 수령 정보: 당첨자가 경품 수령 안내 구글폼에 직접 입력한 학번 등 수령에 필요한 정보(서비스에는 저장하지 않습니다)
+- 보안 기록: 로그인·인증 시도와 결과, IP 주소, user-agent, 관리자 처리 감사 기록
+- 제휴처 담당자 정보: 담당자 이름·이메일·연락처, 파트너 계정 아이디·이메일, 사업자등록번호, 상호, 대표자명, 사업장 주소, 업태·종목, 세금계산서 수신 이메일, 입금자명
+
+## 3. 보유 및 이용 기간
+- 회원 정보: 탈퇴할 때까지 보관합니다. 탈퇴하면 로그인 세션과 푸시 구독을 바로 정리하고, 30일 뒤 이름·이메일·연락 수단·사진 등 식별 정보를 익명화합니다. 공개 리뷰 본문은 "탈퇴한 회원"으로 표시해 남습니다.
+- 수료생 교육이수증: 검토가 끝난 날부터 30일 뒤 삭제합니다. 제출하지 않은 업로드 파일은 24시간 뒤 삭제합니다.
+- 본인 사진: 승인된 사진은 회원 카드에 쓰는 동안 보관하고 탈퇴 후 익명화할 때 삭제합니다. 반려되거나 교체된 사진은 30일 뒤 삭제합니다.
+- 제품 이용 기록(IP 주소·user-agent 포함), 보안·감사 기록, 푸시 발송 기록: 생성일부터 1년
+- 제휴 혜택 사용 기록: 생성일부터 1년
+- 로그인·인증·문의 시도 제한 기록: 30일
+- 발송이 끝난 알림의 발송 결과: 180일. 회원 알림함은 탈퇴할 때까지 보관합니다.
+- 이미지 업로드 처리 기록: 만료 후 30일
+- 방문·활동 통계용 식별자 기록: 400일. 이후에는 개인을 식별할 수 없는 집계만 남깁니다.
+- 쇼케이스 회원 연결 정보: 행사 정산 후 30일. 피드백 본문과 일부를 가린 당첨자 명단은 행사 증빙으로 남깁니다.
+- 쇼케이스 경품 수령 정보(구글폼): 경품 발송과 정산을 마치면 삭제하며, 늦어도 행사 정산 후 30일 안에 삭제합니다.
+- 이벤트 추첨·당첨 기록: 탈퇴할 때까지 보관하며, 익명화할 때 당첨자 이름 등 표시 정보를 지웁니다.
+- 정책 동의 기록: 탈퇴할 때까지 보관하며, 익명화할 때 IP 주소와 user-agent를 삭제합니다.
+- 쿠폰 발급·사용 기록과 청구·결제·세금계산서 기록: 정산과 세무 증빙에 필요한 기간 동안 보관하고, 관계 법령이 보존 기간을 정한 경우 그 기간을 따릅니다. 탈퇴한 회원의 기록에는 익명화된 회원 정보만 남습니다.
+- 제휴처 담당자 정보: 제휴 기간 동안 보관하며, 제휴가 끝난 뒤 삭제를 요청하면 정산·세무 증빙에 필요한 정보를 제외하고 지체 없이 삭제합니다.
+- 백업 사본: 암호화해 보관하며, 삭제한 정보도 백업 사본이 만료될 때까지 최대 30일 남을 수 있습니다. 백업에서 복원하면 서비스에 연결하기 전에 삭제·익명화 대상을 다시 정리합니다.
+- 보안 사고·분쟁 대응이나 법령상 보존 의무가 있으면 필요한 범위와 기간 동안 따로 보존합니다.
+
+## 4. 처리 환경과 외부 전송
+서비스 애플리케이션, 데이터베이스, 파일 저장소는 운영자가 직접 관리하는 국내 서버에서 운영합니다(자체 호스팅). 서비스가 보관하는 회원 데이터를 외부 클라우드 사업자에게 맡기지 않습니다. 쇼케이스 경품 수령 정보만 아래 구글폼으로 따로 받습니다.
+싸트너십은 개인정보를 제휴처를 포함한 제3자에게 제공하지 않습니다. 법령에 근거가 있거나 이용자가 따로 동의한 경우만 예외입니다.
+아래 서비스에는 기능 제공에 필요한 최소 정보만 전송합니다.
+
+- Resend, Inc.(미국): 인증 코드·비밀번호 재설정·알림 이메일 발송. 받는 사람 이메일 주소와 메일 본문을 발송할 때 암호화된 연결로 전송하며, 발송 처리와 해당 사업자의 정책에 따른 기간 동안 보관됩니다. 발송 장애 시에는 운영자가 지정한 SMTP 메일 서비스로 같은 정보를 보낼 수 있습니다.
+- Apple Inc.(미국, Apple Push Notification service): Apple Wallet 회원 카드 갱신 알림. 패스 갱신용 푸시 토큰을 갱신이 필요할 때 전송하며 회원 정보는 담지 않습니다.
+- 웹 푸시 서비스(이용자 브라우저 제공자, 예: Apple·Google·Mozilla): 웹 푸시 알림 전달. 구독 주소와 암호화된 알림 내용을 발송할 때 전송합니다. 알림 수신을 끄면 전송하지 않습니다.
+- SSAFY Mattermost: Mattermost 회원 인증, 인증 코드·알림 메시지 전달. Mattermost 사용자 ID·사용자명과 메시지 본문을 처리합니다.
+- Google LLC(미국, Google Forms): 쇼케이스 경품 수령 정보 수집. 당첨자가 운영자가 안내한 폼에 학번 등 수령에 필요한 정보를 직접 입력하며, 경품 발송과 정산을 마치면 삭제합니다.
+- 공공데이터포털 국세청 사업자등록 상태 조회: 제휴처 등록 시 사업자 상태 확인. 사업자등록번호만 전송합니다.
+
+## 5. 이용자의 권리와 열람 요청 절차
+이용자는 언제든지 개인정보 열람, 정정, 삭제, 처리 정지와 동의 철회를 요청할 수 있습니다.
+
+- 설정 화면에서 내 정보를 확인·수정하고 회원 탈퇴를 직접 할 수 있습니다. 알림 화면에서는 알림과 마케팅 정보 수신 동의를 언제든 바꿀 수 있습니다.
+- 그 밖의 요청은 아래 문의처 이메일로 가입한 아이디나 이메일 주소와 요청 내용을 보내 주세요. 본인 확인 후 처리합니다.
+- 요청을 받은 날부터 10일 이내에 열람·정정·삭제 결과를 알리거나, 미루거나 거절해야 하면 그 사유와 이의 제기 방법을 알립니다.
+- 법정대리인이나 위임받은 사람도 위임 사실을 확인할 수 있는 자료와 함께 요청할 수 있습니다.
+
+## 6. 안전성 확보 조치
+싸트너십은 비밀번호 해시 저장, 서버 측 권한 검증, 데이터베이스 접근 권한 최소화, 비공개 파일 저장소, 로그의 민감 정보 제거, 백업 암호화, 보존 기간 자동 파기 같은 보호 조치를 적용합니다.
+
+## 7. 개인정보 보호책임자와 문의처
+- 책임자: 정민호
+- 이메일: myknow00@naver.com
+
+## 8. 방침 변경
+이 방침을 바꾸면 버전을 올리고 서비스 안에서 다시 안내합니다. 수집 항목이나 이용 목적이 바뀌는 경우 다시 동의를 받습니다.$$,
+  true,
+  now()
+)
+on conflict (kind, version) do update set
+  title = excluded.title,
+  summary = excluded.summary,
+  content = excluded.content,
+  is_active = excluded.is_active,
+  effective_at = excluded.effective_at,
+  updated_at = now();
+
+
+-- Snapshot of 20261006010931_fence_consent_profile_delivery_and_upload_transitions.sql
+-- BEGIN CONSENT PROFILE TRANSACTIONS
+create or replace function public.patch_member_notification_preferences_atomic(
+  input_member_id uuid,
+  input_enabled boolean,
+  input_announcement_enabled boolean,
+  input_new_partner_enabled boolean,
+  input_expiring_partner_enabled boolean,
+  input_review_enabled boolean,
+  input_mm_enabled boolean,
+  input_marketing_enabled boolean,
+  input_ip_address text,
+  input_user_agent text,
+  input_marketing_policy_id uuid,
+  input_marketing_policy_version integer
+)
+returns table (
+  enabled boolean,
+  announcement_enabled boolean,
+  new_partner_enabled boolean,
+  expiring_partner_enabled boolean,
+  review_enabled boolean,
+  mm_enabled boolean,
+  marketing_enabled boolean
+)
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $$
+declare
+  current_preferences public.push_preferences%rowtype;
+  current_marketing_enabled boolean := false;
+  active_push_subscription_count bigint := 0;
+  active_marketing_policy_id uuid;
+  active_marketing_policy_version integer;
+  agreed_at timestamp with time zone := pg_catalog.clock_timestamp();
+  next_enabled boolean;
+  next_announcement_enabled boolean;
+  next_new_partner_enabled boolean;
+  next_expiring_partner_enabled boolean;
+  next_review_enabled boolean;
+  next_mm_enabled boolean;
+  next_marketing_enabled boolean;
+begin
+  if input_member_id is null then
+    raise exception using
+      errcode = '22023',
+      message = 'member_notification_preferences_invalid';
+  end if;
+
+  perform 1
+  from public.members
+  where id = input_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception using
+      errcode = 'P0002',
+      message = 'member_not_found';
+  end if;
+
+  select *
+  into current_preferences
+  from public.push_preferences
+  where member_id = input_member_id
+  for update;
+
+  current_marketing_enabled :=
+    coalesce(current_preferences.marketing_enabled, false);
+
+  select pg_catalog.count(*)
+  into active_push_subscription_count
+  from public.push_subscriptions
+  where member_id = input_member_id
+    and is_active = true;
+
+  next_enabled :=
+    coalesce(input_enabled, coalesce(current_preferences.enabled, false))
+    and active_push_subscription_count > 0;
+  next_announcement_enabled :=
+    coalesce(
+      input_announcement_enabled,
+      coalesce(current_preferences.announcement_enabled, true)
+    );
+  next_new_partner_enabled :=
+    coalesce(
+      input_new_partner_enabled,
+      coalesce(current_preferences.new_partner_enabled, true)
+    );
+  next_expiring_partner_enabled :=
+    coalesce(
+      input_expiring_partner_enabled,
+      coalesce(current_preferences.expiring_partner_enabled, true)
+    );
+  next_review_enabled :=
+    coalesce(
+      input_review_enabled,
+      coalesce(current_preferences.review_enabled, true)
+    );
+  next_mm_enabled :=
+    coalesce(
+      input_mm_enabled,
+      coalesce(current_preferences.mm_enabled, true)
+    );
+  next_marketing_enabled :=
+    coalesce(
+      input_marketing_enabled,
+      current_marketing_enabled
+    );
+
+  -- Consent requires explicit intent for exactly the immutable version reviewed.
+  -- Locking that active row serializes us with a policy activation transaction.
+  if input_marketing_enabled is true then
+    if input_marketing_policy_id is null or input_marketing_policy_version is null
+      or input_marketing_policy_version < 1 then
+      raise exception using errcode = '22023', message = 'marketing_policy_confirmation_required';
+    end if;
+    select id, version
+    into active_marketing_policy_id, active_marketing_policy_version
+    from public.policy_documents
+    where id = input_marketing_policy_id
+      and version = input_marketing_policy_version
+      and kind = 'marketing' and is_active = true
+    for share;
+    if not found then
+      raise exception using errcode = 'P0001', message = 'marketing_policy_changed';
+    end if;
+  elsif input_marketing_policy_id is not null or input_marketing_policy_version is not null then
+    raise exception using errcode = '22023', message = 'member_notification_preferences_invalid';
+  end if;
+
+  insert into public.push_preferences (
+    member_id,
+    enabled,
+    announcement_enabled,
+    new_partner_enabled,
+    expiring_partner_enabled,
+    review_enabled,
+    mm_enabled,
+    marketing_enabled,
+    updated_at
+  )
+  values (
+    input_member_id,
+    next_enabled,
+    next_announcement_enabled,
+    next_new_partner_enabled,
+    next_expiring_partner_enabled,
+    next_review_enabled,
+    next_mm_enabled,
+    next_marketing_enabled,
+    agreed_at
+  )
+  on conflict (member_id) do update
+  set
+    enabled = excluded.enabled,
+    announcement_enabled = excluded.announcement_enabled,
+    new_partner_enabled = excluded.new_partner_enabled,
+    expiring_partner_enabled = excluded.expiring_partner_enabled,
+    review_enabled = excluded.review_enabled,
+    mm_enabled = excluded.mm_enabled,
+    marketing_enabled = excluded.marketing_enabled,
+    updated_at = excluded.updated_at;
+
+  -- Unrelated patches and withdrawal preserve all historical consent evidence.
+  -- A retry of a current opt-in is a no-op; a new opt-in after withdrawal records
+  -- the fresh acceptance even if that immutable policy has prior evidence.
+  if input_marketing_enabled is true and (
+    not current_marketing_enabled or not exists (
+      select 1 from public.member_policy_consents c
+      where c.member_id = input_member_id
+        and c.policy_document_id = active_marketing_policy_id
+        and c.kind = 'marketing' and c.version = active_marketing_policy_version
+    )
+  ) then
+    insert into public.member_policy_consents (
+      member_id,
+      policy_document_id,
+      kind,
+      version,
+      agreed_at,
+      ip_address,
+      user_agent
+    )
+    values (
+      input_member_id,
+      active_marketing_policy_id,
+      'marketing',
+      active_marketing_policy_version,
+      agreed_at,
+      input_ip_address,
+      input_user_agent
+    )
+    on conflict (member_id, policy_document_id) do update
+    set
+      kind = excluded.kind,
+      version = excluded.version,
+      agreed_at = excluded.agreed_at,
+      ip_address = excluded.ip_address,
+      user_agent = excluded.user_agent;
+  end if;
+
+  return query
+  select
+    next_enabled,
+    next_announcement_enabled,
+    next_new_partner_enabled,
+    next_expiring_partner_enabled,
+    next_review_enabled,
+    next_mm_enabled,
+    next_marketing_enabled and exists (
+      select 1 from public.member_policy_consents c
+      join public.policy_documents p on p.id = c.policy_document_id
+      where c.member_id = input_member_id and c.kind = 'marketing'
+        and p.kind = 'marketing' and p.is_active = true and c.version = p.version
+    );
+end;
+$$;
+
+revoke all on function public.patch_member_notification_preferences_atomic(
+  uuid, boolean, boolean, boolean, boolean, boolean, boolean, boolean, text, text, uuid, integer
+) from public, anon, authenticated;
+grant execute on function public.patch_member_notification_preferences_atomic(
+  uuid, boolean, boolean, boolean, boolean, boolean, boolean, boolean, text, text, uuid, integer
+) to service_role;
+
+-- Preserve the old signature for omission/withdrawal. Old clients cannot opt in
+-- without reviewed-policy evidence, including stale full-state settings forms.
+create or replace function public.update_member_push_preferences_atomic(
+  input_member_id uuid,
+  input_enabled boolean,
+  input_announcement_enabled boolean,
+  input_new_partner_enabled boolean,
+  input_expiring_partner_enabled boolean,
+  input_review_enabled boolean,
+  input_mm_enabled boolean,
+  input_marketing_enabled boolean,
+  input_ip_address text,
+  input_user_agent text
+)
+returns table (
+  enabled boolean,
+  announcement_enabled boolean,
+  new_partner_enabled boolean,
+  expiring_partner_enabled boolean,
+  review_enabled boolean,
+  mm_enabled boolean,
+  marketing_enabled boolean
+)
+language sql
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select * from public.patch_member_notification_preferences_atomic(
+    input_member_id, input_enabled, input_announcement_enabled,
+    input_new_partner_enabled, input_expiring_partner_enabled, input_review_enabled,
+    input_mm_enabled, input_marketing_enabled, input_ip_address, input_user_agent,
+    null::uuid, null::integer
+  );
+$$;
+revoke all on function public.update_member_push_preferences_atomic(
+  uuid, boolean, boolean, boolean, boolean, boolean, boolean, boolean, text, text
+) from public, anon, authenticated;
+grant execute on function public.update_member_push_preferences_atomic(
+  uuid, boolean, boolean, boolean, boolean, boolean, boolean, boolean, text, text
+) to service_role;
+
+create or replace function public.activate_member_profile_image_atomic(
+  input_member_id uuid,
+  input_image_id uuid
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $$
+declare
+  target public.member_profile_images%rowtype;
+  applied_at timestamptz;
+begin
+  perform 1 from public.members
+  where id = input_member_id and deleted_at is null
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'profile_image_member_missing';
+  end if;
+
+  select * into target from public.member_profile_images
+  where id = input_image_id and member_id = input_member_id
+    and deleted_at is null and graduate_verification_request_id is null
+    and source in ('legacy', 'mattermost') and status in ('pending', 'approved')
+  for update;
+  if not found then
+    raise exception using errcode = '22023', message = 'profile_image_not_activatable';
+  end if;
+  if target.status = 'approved' then
+    return true;
+  end if;
+
+  applied_at := pg_catalog.clock_timestamp();
+  update public.member_profile_images
+  set status = 'superseded', delete_after = applied_at + interval '30 days', updated_at = applied_at
+  where member_id = input_member_id and id <> input_image_id
+    and status = 'approved' and deleted_at is null;
+
+  update public.member_profile_images
+  set status = 'approved', reviewed_at = applied_at, review_reason = null,
+      delete_after = null, updated_at = applied_at
+  where id = input_image_id;
+
+  update public.members set updated_at = applied_at where id = input_member_id;
+  return true;
+end;
+$$;
+revoke all on function public.activate_member_profile_image_atomic(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.activate_member_profile_image_atomic(uuid, uuid) to service_role;
+
+-- Align admin replacement with automatic sync: lock member before image, then
+-- revalidate the original pending target. Keep the active-admin review boundary.
+create or replace function public.approve_member_profile_image_replacement(
+  p_image_id uuid,
+  p_admin_id uuid
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $$
+declare
+  image_row public.member_profile_images%rowtype;
+  member_row public.members%rowtype;
+  reviewer_profile_id uuid;
+  target_member_id uuid;
+begin
+  select member_id into target_member_id
+  from public.member_profile_images
+  where id = p_image_id and member_id is not null
+    and graduate_verification_request_id is null and status = 'pending'
+    and deleted_at is null;
+  if not found then
+    raise exception 'profile_image_not_reviewable';
+  end if;
+  select * into member_row from public.members
+  where id = target_member_id and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'profile_image_member_missing';
+  end if;
+  select * into image_row from public.member_profile_images
+  where id = p_image_id and member_id = member_row.id
+    and graduate_verification_request_id is null and status = 'pending'
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'profile_image_not_reviewable';
+  end if;
+  select id into reviewer_profile_id
+  from public.admin_profiles
+  where member_id = p_admin_id
+    and is_active = true;
+  if reviewer_profile_id is null then
+    raise exception 'profile_image_admin_profile_missing';
+  end if;
+
+  update public.member_profile_images
+  set status = 'superseded',
+      delete_after = now() + interval '30 days',
+      updated_at = now()
+  where member_id = member_row.id
+    and status = 'approved'
+    and deleted_at is null;
+
+  update public.member_profile_images
+  set status = 'approved',
+      reviewer_admin_id = p_admin_id,
+      reviewer_admin_profile_id = reviewer_profile_id,
+      reviewed_at = now(),
+      updated_at = now()
+  where id = image_row.id;
+
+  update public.members
+  set updated_at = now()
+  where id = member_row.id;
+  return member_row.id;
+end;
+$$;
+
+revoke all on function public.approve_member_profile_image_replacement(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.approve_member_profile_image_replacement(uuid, uuid) to service_role;
+
+-- Rejection shares the same member-before-image order as approval.
+create or replace function public.reject_member_profile_image_replacement(
+  p_image_id uuid,
+  p_admin_id uuid,
+  p_reason text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $$
+declare
+  image_row public.member_profile_images%rowtype;
+  member_row public.members%rowtype;
+  reviewer_profile_id uuid;
+  target_member_id uuid;
+begin
+  if char_length(btrim(coalesce(p_reason, ''))) not between 1 and 500 then
+    raise exception 'profile_image_rejection_reason_invalid';
+  end if;
+  select member_id into target_member_id
+  from public.member_profile_images
+  where id = p_image_id and member_id is not null
+    and graduate_verification_request_id is null and status = 'pending';
+  if not found then
+    raise exception 'profile_image_not_reviewable';
+  end if;
+  select * into member_row from public.members
+  where id = target_member_id
+  for update;
+  if not found then
+    raise exception 'profile_image_member_missing';
+  end if;
+  select * into image_row from public.member_profile_images
+  where id = p_image_id and member_id = member_row.id
+    and graduate_verification_request_id is null and status = 'pending'
+  for update;
+  if not found then
+    raise exception 'profile_image_not_reviewable';
+  end if;
+  select id into reviewer_profile_id
+  from public.admin_profiles
+  where member_id = p_admin_id
+    and is_active = true;
+  if reviewer_profile_id is null then
+    raise exception 'profile_image_admin_profile_missing';
+  end if;
+
+  update public.member_profile_images
+  set status = 'rejected',
+      reviewer_admin_id = p_admin_id,
+      reviewer_admin_profile_id = reviewer_profile_id,
+      review_reason = btrim(p_reason),
+      reviewed_at = now(),
+      delete_after = now() + interval '30 days',
+      updated_at = now()
+  where id = image_row.id;
+
+  update public.members
+  set updated_at = now()
+  where id = member_row.id;
+  return member_row.id;
+end;
+$$;
+
+revoke all on function public.reject_member_profile_image_replacement(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.reject_member_profile_image_replacement(uuid, uuid, text) to service_role;
+-- END CONSENT PROFILE TRANSACTIONS
+
+-- BEGIN WINNER DELIVERY
+-- D2/D3 complete additive fragment for the database owner's integrated migration.
+-- Requires the existing notification campaign/delivery schema and RPCs.
+-- No historical rows are rewritten. Existing push signature/semantics retained.
+-- Parent will stop Preview old writers before switching the application.
+create unique index if not exists notification_deliveries_mattermost_v2_claim_unique
+  on public.notification_deliveries(provider_idempotency_key)
+  where provider = 'mattermost'
+    and provider_idempotency_key like 'ssartnership:delivery:v2:%';
+
+create or replace function public.claim_notification_delivery(
+  p_notification_id uuid,
+  p_member_id uuid,
+  p_channel text,
+  p_provider text,
+  p_provider_campaign_id text,
+  p_provider_idempotency_key text,
+  p_lease_seconds integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  delivery_row public.notification_deliveries%rowtype;
+  normalized_idempotency_key text := pg_catalog.btrim(
+    coalesce(p_provider_idempotency_key, '')
+  );
+  claim_time timestamp with time zone := pg_catalog.clock_timestamp();
+  stale_before timestamp with time zone;
+begin
+  if p_notification_id is null
+    or p_member_id is null
+    or not ((p_channel is not distinct from 'push' and p_provider is not distinct from 'web_push')
+      or (p_channel is not distinct from 'mm' and p_provider is not distinct from 'mattermost'))
+    or (p_provider = 'mattermost' and normalized_idempotency_key is distinct from
+      ('ssartnership:delivery:v2:' || p_notification_id::text || ':mm:' || p_member_id::text))
+    or normalized_idempotency_key = ''
+    or p_lease_seconds is null
+    or p_lease_seconds < 30
+    or p_lease_seconds > 3600 then
+    raise exception using
+      errcode = '22023',
+      message = 'notification_delivery_claim_invalid';
+  end if;
+
+  stale_before :=
+    claim_time - pg_catalog.make_interval(secs => p_lease_seconds);
+
+  if p_provider = 'web_push' then
+  insert into public.notification_deliveries (
+    notification_id,
+    member_id,
+    channel,
+    status,
+    error_message,
+    provider,
+    provider_campaign_id,
+    provider_idempotency_key,
+    provider_status,
+    delivered_at,
+    created_at,
+    updated_at
+  )
+  values (
+    p_notification_id,
+    p_member_id,
+    'push',
+    'pending',
+    null,
+    'web_push',
+    nullif(pg_catalog.btrim(coalesce(p_provider_campaign_id, '')), ''),
+    normalized_idempotency_key,
+    'claimed',
+    null,
+    claim_time,
+    claim_time
+  )
+  on conflict (provider_idempotency_key)
+    where provider = 'web_push'
+      and provider_idempotency_key is not null
+  do nothing
+  returning * into delivery_row;
+  else
+  insert into public.notification_deliveries (
+    notification_id,
+    member_id,
+    channel,
+    status,
+    error_message,
+    provider,
+    provider_campaign_id,
+    provider_idempotency_key,
+    provider_status,
+    delivered_at,
+    created_at,
+    updated_at
+  )
+  values (
+    p_notification_id,
+    p_member_id,
+    'mm',
+    'pending',
+    null,
+    'mattermost',
+    nullif(pg_catalog.btrim(coalesce(p_provider_campaign_id, '')), ''),
+    normalized_idempotency_key,
+    'claimed',
+    null,
+    claim_time,
+    claim_time
+  )
+  on conflict (provider_idempotency_key)
+    where provider = 'mattermost'
+      and provider_idempotency_key like 'ssartnership:delivery:v2:%'
+  do nothing
+  returning * into delivery_row;
+  end if;
+
+  if found then
+    return pg_catalog.jsonb_build_object(
+      'delivery_id', delivery_row.id,
+      'disposition', 'claimed'
+    );
+  end if;
+
+  select *
+  into delivery_row
+  from public.notification_deliveries
+  where provider = p_provider
+    and provider_idempotency_key = normalized_idempotency_key
+  for update;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      message = 'notification_delivery_claim_conflict';
+  end if;
+
+  if delivery_row.notification_id <> p_notification_id
+    or delivery_row.member_id is distinct from p_member_id
+    or delivery_row.channel is distinct from p_channel
+    or delivery_row.provider is distinct from p_provider
+    or delivery_row.provider_campaign_id is distinct from
+      nullif(pg_catalog.btrim(coalesce(p_provider_campaign_id, '')), '') then
+    raise exception using
+      errcode = '23505',
+      message = 'notification_delivery_idempotency_conflict';
+  end if;
+
+  if delivery_row.status = 'sent' then
+    return pg_catalog.jsonb_build_object(
+      'delivery_id', delivery_row.id,
+      'disposition', 'sent'
+    );
+  end if;
+
+  if delivery_row.provider_status = 'needs_reconciliation' then
+    return pg_catalog.jsonb_build_object(
+      'delivery_id', delivery_row.id,
+      'disposition', 'needs_reconciliation'
+    );
+  end if;
+
+  if delivery_row.status = 'failed' then
+    update public.notification_deliveries
+    set
+      status = 'pending',
+      error_message = null,
+      provider_status = 'claimed',
+      delivered_at = null,
+      updated_at = claim_time
+    where id = delivery_row.id;
+
+    return pg_catalog.jsonb_build_object(
+      'delivery_id', delivery_row.id,
+      'disposition', 'claimed'
+    );
+  end if;
+
+  if delivery_row.status = 'pending'
+    and delivery_row.provider_status = 'claimed'
+    and coalesce(delivery_row.updated_at, delivery_row.created_at) <= stale_before then
+    update public.notification_deliveries
+    set updated_at = claim_time
+    where id = delivery_row.id;
+
+    return pg_catalog.jsonb_build_object(
+      'delivery_id', delivery_row.id,
+      'disposition', 'claimed'
+    );
+  end if;
+
+  if delivery_row.status = 'pending'
+    and delivery_row.provider_status = 'sending'
+    and coalesce(delivery_row.updated_at, delivery_row.created_at) <= stale_before then
+    update public.notification_deliveries
+    set
+      provider_status = 'needs_reconciliation',
+      error_message = 'provider_delivery_outcome_unknown',
+      updated_at = claim_time
+    where id = delivery_row.id;
+
+    return pg_catalog.jsonb_build_object(
+      'delivery_id', delivery_row.id,
+      'disposition', 'needs_reconciliation'
+    );
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'delivery_id', delivery_row.id,
+    'disposition', 'in_progress'
+  );
+end;
+$$;
+
+revoke all on function public.claim_notification_delivery(
+  uuid, uuid, text, text, text, text, integer
+) from public;
+revoke all on function public.claim_notification_delivery(
+  uuid, uuid, text, text, text, text, integer
+) from anon;
+revoke all on function public.claim_notification_delivery(
+  uuid, uuid, text, text, text, text, integer
+) from authenticated;
+grant execute on function public.claim_notification_delivery(
+  uuid, uuid, text, text, text, text, integer
+) to service_role;
+
+create or replace function public.transition_notification_delivery(
+  p_delivery_id uuid,
+  p_transition text,
+  p_error_message text default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  transition_time timestamp with time zone := pg_catalog.clock_timestamp();
+begin
+  if p_delivery_id is null
+    or p_transition is null
+    or p_transition not in (
+      'sending',
+      'sent',
+      'failed',
+      'needs_reconciliation'
+    ) then
+    raise exception using
+      errcode = '22023',
+      message = 'notification_delivery_transition_invalid';
+  end if;
+
+  if p_transition = 'sending' then
+    update public.notification_deliveries
+    set
+      provider_status = 'sending',
+      updated_at = transition_time
+    where id = p_delivery_id
+      and ((channel = 'push' and provider = 'web_push')
+        or (channel = 'mm' and provider = 'mattermost'
+          and provider_idempotency_key =
+            'ssartnership:delivery:v2:' || notification_id::text || ':mm:' || member_id::text))
+      and status = 'pending'
+      and provider_status = 'claimed';
+  elsif p_transition = 'sent' then
+    update public.notification_deliveries
+    set
+      status = 'sent',
+      error_message = null,
+      provider_status = 'sent',
+      delivered_at = transition_time,
+      updated_at = transition_time
+    where id = p_delivery_id
+      and ((channel = 'push' and provider = 'web_push')
+        or (channel = 'mm' and provider = 'mattermost'
+          and provider_idempotency_key =
+            'ssartnership:delivery:v2:' || notification_id::text || ':mm:' || member_id::text))
+      and status = 'pending'
+      and provider_status = 'sending';
+  elsif p_transition = 'failed' then
+    update public.notification_deliveries
+    set
+      status = 'failed',
+      error_message = coalesce(
+        nullif(p_error_message, ''),
+        '푸시 알림 전송에 실패했습니다.'
+      ),
+      provider_status = 'failed',
+      delivered_at = null,
+      updated_at = transition_time
+    where id = p_delivery_id
+      and ((channel = 'push' and provider = 'web_push')
+        or (channel = 'mm' and provider = 'mattermost'
+          and provider_idempotency_key =
+            'ssartnership:delivery:v2:' || notification_id::text || ':mm:' || member_id::text))
+      and status = 'pending'
+      and provider_status = 'sending';
+  else
+    update public.notification_deliveries
+    set
+      error_message = coalesce(
+        nullif(p_error_message, ''),
+        'provider_delivery_outcome_unknown'
+      ),
+      provider_status = 'needs_reconciliation',
+      delivered_at = null,
+      updated_at = transition_time
+    where id = p_delivery_id
+      and ((channel = 'push' and provider = 'web_push')
+        or (channel = 'mm' and provider = 'mattermost'
+          and provider_idempotency_key =
+            'ssartnership:delivery:v2:' || notification_id::text || ':mm:' || member_id::text))
+      and status = 'pending'
+      and provider_status in ('claimed', 'sending');
+  end if;
+
+  return found;
+end;
+$$;
+
+revoke all on function public.transition_notification_delivery(
+  uuid, text, text
+) from public;
+revoke all on function public.transition_notification_delivery(
+  uuid, text, text
+) from anon;
+revoke all on function public.transition_notification_delivery(
+  uuid, text, text
+) from authenticated;
+grant execute on function public.transition_notification_delivery(
+  uuid, text, text
+) to service_role;
+
+-- Approved additional reserved-key identity guard; same 9-argument signature.
+create or replace function public.claim_notification_campaign(
+  p_type text,
+  p_title text,
+  p_body text,
+  p_target_url text,
+  p_metadata jsonb,
+  p_created_by_member_id uuid,
+  p_idempotency_key text,
+  p_recipient_member_ids uuid[],
+  p_lease_seconds integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  campaign_row public.notifications%rowtype;
+  normalized_idempotency_key text := pg_catalog.btrim(
+    coalesce(p_idempotency_key, '')
+  );
+  normalized_target_url text := pg_catalog.btrim(coalesce(p_target_url, ''));
+  normalized_recipient_ids uuid[];
+  claim_time timestamp with time zone := pg_catalog.clock_timestamp();
+  lease_expires_at timestamp with time zone;
+  existing_lease_expires_at timestamp with time zone;
+  attempt_token text := pg_catalog.gen_random_uuid()::text;
+  campaign_status text;
+  claim_disposition text;
+  claimed_metadata jsonb;
+begin
+  if p_type is null
+    or pg_catalog.btrim(p_type) = ''
+    or p_title is null
+    or pg_catalog.btrim(p_title) = ''
+    or p_body is null
+    or pg_catalog.btrim(p_body) = ''
+    or normalized_target_url = ''
+    or pg_catalog.left(normalized_target_url, 1) <> '/'
+    or pg_catalog.left(normalized_target_url, 2) = '//'
+    or normalized_idempotency_key = ''
+    or p_lease_seconds is null
+    or p_lease_seconds < 30
+    or p_lease_seconds > 3600 then
+    raise exception using
+      errcode = '22023',
+      message = 'notification_campaign_claim_invalid';
+  end if;
+
+  -- The reserved winner namespace cannot be adopted by another campaign.
+  if normalized_idempotency_key like 'event-reward:%' and (
+    normalized_idempotency_key is distinct from
+      ('event-reward:' || (p_metadata ->> 'eventRewardDrawId') || ':winner-notice:v1')
+    or pg_catalog.btrim(coalesce(p_metadata ->> 'eventRewardDrawId', '')) = ''
+    or pg_catalog.btrim(coalesce(p_metadata ->> 'eventSlug', '')) = ''
+  ) then
+    raise exception using
+      errcode = '22023', message = 'notification_campaign_claim_invalid';
+  end if;
+
+  select coalesce(
+    pg_catalog.array_agg(distinct recipients.member_id),
+    '{}'::uuid[]
+  )
+  into normalized_recipient_ids
+  from pg_catalog.unnest(
+    coalesce(p_recipient_member_ids, '{}'::uuid[])
+  ) as recipients(member_id)
+  where recipients.member_id is not null;
+
+  lease_expires_at :=
+    claim_time + pg_catalog.make_interval(secs => p_lease_seconds);
+  claimed_metadata :=
+    (
+      coalesce(p_metadata, '{}'::jsonb)
+      - 'completedAt'
+      - 'channelResults'
+      - 'warnings'
+    )
+    || pg_catalog.jsonb_build_object(
+      'adminOperationIdempotencyKey', normalized_idempotency_key,
+      'campaignStatus', 'pending',
+      'campaignAttemptToken', attempt_token,
+      'campaignClaimedAt', claim_time,
+      'campaignLeaseExpiresAt', lease_expires_at
+    );
+
+  insert into public.notifications (
+    type,
+    title,
+    body,
+    target_url,
+    metadata,
+    created_by_member_id,
+    idempotency_key
+  )
+  values (
+    p_type,
+    p_title,
+    p_body,
+    normalized_target_url,
+    claimed_metadata,
+    p_created_by_member_id,
+    normalized_idempotency_key
+  )
+  on conflict (idempotency_key) do nothing
+  returning * into campaign_row;
+
+  if found then
+    claim_disposition := 'claimed';
+  else
+    select *
+    into campaign_row
+    from public.notifications
+    where idempotency_key = normalized_idempotency_key
+    for update;
+
+    if not found then
+      raise exception using
+        errcode = 'P0001',
+        message = 'notification_campaign_claim_conflict';
+    end if;
+
+    if campaign_row.type <> p_type or (
+      normalized_idempotency_key like 'event-reward:%' and (
+        campaign_row.metadata ->> 'eventRewardDrawId' is distinct from p_metadata ->> 'eventRewardDrawId'
+        or campaign_row.metadata ->> 'eventSlug' is distinct from p_metadata ->> 'eventSlug'
+        or campaign_row.target_url is distinct from normalized_target_url
+      )
+    ) then
+      raise exception using
+        errcode = '23505',
+        message = 'notification_campaign_idempotency_conflict';
+    end if;
+
+    campaign_status :=
+      coalesce(campaign_row.metadata ->> 'campaignStatus', '');
+    if campaign_status in ('sent', 'no_target') then
+      return pg_catalog.jsonb_build_object(
+        'disposition', 'completed',
+        'attempt_token', null,
+        'notification', pg_catalog.to_jsonb(campaign_row),
+        'recipient_member_ids', pg_catalog.to_jsonb('{}'::uuid[])
+      );
+    end if;
+
+    begin
+      existing_lease_expires_at := nullif(
+        campaign_row.metadata ->> 'campaignLeaseExpiresAt',
+        ''
+      )::timestamp with time zone;
+    exception
+      when invalid_datetime_format or datetime_field_overflow then
+        existing_lease_expires_at := null;
+    end;
+
+    if campaign_status = 'pending'
+      and existing_lease_expires_at is not null
+      and existing_lease_expires_at > claim_time then
+      return pg_catalog.jsonb_build_object(
+        'disposition', 'in_progress',
+        'attempt_token', null,
+        'notification', pg_catalog.to_jsonb(campaign_row),
+        'recipient_member_ids', pg_catalog.to_jsonb('{}'::uuid[])
+      );
+    end if;
+
+    claim_disposition := 'resumed';
+    update public.notifications
+    set
+      title = p_title,
+      body = p_body,
+      target_url = normalized_target_url,
+      metadata =
+        (
+          coalesce(metadata, '{}'::jsonb)
+          - 'completedAt'
+          - 'channelResults'
+          - 'warnings'
+        )
+        || (
+          coalesce(p_metadata, '{}'::jsonb)
+          - 'completedAt'
+          - 'channelResults'
+          - 'warnings'
+        )
+        || pg_catalog.jsonb_build_object(
+          'adminOperationIdempotencyKey', normalized_idempotency_key,
+          'campaignStatus', 'pending',
+          'campaignAttemptToken', attempt_token,
+          'campaignClaimedAt', claim_time,
+          'campaignLeaseExpiresAt', lease_expires_at
+        )
+    where id = campaign_row.id
+    returning * into campaign_row;
+  end if;
+
+  insert into public.member_notifications (
+    notification_id,
+    member_id,
+    read_at,
+    deleted_at,
+    created_at,
+    updated_at
+  )
+  select
+    campaign_row.id,
+    recipients.member_id,
+    null,
+    null,
+    claim_time,
+    claim_time
+  from pg_catalog.unnest(normalized_recipient_ids) as recipients(member_id)
+  on conflict (notification_id, member_id) do nothing;
+
+  insert into public.notification_deliveries (
+    notification_id,
+    member_id,
+    channel,
+    status,
+    delivered_at,
+    created_at,
+    updated_at
+  )
+  select
+    campaign_row.id,
+    recipients.member_id,
+    'in_app',
+    'sent',
+    claim_time,
+    claim_time,
+    claim_time
+  from pg_catalog.unnest(normalized_recipient_ids) as recipients(member_id)
+  where not exists (
+    select 1
+    from public.notification_deliveries as existing_delivery
+    where existing_delivery.notification_id = campaign_row.id
+      and existing_delivery.member_id = recipients.member_id
+      and existing_delivery.channel = 'in_app'
+  );
+
+  return pg_catalog.jsonb_build_object(
+    'disposition', claim_disposition,
+    'attempt_token', attempt_token,
+    'notification', pg_catalog.to_jsonb(campaign_row),
+    'recipient_member_ids', pg_catalog.to_jsonb(normalized_recipient_ids)
+  );
+end;
+$$;
+
+revoke all on function public.claim_notification_campaign(
+  text, text, text, text, jsonb, uuid, text, uuid[], integer
+) from public;
+revoke all on function public.claim_notification_campaign(
+  text, text, text, text, jsonb, uuid, text, uuid[], integer
+) from anon;
+revoke all on function public.claim_notification_campaign(
+  text, text, text, text, jsonb, uuid, text, uuid[], integer
+) from authenticated;
+grant execute on function public.claim_notification_campaign(
+  text, text, text, text, jsonb, uuid, text, uuid[], integer
+) to service_role;
+-- END WINNER DELIVERY
+
+-- BEGIN UPLOAD LIFECYCLE
+-- Review/signup references and cleanup share session row locks. Storage deletion
+-- happens after the claim; it is not part of the PostgreSQL transaction.
+create or replace function public.validate_partner_review_image_references()
+returns trigger language plpgsql volatile security definer set search_path = pg_catalog, public
+as $$
+declare
+  introduced_urls text[];
+  image_row public.image_upload_sessions%rowtype;
+  matched_urls text[] := '{}';
+begin
+  if current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'review_image_isolation_unsupported';
+  end if;
+  -- Anonymization detaches the author while preserving review content/media.
+  -- It cannot introduce a URL or transfer ownership to another member.
+  if TG_OP = 'UPDATE' and NEW.id is not distinct from OLD.id
+    and NEW.partner_id is not distinct from OLD.partner_id
+    and (NEW.member_id is not distinct from OLD.member_id
+      or (NEW.member_id is null and NEW.images is not distinct from OLD.images)) then
+    select coalesce(array_agg(distinct u), '{}') into introduced_urls
+    from unnest(coalesce(NEW.images, '{}')) u where not (u = any(coalesce(OLD.images, '{}')));
+  else
+    select coalesce(array_agg(distinct u), '{}') into introduced_urls from unnest(coalesce(NEW.images, '{}')) u;
+  end if;
+  for image_row in
+    select s.* from public.image_upload_sessions s
+    where s.owner_kind = 'member' and s.owner_id = NEW.member_id::text and s.purpose = 'review'
+      and s.final_url = any(introduced_urls)
+    order by s.id for update
+  loop
+    if image_row.status <> 'attached' or image_row.role <> 'image'
+      or image_row.attached_resource_type is distinct from 'partner_review'
+      or image_row.attached_resource_id is distinct from NEW.id::text
+      or image_row.final_bucket is distinct from 'review-media'
+      or image_row.final_path is null
+      or image_row.expires_at <= clock_timestamp() then
+      raise exception 'review_image_reference_invalid';
+    end if;
+    matched_urls := array_append(matched_urls, image_row.final_url);
+  end loop;
+  if not (introduced_urls <@ matched_urls) then
+    raise exception 'review_image_reference_invalid';
+  end if;
+  return NEW;
+end;
+$$;
+create trigger partner_reviews_validate_image_references
+before insert or update of images,id,member_id,partner_id on public.partner_reviews
+for each row execute function public.validate_partner_review_image_references();
+revoke all on function public.validate_partner_review_image_references() from public,anon,authenticated;
+
+-- A pending signup approval is another durable upload reference. The application
+-- already checks its owner; the DB invariant requires prepared, non-retired state.
+create or replace function public.validate_signup_approval_image_reference()
+returns trigger language plpgsql volatile security definer set search_path = pg_catalog, public
+as $$
+declare image_row public.image_upload_sessions%rowtype;
+begin
+  if NEW.profile_image_upload_id is null then return NEW; end if;
+  if TG_OP = 'UPDATE' and NEW.profile_image_upload_id is not distinct from OLD.profile_image_upload_id then return NEW; end if;
+  if current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'signup_image_isolation_unsupported';
+  end if;
+  select * into image_row from public.image_upload_sessions where id = NEW.profile_image_upload_id for update;
+  if not found or image_row.purpose <> 'member-signup-profile' or image_row.owner_kind <> 'signup'
+    or image_row.role <> 'profile' or image_row.status <> 'ready' or image_row.expires_at <= clock_timestamp() then
+    raise exception 'signup_image_reference_invalid';
+  end if;
+  return NEW;
+end;
+$$;
+create trigger member_signup_approval_validate_image_reference
+before insert or update of profile_image_upload_id on public.member_signup_approval_requests
+for each row execute function public.validate_signup_approval_image_reference();
+revoke all on function public.validate_signup_approval_image_reference() from public,anon,authenticated;
+
+-- Ledgered profile files outlive signup approval rows and remain protected until
+-- the existing profile-retention owner marks the image deleted. Unledgered legacy
+-- and Mattermost paths are unchanged; only common-upload paths join this fence.
+create or replace function public.validate_member_profile_image_upload_reference()
+returns trigger language plpgsql volatile security definer set search_path = pg_catalog, public
+as $$
+declare image_row public.image_upload_sessions%rowtype;
+begin
+  if TG_OP = 'UPDATE' and NEW.storage_path is not distinct from OLD.storage_path then return NEW; end if;
+  if current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'profile_image_upload_isolation_unsupported';
+  end if;
+  for image_row in
+    select s.* from public.image_upload_sessions s
+    where s.final_bucket = 'member-profile-images' and s.final_path = NEW.storage_path
+    order by s.id for update
+  loop
+    if image_row.status <> 'attached' then raise exception 'profile_image_upload_reference_invalid'; end if;
+  end loop;
+  return NEW;
+end;
+$$;
+create trigger member_profile_images_validate_upload_reference
+before insert or update of storage_path on public.member_profile_images
+for each row execute function public.validate_member_profile_image_upload_reference();
+revoke all on function public.validate_member_profile_image_upload_reference() from public,anon,authenticated;
+
+create index if not exists image_upload_sessions_cleanup_tombstone_rotation_idx
+  on public.image_upload_sessions(updated_at,id)
+  where status = 'expired' and failure_code in ('review_cleanup_tombstone','image_cleanup_tombstone');
+
+create or replace function public.claim_image_upload_cleanup(
+  p_upload_id uuid default null,
+  p_owner_kind text default null,
+  p_owner_id text default null,
+  p_purpose text default null,
+  p_discard boolean default false,
+  p_limit integer default 100
+) returns table (
+  id uuid, purpose text, storage_bucket text, storage_path text,
+  source_storage_path text, final_bucket text, final_path text, final_url text,
+  previous_status text, claim_updated_at timestamptz, cleanup_code text
+) language plpgsql volatile security definer set search_path = pg_catalog, public
+as $$
+declare
+  image_row public.image_upload_sessions%rowtype;
+  claimed_row public.image_upload_sessions%rowtype;
+  lane integer;
+  lane_limit integer;
+  first_lane integer;
+  last_lane integer;
+  old_status text;
+  next_code text;
+  now_at timestamptz := clock_timestamp();
+begin
+  if current_setting('transaction_isolation') <> 'read committed' then raise exception 'image_cleanup_isolation_unsupported'; end if;
+  if p_limit is null or p_limit not between 1 and 100 or p_discard is null then raise exception 'image_cleanup_parameters_invalid'; end if;
+  if p_upload_id is null then
+    if p_owner_kind is not null or p_owner_id is not null or p_purpose is not null or p_discard then
+      raise exception 'image_cleanup_parameters_invalid';
+    end if;
+  elsif p_owner_kind is null or p_owner_id is null or p_purpose is null then
+    raise exception 'image_cleanup_owner_required';
+  end if;
+  -- Three independent lanes reserve progress for ordinary expiry, review
+  -- attachments, and retired paths which may receive a late Storage write.
+  -- Tiny batches use one rotating pool instead of permanently starving a lane.
+  first_lane := case when p_upload_id is null and p_limit < 3 then -1 else 0 end;
+  last_lane := case when first_lane = -1 then -1 else 2 end;
+  for lane in first_lane..last_lane loop
+    lane_limit := case when p_upload_id is not null then 1 when lane = -1 then p_limit
+      else p_limit / 3 + case when lane < p_limit % 3 then 1 else 0 end end;
+    if lane_limit = 0 then continue; end if;
+    -- Static state predicates let the retired-path lane use its partial ordered
+    -- index even after PostgreSQL switches this function to a generic plan.
+    for image_row in
+      with ordinary as (
+        select s.* from public.image_upload_sessions s
+        where (p_upload_id is null or (s.id = p_upload_id and s.owner_kind = p_owner_kind and s.owner_id = p_owner_id and s.purpose = p_purpose))
+          and lane in (-1,0) and s.status in ('signed','processing','ready','attaching','failed')
+        and (p_discard or s.expires_at <= now_at or (s.status = 'signed' and s.signed_url_expires_at <= now_at))
+        and not (s.purpose = 'review' and s.final_url is not null and exists (
+          select 1 from public.partner_reviews r where s.final_url = any(r.images)
+        ))
+        and not (s.final_bucket = 'member-profile-images' and s.final_path is not null and exists (
+          select 1 from public.member_profile_images i where i.storage_path = s.final_path and i.deleted_at is null
+        ))
+        and not (s.purpose = 'member-signup-profile' and exists (
+          select 1 from public.member_signup_approval_requests a
+          where a.profile_image_upload_id = s.id and a.status in ('pending','approved')
+        ))
+        order by s.updated_at,s.id limit lane_limit for update skip locked
+      ),
+      attached as (
+        select s.* from public.image_upload_sessions s
+        where (p_upload_id is null or (s.id = p_upload_id and s.owner_kind = p_owner_kind and s.owner_id = p_owner_id and s.purpose = p_purpose))
+          and lane in (-1,1) and s.status = 'attached'
+        and ((s.purpose = 'review' and (p_discard or s.expires_at <= now_at)) or (p_discard and s.purpose <> 'review'))
+        and not (s.purpose = 'review' and s.final_url is not null and exists (
+          select 1 from public.partner_reviews r where s.final_url = any(r.images)
+        ))
+        and not (s.final_bucket = 'member-profile-images' and s.final_path is not null and exists (
+          select 1 from public.member_profile_images i where i.storage_path = s.final_path and i.deleted_at is null
+        ))
+        and not (s.purpose = 'member-signup-profile' and exists (
+          select 1 from public.member_signup_approval_requests a
+          where a.profile_image_upload_id = s.id and a.status in ('pending','approved')
+        ))
+        order by s.updated_at,s.id limit lane_limit for update skip locked
+      ),
+      tombstone as (
+        select s.* from public.image_upload_sessions s
+        where (p_upload_id is null or (s.id = p_upload_id and s.owner_kind = p_owner_kind and s.owner_id = p_owner_id and s.purpose = p_purpose))
+          and lane in (-1,2) and s.status = 'expired'
+        and s.failure_code in ('review_cleanup_tombstone','image_cleanup_tombstone')
+        and s.updated_at <= now_at - interval '1 hour'
+        and not (s.purpose = 'review' and s.final_url is not null and exists (
+          select 1 from public.partner_reviews r where s.final_url = any(r.images)
+        ))
+        and not (s.final_bucket = 'member-profile-images' and s.final_path is not null and exists (
+          select 1 from public.member_profile_images i where i.storage_path = s.final_path and i.deleted_at is null
+        ))
+        and not (s.purpose = 'member-signup-profile' and exists (
+          select 1 from public.member_signup_approval_requests a
+          where a.profile_image_upload_id = s.id and a.status in ('pending','approved')
+        ))
+        order by s.updated_at,s.id limit lane_limit for update skip locked
+      )
+      select candidate.* from (
+        select * from ordinary union all select * from attached union all select * from tombstone
+      ) candidate
+      order by candidate.updated_at,candidate.id limit lane_limit
+    loop
+      -- Separate commands: these references must use a fresh snapshot AFTER the
+      -- session lock. Never lock a review/approval row here (writer lock order).
+      if image_row.purpose = 'review' and image_row.final_url is not null and exists (
+        select 1 from public.partner_reviews r where image_row.final_url = any(r.images)
+      ) then continue; end if;
+      if image_row.purpose = 'member-signup-profile' and exists (
+        select 1 from public.member_signup_approval_requests a
+        where a.profile_image_upload_id = image_row.id and a.status in ('pending','approved')
+      ) then continue; end if;
+      if image_row.final_bucket = 'member-profile-images' and image_row.final_path is not null and exists (
+        select 1 from public.member_profile_images i where i.storage_path = image_row.final_path and i.deleted_at is null
+      ) then continue; end if;
+      -- Preserve the original expiration through a failed tombstone re-sweep so
+      -- acknowledgements cannot count the same session as newly expired twice.
+      old_status := case when image_row.status = 'expired'
+        or image_row.failure_code in ('review_cleanup_tombstone','image_cleanup_tombstone')
+        then 'expired' else image_row.status end;
+      next_code := case when old_status = 'expired' then
+        case when image_row.purpose = 'review' then 'review_cleanup_tombstone' else 'image_cleanup_tombstone' end
+        when image_row.purpose = 'review' then 'review_cleanup_pending' else 'cleanup_pending' end;
+      update public.image_upload_sessions s set status = 'failed', failure_code = next_code,
+        signed_url_expires_at = least(s.signed_url_expires_at, now_at), expires_at = least(s.expires_at,now_at)
+      where s.id = image_row.id returning s.* into claimed_row;
+      -- Existing updated_at trigger sets transaction timestamp; return the exact
+      -- stored timestamp, not an independently generated client/clock token.
+      return query select claimed_row.id,claimed_row.purpose,claimed_row.storage_bucket,claimed_row.storage_path,
+        claimed_row.source_storage_path,claimed_row.final_bucket,claimed_row.final_path,claimed_row.final_url,
+        old_status,claimed_row.updated_at,next_code;
+    end loop;
+  end loop;
+end;
+$$;
+revoke all on function public.claim_image_upload_cleanup(uuid,text,text,text,boolean,integer) from public,anon,authenticated;
+grant execute on function public.claim_image_upload_cleanup(uuid,text,text,text,boolean,integer) to service_role;
+-- END UPLOAD LIFECYCLE

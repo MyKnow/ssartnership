@@ -26,7 +26,7 @@ test("제휴처 삭제 감사 이벤트는 신규 앱 계약과 알림 조회에
     readFile(new URL("../src/lib/event-catalog.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/partner-notifications-operation.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/partner-notifications.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/components/admin/logs/utils.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/log-insights/utils.ts", import.meta.url), "utf8"),
     readFile(new URL("../docs/architecture/event-logging.md", import.meta.url), "utf8"),
   ]);
 

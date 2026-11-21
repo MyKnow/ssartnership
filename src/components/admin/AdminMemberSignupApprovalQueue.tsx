@@ -9,6 +9,7 @@ import Surface from "@/components/ui/Surface";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import { formatKoreanMediumDateTime } from "@/lib/datetime";
 
 const PARSE_REASON_LABELS: Record<string, string> = {
   campus_ambiguous: "캠퍼스가 여러 개로 감지됨",
@@ -19,13 +20,7 @@ const PARSE_REASON_LABELS: Record<string, string> = {
 };
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "시간 미상"
-    : new Intl.DateTimeFormat("ko-KR", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(date);
+  return formatKoreanMediumDateTime(value) || "시간 미상";
 }
 
 function buildMemberSignupQueueHref(

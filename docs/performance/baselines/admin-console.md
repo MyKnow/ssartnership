@@ -69,6 +69,8 @@ RPC가 500ms를 넘으면 안전한 빈 상태로 전환하도록 했다. SQL mi
 로컬 production 서버에서는 Vercel Analytics·Speed Insights 스크립트를 로드하지
 않도록 조건부 처리했다. Vercel 실행 환경에서는 기존 계측을 유지하고, 로컬 QA에서는
 선택적 외부 스크립트의 404가 관리자 화면 오류 신호를 오염시키지 않게 한다.
+(2026-10 후속: RF-04(#537)에서 Vercel Analytics·Speed Insights와 이 조건 분기를
+제거했다. 브라우저 성능은 [자체 호스팅 Web Vitals·Lighthouse 측정](../measurements/web-vitals.md)으로 확인한다.)
 
 프로필 사진 검토 큐는 최대 50개의 미리보기 요소를 렌더링하지만, 첫 제출 사진만
 즉시 로드하고 나머지는 브라우저 viewport 기준으로 지연 로드한다. 360px·820px·1366px
@@ -266,7 +268,7 @@ Web Vitals·route timing·과업 성과 요약도 같은 보조 경계로 취급
 - Preview에서 과업 집계 migration을 적용한 뒤 대표 과업별 완료율·복구율·처리 p75를 확인한다.
 - 핵심 관리자 읽기 API의 `Server-Timing` phase를 수집해 API p95와 DB/query 구간을 분리한다.
 - Preview에서 새 활성도 migration을 적용한 뒤 RPC p95와 `/admin/logs` 첫 렌더링·전체 스트림 종료 시간을 재측정한다.
-- Preview 적용 후 dev의 수동 `Measure Admin Preview Performance` workflow를 확인 문자열과 함께 실행한다. 이 workflow는 `npm run measure:admin:preview`를 호출하며, 최근 7일의 RUM·route timing·과업 집계와 mobile/tablet/desktop dimension별 p75를 원본 이벤트 없이 읽고, `ADMIN_PREVIEW_URL`과 `ADMIN_PREVIEW_SESSION_COOKIE`가 있을 때만 지정된 관리자 GET API를 반복 호출해 Server-Timing phase p95를 계산한다. 세션 쿠키와 원시 응답 본문은 출력하지 않는다.
+- Preview 적용 후 dev의 수동 `Measure Admin Preview Performance` workflow를 확인 문자열과 함께 실행한다. 이 workflow는 `npm run measure:admin:preview`를 호출하며, 최근 7일의 RUM·route timing·과업 집계와 mobile/tablet/desktop dimension별 p75를 원본 이벤트 없이 읽고, `ADMIN_PREVIEW_URL`과 `ADMIN_PREVIEW_SESSION_COOKIE`가 있을 때만 지정된 관리자 GET API를 반복 호출해 Server-Timing phase p95를 계산한다. 세션 쿠키와 원시 응답 본문은 출력하지 않는다. (2026-10 후속: 이 workflow와 `measure:admin:preview`는 Cloud Preview 자격 증명과 Vercel 보호 우회에 의존해 RF-04(#537)에서 폐기했다. 현재 관리자 성능은 `/admin/logs`의 서버 집계 패널로 확인한다.)
 - 관리자 로그 화면에 route timing p75와 과업 outcome p75·표본 수를 서버 집계로 제공한다. 원본 경로와 이벤트 속성은 UI로 전달하지 않는다.
 - 현재 원격 환경에서 `get_admin_route_timing_summary` RPC가 schema cache에 없고 활성도 RPC가
   timeout으로 fallback하므로, migration 적용 후 위 성능 수치를 다시 측정한다.

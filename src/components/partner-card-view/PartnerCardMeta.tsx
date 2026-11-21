@@ -2,7 +2,6 @@ import type { MouseEvent } from "react";
 import Link from "next/link";
 import PartnerCategoryBadge from "@/components/PartnerCategoryBadge";
 import Badge from "@/components/ui/Badge";
-import PartnerValueBadge from "@/components/PartnerValueBadge";
 import { cn } from "@/lib/cn";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
@@ -72,7 +71,7 @@ export default function PartnerCardMeta({
       className={cn(
         "min-w-0",
         compact
-          ? "grid gap-2 min-[1200px]:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] min-[1200px]:items-center min-[1200px]:gap-3"
+          ? "grid gap-4 @xl/card:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] @xl/card:gap-6"
           : "flex flex-col gap-4",
       )}
     >
@@ -164,30 +163,35 @@ export default function PartnerCardMeta({
       <div
         className={
           compact
-            ? "hidden min-w-0 gap-3 min-[1200px]:grid"
+            ? "grid min-w-0 gap-3"
             : "contents"
         }
       >
-        <div className="min-w-0 text-sm text-foreground">
-          <p className="font-medium text-foreground">혜택</p>
+        <div className="min-w-0" data-partner-card-benefits>
+          <p className="text-xs font-medium leading-5 text-muted-foreground">혜택</p>
           {benefitBudget.visible.length > 0 ? (
-            <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+            <ul className="mt-1.5 grid min-w-0 gap-1.5">
               {benefitBudget.visible.map((benefit) => (
-                <PartnerValueBadge key={benefit}>
-                  {benefit}
-                </PartnerValueBadge>
+                <li key={benefit} className="flex min-w-0 items-start gap-2">
+                  <span aria-hidden="true" className="mt-2.5 size-1 shrink-0 rounded-full bg-primary" />
+                  <span className="min-w-0 text-base font-semibold leading-6 text-foreground break-words [word-break:keep-all]">
+                    {benefit}
+                  </span>
+                </li>
               ))}
               {benefitBudget.hiddenCount > 0 ? (
-                <PartnerValueBadge>+{benefitBudget.hiddenCount}</PartnerValueBadge>
+                <li className="pl-3 text-sm leading-5 text-muted-foreground">
+                  <span aria-label={`추가 혜택 ${benefitBudget.hiddenCount}개`}>+{benefitBudget.hiddenCount}</span>
+                </li>
               ) : null}
-            </div>
+            </ul>
           ) : (
             <p className="mt-1.5 text-sm text-muted-foreground">혜택 정보 준비 중</p>
           )}
         </div>
-        <div className="min-w-0 text-sm text-foreground">
-          <p className="font-medium text-foreground">적용 대상</p>
-          <p className="mt-1.5 truncate text-sm text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <p className="shrink-0 text-xs font-medium leading-5 text-muted-foreground">적용 대상</p>
+          <p className="text-sm leading-6 text-muted-foreground">
             {audienceSummary || "대상 정보 없음"}
           </p>
         </div>

@@ -41,6 +41,35 @@ test("member audience snapshot keeps only generation and graduate verification f
   );
 });
 
+test("member audience snapshot runs its two reads in parallel once per request", () => {
+  const source = readRepoFile("src/lib/member-audience-snapshot.ts");
+
+  assert.match(source, /import \{ cache \} from "react"/);
+  assert.match(
+    source,
+    /export const getMemberAudienceSnapshot = cache\(loadMemberAudienceSnapshot\)/,
+  );
+  assert.match(
+    source,
+    /await Promise\.all\(\[[\s\S]*\.from\("members"\)[\s\S]*\.from\("graduate_profiles"\)[\s\S]*\]\)/,
+  );
+  assert.equal(source.match(/\.from\(/g)?.length, 2);
+});
+
+test("partner detail and campus pages read the signed session once before parallel loads", () => {
+  for (const path of [
+    "src/app/(site)/partners/[id]/page.tsx",
+    "src/app/(site)/campuses/[campus]/page.tsx",
+  ]) {
+    const source = readRepoFile(path);
+    assert.match(source, /getSignedUserSession\(\)/);
+    assert.match(source, /getHeaderSession\(userId\)/);
+    assert.doesNotMatch(source, /getHeaderSession\(\)/);
+    assert.match(source, /getPartnerViewerContext\(userId\)/);
+    assert.match(source, /const headerSessionPromise = userId/);
+  }
+});
+
 test("member audience snapshot preserves mock generation and graduate verification state", async () => {
   const originalDataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
 

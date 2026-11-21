@@ -12,6 +12,11 @@ import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/Ad
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import { AdminMemberDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
+import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
+import {
+  ADMIN_LIST_DEFAULT_PAGE_SIZE,
+  ADMIN_LIST_PAGE_SIZE_OPTIONS,
+} from "@/lib/admin-ia";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { formatSsafyMemberLifecycleLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
@@ -36,8 +41,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const SECURITY_LOG_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
-const DEFAULT_SECURITY_LOG_PAGE_SIZE = 50;
+const SECURITY_LOG_PAGE_SIZE_OPTIONS = ADMIN_LIST_PAGE_SIZE_OPTIONS;
+const DEFAULT_SECURITY_LOG_PAGE_SIZE = ADMIN_LIST_DEFAULT_PAGE_SIZE;
 
 type AdminMemberDetailSearchParams = {
   logPage?: string;
@@ -130,6 +135,18 @@ async function AdminMemberDetailContent({
     }
     notFound();
   }
+
+  // Opening a member detail exposes contact data and security logs; record the
+  // access like the private photo and certificate views.
+  await logAdminAudit({
+    ...(await getServerActionLogContext()),
+    action: "member_detail_view",
+    actorId: adminSession.adminId,
+    targetType: "member",
+    targetId: memberId,
+    path: `/admin/members/${memberId}`,
+    properties: { securityLogPage },
+  });
 
   const member = detail.member;
   const profile = parseSsafyProfile(

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getMockMemberById, isMockDataSource } from "@/lib/mock/member";
 
@@ -15,7 +16,7 @@ export type MemberAudienceSnapshot = {
   graduateVerifiedAt: string | null;
 };
 
-export async function getMemberAudienceSnapshot(
+async function loadMemberAudienceSnapshot(
   memberId: string,
 ): Promise<MemberAudienceSnapshot | null> {
   if (isMockDataSource()) {
@@ -31,37 +32,46 @@ export async function getMemberAudienceSnapshot(
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data: memberData, error: memberError } = await supabase
-    .from("members")
-    .select("id,generation")
-    .eq("id", memberId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  // The graduate profile is keyed by member id, so both reads can run at once;
+  // a missing or deleted member still wins below.
+  const [memberResult, graduateProfileResult] = await Promise.all([
+    supabase
+      .from("members")
+      .select("id,generation")
+      .eq("id", memberId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .from("graduate_profiles")
+      .select("verified_at")
+      .eq("member_id", memberId)
+      .maybeSingle(),
+  ]);
 
-  if (memberError) {
+  if (memberResult.error) {
     throw new Error("회원 인증 정보를 불러오지 못했습니다.");
   }
 
-  const member = (memberData as MemberAudienceRow | null) ?? null;
+  const member = (memberResult.data as MemberAudienceRow | null) ?? null;
   if (!member?.id) {
     return null;
   }
 
-  const { data: graduateProfileData, error: graduateProfileError } = await supabase
-    .from("graduate_profiles")
-    .select("verified_at")
-    .eq("member_id", member.id)
-    .maybeSingle();
-
-  if (graduateProfileError) {
+  if (graduateProfileResult.error) {
     throw new Error("회원 인증 정보를 불러오지 못했습니다.");
   }
 
   const graduateProfile =
-    (graduateProfileData as GraduateProfileAudienceRow | null) ?? null;
+    (graduateProfileResult.data as GraduateProfileAudienceRow | null) ?? null;
 
   return {
     generation: member.generation,
     graduateVerifiedAt: graduateProfile?.verified_at ?? null,
   };
 }
+
+/**
+ * Lean audience snapshot for partner visibility, memoized per server request
+ * so the layout, page and metadata share one pair of reads.
+ */
+export const getMemberAudienceSnapshot = cache(loadMemberAudienceSnapshot);

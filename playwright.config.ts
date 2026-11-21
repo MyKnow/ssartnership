@@ -83,6 +83,7 @@ export default defineConfig({
         reuseExistingServer: false,
         timeout: 120_000,
         env: {
+          NEXT_PUBLIC_SITE_URL: `http://localhost:${e2ePort}`,
           E2E_MOCK_MUTATIONS: "1",
           NEXT_DIST_DIR: ".next-e2e",
           NEXT_PUBLIC_DATA_SOURCE: "mock",
@@ -96,6 +97,10 @@ export default defineConfig({
           MOCK_PW: "e2e-member-password",
           NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock",
           PARTNER_SESSION_SECRET: "e2e-partner-session-secret-for-playwright-only",
+          // Dedicated HMAC keys have no USER_SESSION_SECRET fallback anymore.
+          CERTIFICATION_QR_SECRET: "e2e-certification-qr-secret-for-playwright-only",
+          MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET: "e2e-member-identifier-reservation-secret-only",
+          MEMBER_EMAIL_VERIFICATION_HMAC_SECRET: "e2e-member-email-verification-secret-only",
         },
       },
 });

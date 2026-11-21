@@ -5,7 +5,7 @@ import {
   type AdminMemberConsentHistoryRow,
   type AdminMemberPushPreferenceRow,
 } from "@/lib/admin-member-detail";
-import type { AdminMemberSecurityLog } from "@/components/admin/member-detail/AdminMemberSecurityLogExplorer";
+import type { AdminMemberSecurityLog } from "@/lib/admin-member-security-log";
 import {
   getMemberEmailLoginTransition,
   type MemberEmailLoginTransition,

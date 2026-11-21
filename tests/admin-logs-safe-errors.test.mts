@@ -60,6 +60,8 @@ test("관리자 이미지 흐름은 변환·업로드 예외 원문 대신 복�
     readFile(new URL("../src/components/admin/member-detail/AdminMemberProfilePhotoPanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/admin/partner-media-editor/useMediaFieldController.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/components/admin/promotion-carousel-editor/PromotionCarouselEditor.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/admin/promotion-carousel-editor/usePromotionSlides.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/admin/promotion-carousel-editor/usePromotionCarouselDraft.ts", import.meta.url), "utf8"),
   ]);
   const source = sources.join("\n");
 

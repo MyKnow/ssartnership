@@ -5,7 +5,7 @@ import test from "node:test";
 const readSource = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("관리자 사진 ZIP 파서는 파일을 선택한 뒤에만 로드한다", async () => {
-  const source = await readSource("src/components/admin/AdminMemberManualAddPanel.tsx");
+  const source = await readSource("src/components/admin/manual-member-import-photos.ts");
 
   assert.doesNotMatch(source, /^import JSZip from ["']jszip["'];$/m);
   assert.match(source, /const \{ default: JSZip \} = await import\(["']jszip["']\);/);

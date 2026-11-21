@@ -369,7 +369,7 @@ test("container files keep trusted installs, nonroot execution, image-only deplo
   assert.match(dockerfile, /RUN npm run install:trusted/);
   assert.doesNotMatch(dockerfile, /RUN npm\s+(?:ci|install)\b/);
   assert.match(dockerfile, /COPY scripts\/check-install-scripts\.mjs/);
-  assert.match(dockerfile, /COPY vendor\/archiver-cjs-compat/);
+  assert.match(dockerfile, /COPY vendor \.\/vendor/);
   assert.match(dockerfile, /USER nextjs/);
   assert.match(startScript, /exec node \/app\/server\.js/);
   assert.match(dockerfile, /api\/health/);

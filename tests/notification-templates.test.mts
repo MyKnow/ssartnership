@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { MEMBER_TEMPLATE_TEST_RECIPIENT_SELECT } from "../src/lib/members/projections.ts";
+
 const catalogModulePromise = import("../src/lib/notification-templates/catalog.ts");
 const templateModulePromise = import("../src/lib/notification-templates/template.ts");
 const contextModulePromise = import("../src/lib/notification-templates/context.ts");
@@ -243,18 +245,14 @@ test("기존 사용자 지정 문구는 삭제하지 않고 새 계약과 맞지
 });
 
 test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async () => {
-  const [graduateService, manualImport, manualAdd, cycleActions, suggestionRoute, memberEmail, partnerEmail] =
+  const [graduateService, manualImport, cycleActions, suggestionRoute, memberEmail, partnerEmail] =
     await Promise.all([
       readFile(
         new URL("../src/lib/graduate-verification-service.ts", import.meta.url),
         "utf8",
       ),
       readFile(
-        new URL("../src/lib/member-manual-import/service.server.ts", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL("../src/lib/member-manual-add/provision.ts", import.meta.url),
+        new URL("../src/lib/member-manual-import/delivery.server.ts", import.meta.url),
         "utf8",
       ),
       readFile(
@@ -271,7 +269,6 @@ test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async
   assert.match(graduateService, /rejection_email_last_error_at/);
   assert.match(manualImport, /email\.manual_member_setup/);
   assert.match(manualImport, /mattermost\.manual_member_setup/);
-  assert.match(manualAdd, /mattermost\.manual_member_temporary_password/);
   assert.match(cycleActions, /mattermost\.sender_test/);
   assert.match(suggestionRoute, /email\.partner_suggestion_received/);
   assert.match(memberEmail, /renderResolvedNotificationEmailContent/);
@@ -385,9 +382,9 @@ test("템플릿 관리자는 서버에서 수신 회원을 재검증하고 모�
   assert.match(recipientsRoute, /getNotificationTemplateAdminApiSession/);
   assert.match(recipientsRoute, /listNotificationTemplateTestRecipients/);
 
-  const memberSelect = delivery.match(/const MEMBER_SELECT =\s*"([^"]+)"/)?.[1];
+  assert.match(delivery, /\.select\(MEMBER_TEMPLATE_TEST_RECIPIENT_SELECT\)/);
   assert.equal(
-    memberSelect,
+    MEMBER_TEMPLATE_TEST_RECIPIENT_SELECT,
     "id,display_name,email,generation,staff_source_generation,mattermost_account_id,deleted_at",
   );
 });

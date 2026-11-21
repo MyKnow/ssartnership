@@ -1,5 +1,4 @@
-import { isPartnerPortalMock } from "./partner-portal.ts";
-import { isMissingPartnerAuthSessionVersionColumnError } from "./partner-auth/accounts.ts";
+import { isPartnerPortalMock } from "./partner-auth/portal.ts";
 import {
   findMockPartnerPortalAccountById,
   listMockPartnerPortalCompanySetups,
@@ -92,23 +91,10 @@ async function loadSupabasePartnerSessionAccess(
     .eq("is_active", true)
     .eq("company.is_active", true)
     .order("created_at", { ascending: true });
-  const [primaryAccountResult, companyLinksResult] = await Promise.all([
+  const [accountResult, companyLinksResult] = await Promise.all([
     accountPromise,
     companyLinksPromise,
   ]);
-  let accountResult = primaryAccountResult;
-
-  if (
-    accountResult.error &&
-    isMissingPartnerAuthSessionVersionColumnError(accountResult.error.message)
-  ) {
-    accountResult = await supabase
-      .from("partner_accounts")
-      .select("id,login_id,display_name,is_active,must_change_password")
-      .eq("id", accountId)
-      .eq("is_active", true)
-      .maybeSingle();
-  }
 
   if (accountResult.error) {
     throw accountResult.error;

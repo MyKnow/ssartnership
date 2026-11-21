@@ -160,18 +160,24 @@ export type DuplicateAdCouponInput = {
 
 export type DeleteAdCouponResult =
   | { ok: true }
-  | { ok: false; reason: "usage_history" };
+  /** Issue or redemption rows exist; end the coupon instead of deleting it. */
+  | { ok: false; reason: "usage_history" }
+  /** Still downloadable; pause or end it first (see AD_COUPON_DELETABLE_STATUSES). */
+  | { ok: false; reason: "active" }
+  /** The coupon changed after it was checked (for example re-activated); nothing was deleted. */
+  | { ok: false; reason: "state_changed" };
+
+export type UpdateAdCampaignStatusResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "not_found" | "invalid_transition" | "state_changed";
+      from?: AdCampaignStatus;
+    };
 
 export type UpdateAdCampaignStatusInput = {
   campaignId: string;
   status: AdCampaignStatus;
-};
-
-export type RedeemAdCouponInput = {
-  couponId: string;
-  memberId?: string | null;
-  sessionId?: string | null;
-  metadata?: Record<string, unknown> | null;
 };
 
 export type ListAvailableCouponsForMemberInput = {
@@ -191,25 +197,6 @@ export type AvailableAdCoupon = {
   remainingGlobalUses: number | null;
 };
 
-export type RedeemAdCouponResult =
-  | {
-      ok: true;
-      coupon: AdCoupon;
-      redemption: AdCouponRedemption;
-    }
-  | {
-      ok: false;
-      reason:
-        | "not_found"
-        | "inactive"
-        | "usage_limit"
-        | "member_limit"
-        | "onsite_verification_required"
-        | "invalid";
-      message: string;
-      coupon?: AdCoupon | null;
-    };
-
 export interface AdPackageRepository {
   /** Shares one base campaign read between eager options and deferred stats. */
   prepareAdminCampaigns(): Promise<PreparedAdminCampaigns>;
@@ -225,15 +212,29 @@ export interface AdPackageRepository {
     input: ListAvailableCouponsForMemberInput,
   ): Promise<AvailableAdCoupon[]>;
   createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign>;
-  updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void>;
+  /**
+   * Applies `AD_CAMPAIGN_STATUS_TRANSITIONS` against the stored status with a
+   * compare-and-set write, so a concurrent change reports `state_changed`.
+   */
+  updateCampaignStatus(
+    input: UpdateAdCampaignStatusInput,
+  ): Promise<UpdateAdCampaignStatusResult>;
   createCoupon(input: CreateAdCouponInput): Promise<AdCoupon>;
+  /**
+   * Re-checks `AD_COUPON_STATUS_TRANSITIONS` against the stored status
+   * (`AdStatusTransitionError`) and writes only while that status is
+   * unchanged; a concurrent change throws `AD_COUPON_STATE_CHANGED_ERROR`.
+   */
   updateCoupon(input: UpdateAdCouponInput): Promise<AdCoupon>;
   duplicateCoupon(input: DuplicateAdCouponInput): Promise<AdCoupon>;
+  /**
+   * Deletes only a non-active coupon without issue or redemption history, and
+   * only if the row is unchanged since that check (`state_changed` otherwise).
+   */
   deleteCoupon(couponId: string): Promise<DeleteAdCouponResult>;
   issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult>;
   listIssuedCouponsForMember(input: ListIssuedCouponsForMemberInput): Promise<AvailableAdCoupon[]>;
   addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult>;
-  redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult>;
   redeemCouponIssue(input: RedeemAdCouponIssueInput): Promise<RedeemAdCouponIssueResult>;
 }
 

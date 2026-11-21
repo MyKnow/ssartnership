@@ -7,7 +7,7 @@ import { buildSanitizationSql, validateSnapshotLedger, storageObjectPath } from 
 import { createProcessRunner, performRestoreDrill } from "../self-host-operations/cli.mjs";
 import { loadOperationsContext, acquireOperationsLock, composeArguments } from "../self-host-operations/lib.mjs";
 import { renderMigrationRunnerSql } from "../self-host-database/lib.mjs";
-import { shouldSyncPreviewStorageBucket, isInvalidPreviewRequiredStorageBucket } from "../supabase-sync-preview-storage.mjs";
+import { shouldSyncPreviewStorageBucket, isInvalidPreviewRequiredStorageBucket } from "./storage-selection.mjs";
 
 const CATALOG_SQL = "SELECT coalesce(json_agg(json_build_object('table',table_name,'column',column_name,'nullable',is_nullable='YES','dataType',data_type,'udt',udt_name) ORDER BY table_name,ordinal_position),'[]') FROM information_schema.columns WHERE table_schema='public';";
 const TABLES_SQL = "SELECT coalesce(json_agg(tablename ORDER BY tablename),'[]') FROM pg_tables WHERE schemaname='public';";

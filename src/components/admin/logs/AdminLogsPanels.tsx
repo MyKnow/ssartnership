@@ -1,9 +1,12 @@
+import Checkbox from "@/components/ui/Checkbox";
 import type { ReactNode } from 'react';
 import AdminTimeseriesChart from '@/components/admin/AdminTimeseriesChart';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
+import Modal from '@/components/ui/Modal';
 import SectionHeading from '@/components/ui/SectionHeading';
 import type { LogChartBucket, LogGroup } from '@/lib/log-insights';
 
@@ -41,9 +44,11 @@ export function InsightListCard({
       <SectionHeading title={title} description={description} />
       <div className="mt-4 grid gap-2">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
-            데이터가 없습니다.
-          </div>
+          <EmptyState
+            size="sm"
+            title={`선택한 기간에 집계된 ${title} 항목이 없습니다.`}
+            description="기간이나 로그 범위를 넓혀 다시 확인해 주세요."
+          />
         ) : (
           items.map((item) => (
             <div
@@ -82,7 +87,7 @@ export function SecurityStatusCard({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Success
           </p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-300">
+          <p className="mt-2 text-2xl font-semibold text-success text-success">
             {success}
           </p>
         </div>
@@ -96,7 +101,7 @@ export function SecurityStatusCard({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Blocked
           </p>
-          <p className="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-300">
+          <p className="mt-2 text-2xl font-semibold text-warning text-warning">
             {blocked}
           </p>
         </div>
@@ -156,7 +161,7 @@ export function ActivityChart({
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         {allowedGroups.includes('product') ? (
-          <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">
+          <Badge className="bg-info/15 text-info text-info">
             사용자 이벤트
           </Badge>
         ) : null}
@@ -166,7 +171,7 @@ export function ActivityChart({
           </Badge>
         ) : null}
         {allowedGroups.includes('security') ? (
-          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+          <Badge className="bg-warning/15 text-warning text-warning">
             인증·보안
           </Badge>
         ) : null}
@@ -195,7 +200,7 @@ export function ActivityChart({
           ...(allowedGroups.includes('product') ? [{
             key: 'product',
             label: '사용자 이벤트',
-            lineClassName: 'text-sky-500',
+            lineClassName: 'text-info',
             dotClassName: 'fill-sky-500',
           }] : []),
           ...(allowedGroups.includes('audit') ? [{
@@ -207,7 +212,7 @@ export function ActivityChart({
           ...(allowedGroups.includes('security') ? [{
             key: 'security',
             label: '인증·보안',
-            lineClassName: 'text-amber-500',
+            lineClassName: 'text-warning',
             dotClassName: 'fill-amber-500',
           }] : []),
         ]}
@@ -217,22 +222,22 @@ export function ActivityChart({
           items: [
             {
               label: '전체',
-              value: `${(point.values.total ?? 0).toLocaleString()}건`,
+              value: `${(point.values.total ?? 0).toLocaleString("ko-KR")}건`,
             },
             ...(allowedGroups.includes('product') ? [{
               label: '사용자 이벤트',
-              value: `${(point.values.product ?? 0).toLocaleString()}건`,
-              valueClassName: 'text-sky-700 dark:text-sky-300',
+              value: `${(point.values.product ?? 0).toLocaleString("ko-KR")}건`,
+              valueClassName: 'text-info text-info',
             }] : []),
             ...(allowedGroups.includes('audit') ? [{
               label: '관리자 감사',
-              value: `${(point.values.audit ?? 0).toLocaleString()}건`,
+              value: `${(point.values.audit ?? 0).toLocaleString("ko-KR")}건`,
               valueClassName: 'text-violet-700 dark:text-violet-300',
             }] : []),
             ...(allowedGroups.includes('security') ? [{
               label: '인증·보안',
-              value: `${(point.values.security ?? 0).toLocaleString()}건`,
-              valueClassName: 'text-amber-700 dark:text-amber-300',
+              value: `${(point.values.security ?? 0).toLocaleString("ko-KR")}건`,
+              valueClassName: 'text-warning text-warning',
             }] : []),
           ],
         })}
@@ -252,7 +257,7 @@ export function ActivityChart({
               {bucket.label}
             </p>
             <p className="mt-2 text-lg font-semibold text-foreground">
-              {bucket.total.toLocaleString()}
+              {bucket.total.toLocaleString("ko-KR")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{bucket.rangeLabel}</p>
           </button>
@@ -291,101 +296,89 @@ export function ExportDialog({
   onChangeCustomEnd: (value: string) => void;
   onSubmit: () => void;
 }) {
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-        aria-label="CSV 다운로드 닫기"
-        onClick={onClose}
-      />
-      <Card className="relative z-10 w-full max-w-xl overflow-hidden bg-surface-overlay shadow-overlay">
-        <SectionHeading
-          title="CSV 다운로드"
-          description="현재 조회 범위 또는 별도 사용자 지정 범위를 골라 로그를 CSV로 내보냅니다."
-        />
-
-        <div className="mt-6 grid gap-5">
-          <div className="grid gap-3">
-            <p className="text-sm font-medium text-foreground">내보낼 범위</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <RangePresetButton
-                active={exportScope === 'current'}
-                onClick={() => onChangeScope('current')}
-                disabled={loading}
-              >
-                기본값: 현재 조회 범위
-              </RangePresetButton>
-              <RangePresetButton
-                active={exportScope === 'custom'}
-                onClick={() => onChangeScope('custom')}
-                disabled={loading}
-              >
-                커스텀: 사용자 지정 범위
-              </RangePresetButton>
-            </div>
-          </div>
-
-          {exportScope === 'custom' ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                시작 시각
-                <Input
-                  type="datetime-local"
-                  value={exportCustomStart}
-                  onChange={(event) => onChangeCustomStart(event.target.value)}
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                종료 시각
-                <Input
-                  type="datetime-local"
-                  value={exportCustomEnd}
-                  onChange={(event) => onChangeCustomEnd(event.target.value)}
-                />
-              </label>
-            </div>
-          ) : null}
-
-          <div className="grid gap-3">
-            <p className="text-sm font-medium text-foreground">내보낼 로그 종류</p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {([
-                ['product', '사용자 이벤트'],
-                ['audit', '관리자 감사'],
-                ['security', '인증·보안'],
-              ] as Array<[LogGroup, string]>).filter(([group]) => availableGroups.includes(group)).map(([group, label]) => (
-                <label
-                  key={group}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
-                >
-                  <input
-                    type="checkbox"
-                    checked={exportGroups[group]}
-                    onChange={() => onToggleGroup(group)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                    disabled={loading || !availableGroups.includes(group)}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
+    <Modal
+      open={open}
+      title="CSV 다운로드"
+      description="현재 조회 범위 또는 별도 사용자 지정 범위를 골라 로그를 CSV로 내보냅니다."
+      onClose={onClose}
+      panelClassName="max-w-xl"
+    >
+      <div className="mt-2 grid gap-5">
+        <div className="grid gap-3">
+          <p className="text-sm font-medium text-foreground">내보낼 범위</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <RangePresetButton
+              active={exportScope === 'current'}
+              onClick={() => onChangeScope('current')}
+              disabled={loading}
+            >
+              기본값: 현재 조회 범위
+            </RangePresetButton>
+            <RangePresetButton
+              active={exportScope === 'custom'}
+              onClick={() => onChangeScope('custom')}
+              disabled={loading}
+            >
+              커스텀: 사용자 지정 범위
+            </RangePresetButton>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            취소
-          </Button>
-          <Button onClick={onSubmit} loading={loading} loadingText="다운로드 중">
-            CSV 다운로드
-          </Button>
+        {exportScope === 'custom' ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              시작 시각
+              <Input
+                type="datetime-local"
+                value={exportCustomStart}
+                onChange={(event) => onChangeCustomStart(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              종료 시각
+              <Input
+                type="datetime-local"
+                value={exportCustomEnd}
+                onChange={(event) => onChangeCustomEnd(event.target.value)}
+              />
+            </label>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3">
+          <p className="text-sm font-medium text-foreground">내보낼 로그 종류</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {([
+              ['product', '사용자 이벤트'],
+              ['audit', '관리자 감사'],
+              ['security', '인증·보안'],
+            ] as Array<[LogGroup, string]>).filter(([group]) => availableGroups.includes(group)).map(([group, label]) => (
+              <label
+                key={group}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
+              >
+                <Checkbox
+                  checked={exportGroups[group]}
+                  onChange={() => onToggleGroup(group)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  disabled={loading || !availableGroups.includes(group)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
         </div>
-      </Card>
-    </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" onClick={onClose} disabled={loading}>
+          취소
+        </Button>
+        <Button onClick={onSubmit} loading={loading} loadingText="다운로드 중">
+          CSV 다운로드
+        </Button>
+      </div>
+    </Modal>
   );
 }

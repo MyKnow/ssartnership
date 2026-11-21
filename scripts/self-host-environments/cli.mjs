@@ -3,7 +3,7 @@ import { readFile, readdir, writeFile, mkdir, statfs, realpath } from "node:fs/p
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { hashPreviewSeedPassword, isValidPreviewSeedPassword } from "../preview-credential-seed-lib.mjs";
+import { hashPreviewSeedPassword, isValidPreviewSeedPassword } from "./preview-credential.mjs";
 import { assertPrivatePath, initializePair, loadPair, pairComposeArgs, fail } from "./lib.mjs";
 import { runOperatorCommand } from "../self-host-ci/deployment.mjs";
 import { createMigrationPlan, renderMigrationRunnerSql } from "../self-host-database/lib.mjs";

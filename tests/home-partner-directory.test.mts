@@ -131,7 +131,7 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
     }),
   );
   const popularityRequests: string[][] = [];
-  const memberStateRequests: string[][] = [];
+  const favoriteRequests: Array<string | null> = [];
 
   const directory = await loadHomePartnerDirectory(
     {
@@ -153,9 +153,9 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
           }]),
         );
       },
-      getMemberState: async ({ partnerIds }) => {
-        memberStateRequests.push(partnerIds);
-        return { loadedFavoritePartnerIds: partnerIds, partnerFavoriteStateById: {} };
+      getMemberFavoritePartnerIds: async (currentUserId) => {
+        favoriteRequests.push(currentUserId);
+        return new Set(["partner-30", "partner-24", "partner-2"]);
       },
     },
   );
@@ -164,11 +164,90 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
   assert.equal(popularityRequests[0].includes("partner-29"), true);
   assert.equal(directory.displayPartnerIds.includes("partner-29"), false);
   assert.equal(directory.displayPartnerIds[0], "partner-30");
-  assert.equal(memberStateRequests[0].length, HOME_PARTNER_STATE_BATCH_LIMIT);
-  assert.deepEqual(memberStateRequests[0], directory.displayPartnerIds.slice(0, 24));
-  assert.equal(memberStateRequests[0][0], "partner-30");
-  assert.equal(memberStateRequests[0].includes("partner-24"), false);
-  assert.deepEqual(directory.partnerState.loadedFavoritePartnerIds, memberStateRequests[0]);
+  assert.deepEqual(favoriteRequests, ["member-1"]);
+  const loaded = directory.partnerState.loadedFavoritePartnerIds;
+  assert.equal(loaded.length, HOME_PARTNER_STATE_BATCH_LIMIT);
+  assert.deepEqual(loaded, directory.displayPartnerIds.slice(0, 24));
+  assert.equal(loaded[0], "partner-30");
+  assert.equal(loaded.includes("partner-24"), false);
+  assert.deepEqual(directory.partnerState.partnerFavoriteStateById, {
+    "partner-30": true,
+    "partner-2": true,
+    "partner-24": true,
+  });
+});
+
+test("loadHomePartnerDirectory loads favorites in parallel with popularity ranking", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = [createPartner({ id: "partner-1", name: "제휴처 1" })];
+  const events: string[] = [];
+  let resolvePopularity: (value: Record<string, never>) => void = () => {};
+
+  const loading = loadHomePartnerDirectory(
+    { viewerAuthenticated: true, currentUserId: "member-1" },
+    {
+      getCategories: async () => [],
+      getPartners: async () => partners,
+      getPublicDirectoryPartners: async () => partners,
+      getPopularityByPartnerId: () => {
+        events.push("popularity:start");
+        return new Promise((resolve) => {
+          resolvePopularity = resolve;
+        });
+      },
+      getMemberFavoritePartnerIds: async () => {
+        events.push("favorites:start");
+        return new Set(["partner-1"]);
+      },
+    },
+  );
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events.sort(), ["favorites:start", "popularity:start"]);
+  resolvePopularity({});
+  const directory = await loading;
+  assert.deepEqual(directory.partnerState.partnerFavoriteStateById, { "partner-1": true });
+});
+
+test("loadHomePartnerDirectory strips heavy detail fields for signed-in viewers", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = [
+    createPartner({
+      id: "partner-1",
+      name: "역삼 헬스",
+      thumbnail: "https://img.example.com/fallback.png",
+      images: ["https://img.example.com/fallback.png", "https://img.example.com/2.png"],
+      conditions: ["학생증 제시"],
+      benefits: ["PT 10% 할인"],
+      benefitItems: [{ id: "benefit-1", title: "PT 10% 할인", maxApplyCount: null }],
+      detailDescription: "상세 페이지에서만 보여 주는 긴 소개",
+      branchScopeNote: "지점별 운영 메모",
+    }),
+  ];
+
+  const directory = await loadHomePartnerDirectory(
+    { viewerAuthenticated: true, currentUserId: "member-1" },
+    {
+      getCategories: async () => [],
+      getPartners: async () => partners,
+      getPublicDirectoryPartners: async () => {
+        throw new Error("signed-in viewers keep the full row thumbnail fallback");
+      },
+      getPopularityByPartnerId: async () => ({}),
+      getMemberFavoritePartnerIds: async () => new Set<string>(),
+    },
+  );
+
+  const [partner] = directory.partners;
+  assert.equal(partner.thumbnail, "https://img.example.com/fallback.png");
+  assert.deepEqual(partner.images, []);
+  assert.deepEqual(partner.benefitItems, []);
+  assert.deepEqual(partner.conditions, []);
+  assert.deepEqual(partner.benefits, ["PT 10% 할인"]);
+  assert.match(partner.directorySearchText ?? "", /학생증 제시/);
+  // Same card payload as guests: detail-only text never reaches the client.
+  assert.equal("detailDescription" in partner, false);
+  assert.equal("branchScopeNote" in partner, false);
 });
 
 test("loadHomePartnerDirectory uses the lean public directory loader for logged out viewers", async () => {
@@ -192,10 +271,7 @@ test("loadHomePartnerDirectory uses the lean public directory loader for logged 
         return [];
       },
       getPopularityByPartnerId: async () => ({}),
-      getMemberState: async () => ({
-        loadedFavoritePartnerIds: [],
-        partnerFavoriteStateById: {},
-      }),
+      getMemberFavoritePartnerIds: async () => new Set<string>(),
     },
   );
 
@@ -232,23 +308,35 @@ test("loadHomePartnerDirectoryState converts an unavailable repository into a re
     );
 
     assert.deepEqual(result, { status: "unavailable" });
-    assert.deepEqual(errors, [
-      ["[home-partner-directory] directory unavailable", {
-        reasonCode: "directory_load_failed",
-        errorName: "TypeError",
-        errorMessage: "fetch failed; token=[redacted]",
-        causeName: "Error",
-        causeMessage: "connection to postgresql://[redacted]@db.supabase.co failed",
-        causeCode: "ENOTFOUND",
-      }],
-    ]);
-    assert.doesNotMatch(
-      JSON.stringify(errors),
-      /database-credential|database-password|preview_user/,
-    );
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].length, 1, "failure is one structured JSON line");
+    const entry = JSON.parse(String(errors[0][0]));
+    assert.equal(entry.level, "error");
+    assert.equal(entry.event, "[home-partner-directory] directory unavailable");
+    assert.equal(entry.properties.reasonCode, "directory_load_failed");
+    assert.deepEqual(entry.error, { name: "TypeError", message: "fetch failed; token=[redacted]" });
+    assert.deepEqual(entry.properties.cause, { name: "Error", message: "connection to [url] failed", errorCode: "ENOTFOUND" });
+    assert.doesNotMatch(JSON.stringify(errors), /database-credential|database-password|preview_user/);
   } finally {
     console.error = originalError;
   }
+});
+
+test("home directory errors redact provider values in both error and cause", async (t) => {
+  const { loadHomePartnerDirectoryState } = await homePartnerDirectoryModulePromise;
+  const errors: unknown[][] = [];
+  t.mock.method(console, "error", (...args: unknown[]) => errors.push(args));
+  const message = "failed https://assets.invalid/photo?signature=fixture-signed customer@invalid.example Key (member_id)=(fixture-member)";
+  const result = await loadHomePartnerDirectoryState(
+    { viewerAuthenticated: false, currentUserId: null },
+    async () => { throw new Error(message, { cause: new Error(message) }); },
+  );
+  assert.deepEqual(result, { status: "unavailable" });
+  assert.equal(errors[0].length, 1);
+  const entry = JSON.parse(String(errors[0][0]));
+  assert.equal(entry.error.message, "failed [url] [email] Key (member_id)=([value])");
+  assert.equal(entry.properties.cause.message, entry.error.message);
+  assert.doesNotMatch(String(errors[0][0]), /fixture-signed|customer@|fixture-member/);
 });
 
 test("loadHomePartnerDirectoryState preserves Next.js control-flow errors", async () => {
@@ -303,4 +391,27 @@ test("loadHomePartnerDirectoryState preserves a successful directory result", as
   );
 
   assert.deepEqual(result, { status: "ready", directory });
+});
+
+
+test("directory preserves favorites beyond the first hydration batch without leaking absent partner ids", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = Array.from({ length: 30 }, (_, index) => createPartner({ id: `p-${index}`, name: `제휴처 ${index}` }));
+  const directory = await loadHomePartnerDirectory({ viewerAuthenticated: true, currentUserId: "member-1" }, {
+    getCategories: async () => [], getPartners: async () => partners, getPublicDirectoryPartners: async () => partners,
+    getPopularityByPartnerId: async () => ({}), getMemberFavoritePartnerIds: async () => new Set(["p-29", "absent-private-id"]),
+  });
+  assert.equal(directory.partnerState.partnerFavoriteStateById["p-29"], true);
+  assert.equal(directory.partnerState.partnerFavoriteStateById["absent-private-id"], undefined);
+  assert.equal(directory.partnerState.loadedFavoritePartnerIds.length, 24);
+});
+
+
+test("favorite read failure becomes recoverable directory error instead of false empty saved list", async () => {
+  const { loadHomePartnerDirectory, loadHomePartnerDirectoryState } = await homePartnerDirectoryModulePromise;
+  const result = await loadHomePartnerDirectoryState({ viewerAuthenticated: true, currentUserId: "member-1" }, (input) => loadHomePartnerDirectory(input, {
+    getCategories: async () => [], getPartners: async () => [], getPublicDirectoryPartners: async () => [], getPopularityByPartnerId: async () => ({}),
+    getMemberFavoritePartnerIds: async () => { throw new Error("provider failed"); },
+  }));
+  assert.deepEqual(result, { status: "unavailable" });
 });

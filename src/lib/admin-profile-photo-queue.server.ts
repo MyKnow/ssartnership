@@ -1,6 +1,9 @@
 import { getMemberProfilePhotoStates } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+// Capped review window, not a paginated row list: the queue renders every
+// pending request up to this cap, so the admin 20-row page default does not
+// apply until the queue gains pagination.
 const PROFILE_PHOTO_QUEUE_LIMIT = 50;
 
 export type AdminProfilePhotoReplacementReadModel = {

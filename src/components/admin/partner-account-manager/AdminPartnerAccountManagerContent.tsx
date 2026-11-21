@@ -5,7 +5,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Surface from "@/components/ui/Surface";
 import PartnerAccountCreateForm from "@/components/admin/partner-account-manager/PartnerAccountCreateForm";
 import PartnerAccountCard from "@/components/admin/partner-account-manager/PartnerAccountCard";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
 export default function AdminPartnerAccountManagerContent({

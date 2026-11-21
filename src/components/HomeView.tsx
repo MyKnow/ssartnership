@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import Button from "@/components/ui/Button";
+import { FOCUS_RING_ON_BACKGROUND_CLASS_NAME } from "@/components/ui/focus-ring";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -7,6 +10,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -16,7 +20,9 @@ import PartnerFilters, {
 } from "@/components/PartnerFilters";
 import PartnerActiveFilters from "@/components/partner-filters/PartnerActiveFilters";
 import PartnerDirectoryToolbar from "@/components/partner-filters/PartnerDirectoryToolbar";
-import MotionReveal from "@/components/ui/MotionReveal";
+import { useHomePartnerState } from "@/components/home-view/useHomePartnerState";
+import { useHomeSearchAnalytics } from "@/components/home-view/useHomeSearchAnalytics";
+import { createHomePartnerState, homePartnerStateReducer, homeDirectoryKey, isHomeHistoryReturn, parseHomeReturnState } from "@/components/home-view/state-merge";
 import PartnerCardView from "@/components/PartnerCardView";
 import EmptyState from "@/components/ui/EmptyState";
 import HomeDirectorySectionHeader from "@/components/home-view/HomeDirectorySectionHeader";
@@ -30,7 +36,7 @@ import {
   createHomeCategoryMap,
   filterHomePartners,
   normalizeHomePartners,
-} from "@/components/home-view/selectors";
+} from "@/lib/home-partner-selectors";
 import {
   parseHomeDirectoryState,
   reconcileRouterSearchValue,
@@ -75,25 +81,22 @@ export default function HomeView({
   const sortValue = directoryState.sort;
   const searchValue = directoryState.q;
   const viewMode = directoryState.view;
+  const favoritesOnly = directoryState.favoritesOnly === true;
+  const savedLoginHref = `/auth/login?${new URLSearchParams({ returnTo: `${pathname}?${serializeHomeDirectoryState({ ...directoryState, favoritesOnly: true }, searchParams)}#benefits` })}`;
   const [visibleCardState, setVisibleCardState] = useState({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
   });
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const directoryHydrated = useHydrated();
-  const [localPopularityById, setLocalPopularityById] = useState<
-    Record<string, PartnerPopularityMetrics | undefined>
-  >(partnerPopularityById ?? {});
-  const [localFavoriteStateById, setLocalFavoriteStateById] = useState<
-    Record<string, boolean | undefined>
-  >(partnerFavoriteStateById ?? {});
-  const [loadedFavoritePartnerIdSet, setLoadedFavoritePartnerIdSet] = useState(
-    () => new Set(loadedFavoritePartnerIds ?? []),
+  const [partnerState, dispatchPartnerState] = useReducer(
+    homePartnerStateReducer,
+    { favorites: partnerFavoriteStateById, popularity: partnerPopularityById, loadedIds: loadedFavoritePartnerIds },
+    createHomePartnerState,
   );
+  const { favorites: localFavoriteStateById, popularity: localPopularityById, loadedIds: loadedFavoritePartnerIdSet } = partnerState;
   const deferredSearchValue = useDeferredValue(searchValue);
-  const searchTimeoutRef = useRef<number | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
-  const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
 
   const updateDirectoryState = useCallback(
@@ -182,7 +185,9 @@ export default function HomeView({
 
   const filteredPartners = useMemo(() => {
     return filterHomePartners({
-      partners: normalizedPartners,
+      partners: favoritesOnly
+        ? normalizedPartners.filter((partner) => Boolean(currentUserId && localFavoriteStateById[partner.id]))
+        : normalizedPartners,
       activeCategory,
       campusFilter,
       appliesToFilter,
@@ -193,16 +198,84 @@ export default function HomeView({
     activeCategory,
     campusFilter,
     appliesToFilter,
+    currentUserId,
+    favoritesOnly,
+    localFavoriteStateById,
     deferredSearchValue,
     normalizedPartners,
     sortValue,
   ]);
 
-  const visibleCardKey = `${activeCategory}:${campusFilter}:${appliesToFilter}:${deferredSearchValue}:${sortValue}:${viewMode}`;
+  const visibleCardKey = homeDirectoryKey({ ...directoryState, q: deferredSearchValue });
   const visibleCardLimit =
     visibleCardState.key === visibleCardKey
       ? visibleCardState.limit
       : INITIAL_PARTNER_CARD_COUNT;
+  const restoredDirectoryKeyRef = useRef("");
+  const pendingReturnScrollRef = useRef<{ key: string; limit: number; scrollY: number } | null>(null);
+  const [restorationReadyKey, setRestorationReadyKey] = useState<string | null>(null);
+  const [scrollRestoredKey, setScrollRestoredKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    // On a history return, useSearchParams/deferred search can still hold the
+    // previous render. Preserve the return marker until the URL state settles.
+    if (homeDirectoryKey(parseHomeDirectoryState(new URLSearchParams(window.location.search), categoryKeys)) !== visibleCardKey) return;
+    if (restoredDirectoryKeyRef.current === visibleCardKey) return;
+    restoredDirectoryKeyRef.current = visibleCardKey;
+    pendingReturnScrollRef.current = null;
+    // Restoration is keyed by external state (the live URL and sessionStorage),
+    // which render cannot read, so it has to be synchronized from an effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRestorationReadyKey(visibleCardKey);
+    try {
+      const saved = parseHomeReturnState(sessionStorage.getItem(`home:directory:${pathname}`), visibleCardKey);
+      // A full-document Back can dispatch popstate before React hydrates.
+      // Navigation Timing covers it even when the mounted listener missed it.
+      const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      const shouldRestoreScroll = isHomeHistoryReturn(sessionStorage.getItem("home:return"), navigation?.type);
+      sessionStorage.removeItem("home:return");
+      if (saved) {
+        setVisibleCardState({ key: saved.key, limit: saved.limit });
+        if (shouldRestoreScroll) {
+          pendingReturnScrollRef.current = saved;
+          return;
+        }
+      }
+    } catch { /* Storage can be unavailable in private browsing. */ }
+    setScrollRestoredKey(visibleCardKey);
+  }, [categoryKeys, pathname, visibleCardKey]);
+
+  useEffect(() => {
+    const saved = pendingReturnScrollRef.current;
+    if (restorationReadyKey !== visibleCardKey || !saved || saved.key !== visibleCardKey || visibleCardLimit < saved.limit) return;
+    let innerFrame = 0;
+    const frame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(() => {
+        if (window.location.pathname !== pathname) return;
+        window.scrollTo({ top: saved.scrollY, behavior: "instant" });
+        pendingReturnScrollRef.current = null;
+        setScrollRestoredKey(visibleCardKey);
+      });
+    });
+    return () => { cancelAnimationFrame(frame); cancelAnimationFrame(innerFrame); };
+  }, [pathname, restorationReadyKey, visibleCardKey, visibleCardLimit]);
+
+  useEffect(() => {
+    if (scrollRestoredKey !== visibleCardKey) return;
+    const save = () => {
+      // Next can scroll the incoming detail before this effect is cleaned up.
+      if (window.location.pathname !== pathname) return;
+      if (homeDirectoryKey(parseHomeDirectoryState(new URLSearchParams(window.location.search), categoryKeys)) !== visibleCardKey) return;
+      try {
+        sessionStorage.setItem(`home:directory:${pathname}`, JSON.stringify({ key: visibleCardKey, limit: visibleCardLimit, scrollY: window.scrollY }));
+      } catch { /* Optional return state. */ }
+    };
+    save();
+    window.addEventListener("scroll", save, { passive: true });
+    window.addEventListener("pagehide", save);
+    return () => { window.removeEventListener("scroll", save); window.removeEventListener("pagehide", save); };
+  }, [categoryKeys, pathname, scrollRestoredKey, visibleCardKey, visibleCardLimit]);
+
   const displayPartners = filteredPartners.display.slice(0, visibleCardLimit);
   const hasMoreDisplayPartners =
     filteredPartners.display.length > displayPartners.length;
@@ -231,7 +304,9 @@ export default function HomeView({
 
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current;
-    if (!sentinel || !hasMoreDisplayPartners) {
+    // A restored scroll can briefly intersect the initial 12-card sentinel.
+    // Observe only after the stored card limit has committed.
+    if (!sentinel || !hasMoreDisplayPartners || scrollRestoredKey !== visibleCardKey) {
       return;
     }
 
@@ -246,7 +321,7 @@ export default function HomeView({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMoreDisplayPartners, loadMorePartners]);
+  }, [hasMoreDisplayPartners, loadMorePartners, scrollRestoredKey, visibleCardKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -279,109 +354,8 @@ export default function HomeView({
     return () => window.cancelAnimationFrame(animationFrame);
   }, []);
 
-  useEffect(() => {
-    if (!currentUserId) {
-      return;
-    }
-
-    const missingPartnerIds = displayPartnerIds.filter(
-      (partnerId) => !loadedFavoritePartnerIdSet.has(partnerId),
-    );
-    if (missingPartnerIds.length === 0) {
-      return;
-    }
-
-    const abortController = new AbortController();
-    const params = new URLSearchParams();
-    for (const partnerId of missingPartnerIds) {
-      params.append("id", partnerId);
-    }
-    params.set("includeFavorites", "1");
-    params.set("includePopularity", "0");
-
-    fetch(`/api/partners/home-state?${params.toString()}`, {
-      credentials: "same-origin",
-      signal: abortController.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("home_state_failed");
-        }
-        return (await response.json()) as {
-          loadedFavoritePartnerIds?: string[];
-          partnerFavoriteStateById?: Record<string, boolean | undefined>;
-        };
-      })
-      .then((state) => {
-        setLocalFavoriteStateById((current) => ({
-          ...current,
-          ...(state.partnerFavoriteStateById ?? {}),
-        }));
-        setLoadedFavoritePartnerIdSet((current) => {
-          const next = new Set(current);
-          for (const partnerId of state.loadedFavoritePartnerIds ?? []) {
-            next.add(partnerId);
-          }
-          return next;
-        });
-      })
-      .catch((error) => {
-        if (abortController.signal.aborted) {
-          return;
-        }
-        console.error("[home-view] partner state hydration failed", error);
-      });
-
-    return () => abortController.abort();
-  }, [currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet]);
-
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      window.clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
-    }
-
-    const query = deferredSearchValue.trim();
-    if (!query) {
-      lastLoggedSearchRef.current = "";
-      return;
-    }
-
-    searchTimeoutRef.current = window.setTimeout(() => {
-      const dedupeKey = `${activeCategory}:${campusFilter}:${appliesToFilter}:${sortValue}:${query}`;
-      if (lastLoggedSearchRef.current === dedupeKey) {
-        return;
-      }
-      lastLoggedSearchRef.current = dedupeKey;
-      trackProductEvent({
-        eventName: "search_execute",
-        targetType: "partner_search",
-        properties: {
-          hasQuery: true,
-          queryLength: query.length,
-          categoryKey: activeCategory,
-          campusFilter,
-          appliesToFilter,
-          sortValue,
-          resultCount: visibleResultCount,
-        },
-      });
-    }, 450);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        window.clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = null;
-      }
-    };
-  }, [
-    activeCategory,
-    campusFilter,
-    appliesToFilter,
-    deferredSearchValue,
-    sortValue,
-    visibleResultCount,
-  ]);
+  useHomePartnerState({ currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, dispatch: dispatchPartnerState });
+  useHomeSearchAnalytics({ activeCategory, campusFilter, appliesToFilter, deferredSearchValue, sortValue, visibleResultCount });
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     startTransition(() => {
@@ -449,28 +423,15 @@ export default function HomeView({
     commitSearchValue(searchInputValue);
   };
 
-  const handleFavoriteChange = (partnerId: string, nextFavorited: boolean) => {
-    setLocalPopularityById((current) => {
-      const currentMetrics = current[partnerId] ?? {
-        favoriteCount: 0,
-        reviewCount: 0,
-        detailViews: 0,
-      };
-      return {
-        ...current,
-        [partnerId]: {
-          ...currentMetrics,
-          favoriteCount: Math.max(
-            0,
-            (currentMetrics.favoriteCount ?? 0) + (nextFavorited ? 1 : -1),
-          ),
-        },
-      };
-    });
+  const handleFavoriteChange = (partnerId: string, nextFavorited: boolean, count?: number) => {
+    dispatchPartnerState({ type: "favorite", partnerId, favorite: nextFavorited, count });
+  };
+  const handleFavoritePendingChange = (partnerId: string, pending: boolean, outcome?: "success" | "failure") => {
+    dispatchPartnerState({ type: "pending", partnerId, pending, outcome });
   };
 
   return (
-    <MotionReveal delay={0.04}>
+    <div>
       <section id="benefits" className="flex scroll-mt-24 flex-col gap-4 pt-7">
         <HomeDirectorySectionHeader />
         <div className="grid min-w-0 gap-6 min-[840px]:grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] min-[840px]:items-start min-[1200px]:grid-cols-[18rem_minmax(0,1fr)]">
@@ -514,6 +475,20 @@ export default function HomeView({
               onAppliesToFilterChange={handleAppliesToFilterChange}
               onSortChange={handleSortChange}
             />
+            <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="제휴처 모아보기">
+              <Button type="button" variant={favoritesOnly ? "secondary" : "primary"} ariaPressed={!favoritesOnly} onClick={() => updateDirectoryState({ favoritesOnly: false }, "push")}>
+                전체 제휴처
+              </Button>
+              {currentUserId ? (
+                <Button type="button" variant={favoritesOnly ? "primary" : "secondary"} ariaPressed={favoritesOnly} onClick={() => updateDirectoryState({ favoritesOnly: true }, "push")}>
+                  즐겨찾기
+                </Button>
+              ) : (
+                <Link href={savedLoginHref} className={cn("inline-flex min-h-11 items-center rounded-control border border-border bg-surface-control px-4 text-sm font-semibold text-foreground", FOCUS_RING_ON_BACKGROUND_CLASS_NAME)}>
+                  즐겨찾기
+                </Link>
+              )}
+            </div>
             <PartnerDirectoryToolbar
               resultCount={directoryResultCount}
               viewMode={viewMode}
@@ -524,13 +499,18 @@ export default function HomeView({
           {displayPartners.length === 0 ? (
             <div data-testid="partner-no-results">
               <EmptyState
+                action={favoritesOnly ? currentUserId ? <Button type="button" variant="secondary" onClick={() => updateDirectoryState({ favoritesOnly: false }, "push")}>전체 제휴처 보기</Button> : <Link href={savedLoginHref} className={cn("inline-flex min-h-11 items-center text-primary underline", FOCUS_RING_ON_BACKGROUND_CLASS_NAME)}>로그인하기</Link> : undefined}
                 title={
-                  partners.length === 0
+                  favoritesOnly
+                    ? currentUserId ? "조건에 맞는 즐겨찾기가 없어요" : "로그인하면 저장한 제휴처를 볼 수 있어요"
+                    : partners.length === 0
                     ? HOME_COPY.emptyTitle
                     : HOME_COPY.noResultsTitle
                 }
                 description={
-                  partners.length === 0
+                  favoritesOnly
+                    ? "필터를 바꾸거나 전체 목록에서 즐겨찾기를 눌러 저장해 보세요."
+                    : partners.length === 0
                     ? HOME_COPY.emptyDescription
                     : HOME_COPY.noResultsDescription
                 }
@@ -562,6 +542,8 @@ export default function HomeView({
                     metrics={localPopularityById?.[partner.id]}
                     onCategoryClick={handleCategoryChange}
                     onFavoriteChange={handleFavoriteChange}
+                    favoritePending={partnerState.pendingIds.has(partner.id)}
+                    onFavoritePendingChange={handleFavoritePendingChange}
                     variant={viewMode}
                   />
                 ))}
@@ -581,6 +563,6 @@ export default function HomeView({
           </div>
         </div>
       </section>
-    </MotionReveal>
+    </div>
   );
 }

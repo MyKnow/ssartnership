@@ -21,6 +21,23 @@ function createAdminMetrics(favoriteCount: number) {
   };
 }
 
+test("directory member state retains saved entries after the hydration batch and excludes unavailable ids", async () => {
+  const { buildHomePartnerDirectoryMemberState } = await homePartnerStateModulePromise;
+  const authorizedIds = Array.from({ length: 30 }, (_, index) => `partner-${index}`);
+  const state = buildHomePartnerDirectoryMemberState(authorizedIds, new Set(["partner-29", "private-unavailable"]));
+  assert.equal(state.loadedFavoritePartnerIds.length, 24);
+  assert.deepEqual(state.partnerFavoriteStateById, { "partner-29": true });
+});
+
+test("home and campus directories share complete saved state and fail closed on favorite lookup errors", () => {
+  const home = readFileSync(new URL("../src/lib/home-partner-directory.ts", import.meta.url), "utf8");
+  const campus = readFileSync(new URL("../src/app/(site)/campuses/[campus]/page.tsx", import.meta.url), "utf8");
+  for (const source of [home, campus]) {
+    assert.match(source, /buildHomePartnerDirectoryMemberState\(/);
+    assert.match(source, /getHomeMemberFavoritePartnerIds\([^\n]+\{ failOnError: true \}/);
+  }
+});
+
 test("normalizeHomePartnerStateIds deduplicates and caps visible partner ids", async () => {
   const { HOME_PARTNER_STATE_BATCH_LIMIT, normalizeHomePartnerStateIds } =
     await homePartnerStateModulePromise;

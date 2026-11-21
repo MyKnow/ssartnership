@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { walletPassRepository } from "@/lib/repositories/wallet-pass";
+import { classifyWalletPassRepositoryError } from "@/lib/wallet/wallet-pass-error-tokens";
 import type {
   MemberWalletPass,
   RevokeMemberWalletPassResult,
@@ -104,14 +105,14 @@ function summarizeAppleWalletConfigObservability(
 }
 
 function mapRepositoryError(error: unknown): never {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("idempotency_conflict")) {
+  const kind = classifyWalletPassRepositoryError(error);
+  if (kind === "idempotency_conflict") {
     throw new WalletPassServiceError(
       "wallet_pass_idempotency_conflict",
       "같은 요청 키로 다른 작업을 처리할 수 없습니다.",
     );
   }
-  if (message.includes("not_found")) {
+  if (kind === "not_found") {
     throw new WalletPassServiceError(
       "wallet_pass_not_found",
       "Apple Wallet 패스를 찾을 수 없습니다.",

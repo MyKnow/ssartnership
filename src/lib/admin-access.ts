@@ -224,27 +224,6 @@ export async function requireNotificationTemplateAdmin(
   redirect(options?.redirectTo ?? "/admin?error=permission_denied");
 }
 
-export async function ensureAdminApiAccess(request: NextRequest) {
-  if (await getAdminSession()) {
-    return null;
-  }
-
-  await logAuthSecurity({
-    ...getRequestLogContext(request),
-    eventName: "admin_access",
-    status: "blocked",
-    actorType: "guest",
-    properties: {
-      reason: "access_denied",
-    },
-  });
-
-  return NextResponse.json(
-    { message: "관리자 인증이 필요합니다." },
-    { status: 401 },
-  );
-}
-
 type AdminApiPermissionResult =
   { session: AdminSession } | { response: NextResponse };
 

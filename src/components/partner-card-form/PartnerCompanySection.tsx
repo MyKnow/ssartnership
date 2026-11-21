@@ -1,4 +1,5 @@
 import Input from "@/components/ui/Input";
+import { PHONE_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import Surface from "@/components/ui/Surface";
@@ -156,6 +157,7 @@ export default function PartnerCompanySection({
 
           <FieldGroup label="담당자 전화번호" error={fieldErrors?.companyContactPhone}>
             <Input
+              {...PHONE_INPUT_ATTRIBUTES}
               name="companyContactPhone"
               value={values.companyContactPhoneValue}
               onChange={(event) =>

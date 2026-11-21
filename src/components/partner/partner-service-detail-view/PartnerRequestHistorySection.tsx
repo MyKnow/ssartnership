@@ -2,7 +2,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
-import { formatDateTime } from "@/components/admin/logs/utils";
+import { formatDateTime } from "@/lib/log-insights/utils";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 
 const requestStatusLabel: Record<PartnerChangeRequestSummary["status"], string> = {

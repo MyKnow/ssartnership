@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { getMemberLoginCompletionHref } from "@/lib/member-required-gates";
 import {
   PASSWORD_POLICY_MESSAGE,
   isValidPasswordPolicy,
@@ -69,7 +70,14 @@ export default function GraduatePasswordSetupView({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "비밀번호를 설정하지 못했습니다.");
-      router.replace("/certification");
+      // Emailed links carry no destination; an explicit `returnTo` still wins.
+      router.replace(
+        getMemberLoginCompletionHref({
+          currentPath: "/auth/graduate/setup",
+          returnTo: new URLSearchParams(window.location.search).get("returnTo"),
+          fallback: "/certification",
+        }),
+      );
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "비밀번호를 설정하지 못했습니다.");

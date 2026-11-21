@@ -4,6 +4,7 @@ import {
   MAX_GRADUATE_PROFILE_IMAGE_BYTES,
 } from "@/lib/graduate-verification";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { expectNoError } from "@/lib/expect-no-error";
 
 export const GRADUATE_CERTIFICATES_BUCKET = "graduate-certificates";
 export const MEMBER_PROFILE_IMAGES_BUCKET = "member-profile-images";
@@ -92,7 +93,11 @@ export async function createGraduateVerificationSignedUpload(input: {
 
   const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(path);
   if (error || !data?.signedUrl) {
-    await supabase.from("graduate_verification_uploads").delete().eq("id", id);
+    // Compensating delete: the row is useless without a signed upload URL.
+    await expectNoError(
+      supabase.from("graduate_verification_uploads").delete().eq("id", id),
+      "[graduate-verification/upload] compensating delete failed",
+    );
     throw new Error("업로드 URL을 발급하지 못했습니다.");
   }
 

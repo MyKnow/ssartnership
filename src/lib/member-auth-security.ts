@@ -16,7 +16,8 @@ export type MemberAuthRoute =
   | "mattermost-code-issue"
   | "mattermost-code-verify"
   | "change-password"
-  | "manual-password-action";
+  | "manual-password-action"
+  | "recent-auth";
 
 type MemberAuthAttemptContext = {
   ipAddress?: string | null;
@@ -31,6 +32,7 @@ const MEMBER_AUTH_ROUTES: MemberAuthRoute[] = [
   "mattermost-code-verify",
   "change-password",
   "manual-password-action",
+  "recent-auth",
 ];
 
 export const MEMBER_AUTH_RATE_LIMIT: RateLimitConfig = {
@@ -72,6 +74,10 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     max: 700,
   },
   "manual-password-action": {
+    min: 350,
+    max: 700,
+  },
+  "recent-auth": {
     min: 350,
     max: 700,
   },

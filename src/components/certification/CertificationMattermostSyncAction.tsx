@@ -40,7 +40,7 @@ export default function CertificationMattermostSyncAction() {
         .catch(() => null)) as MattermostProfileSyncResponse | null;
 
       if (!response.ok || !payload?.ok) {
-        notify(getResponseMessage(payload));
+        notify(getResponseMessage(payload), { tone: "error" });
         return;
       }
 
@@ -49,6 +49,7 @@ export default function CertificationMattermostSyncAction() {
           payload.imageSkipped
             ? "MM 프로필 사진을 처리하지 못했습니다. 본인 사진을 직접 제출해 주세요."
             : "MM 프로필에 사용할 사진이 없습니다. 본인 사진을 직접 제출해 주세요.",
+          { tone: "error" },
         );
         window.location.assign(
           buildMemberGateHref(
@@ -60,7 +61,9 @@ export default function CertificationMattermostSyncAction() {
       }
 
       if (payload.imageSkipped) {
-        notify("이름과 MM 아이디는 반영됐지만 MM 프로필 사진을 처리하지 못했습니다.");
+        notify("이름과 MM 아이디는 반영됐지만 MM 프로필 사진을 처리하지 못했습니다.", {
+          tone: "error",
+        });
       } else if (payload.updated) {
         notify("MM 프로필의 최신 정보를 반영했습니다.");
       } else {
@@ -68,7 +71,7 @@ export default function CertificationMattermostSyncAction() {
       }
       router.refresh();
     } catch {
-      notify("MM 프로필을 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      notify("MM 프로필을 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
     } finally {
       setSyncing(false);
     }

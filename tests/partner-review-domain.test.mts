@@ -167,13 +167,40 @@ describe("mock partner review repository", () => {
     assert.equal(recommended.recommendCount, 1);
     assert.equal(recommended.myReaction, "recommend");
 
-    const toggledOff = await repository.setPartnerReviewReaction({
+    // `reaction` is the desired final state: a retried request converges
+    // instead of toggling the reaction back off.
+    const retried = await repository.setPartnerReviewReaction({
       reviewId: "created-review-1",
       memberId: "mock-student-14",
       reaction: "recommend",
     });
-    assert.equal(toggledOff.recommendCount, 0);
-    assert.equal(toggledOff.myReaction, null);
+    assert.equal(retried.recommendCount, 1);
+    assert.equal(retried.myReaction, "recommend");
+
+    const switched = await repository.setPartnerReviewReaction({
+      reviewId: "created-review-1",
+      memberId: "mock-student-14",
+      reaction: "disrecommend",
+    });
+    assert.equal(switched.recommendCount, 0);
+    assert.equal(switched.disrecommendCount, 1);
+    assert.equal(switched.myReaction, "disrecommend");
+
+    const cleared = await repository.setPartnerReviewReaction({
+      reviewId: "created-review-1",
+      memberId: "mock-student-14",
+      reaction: null,
+    });
+    assert.equal(cleared.recommendCount, 0);
+    assert.equal(cleared.disrecommendCount, 0);
+    assert.equal(cleared.myReaction, null);
+
+    const clearedAgain = await repository.setPartnerReviewReaction({
+      reviewId: "created-review-1",
+      memberId: "mock-student-14",
+      reaction: null,
+    });
+    assert.equal(clearedAgain.myReaction, null);
 
     const ownedBeforeDelete = await repository.getOwnedPartnerReview(
       "created-review-1",

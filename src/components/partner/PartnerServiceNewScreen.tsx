@@ -5,7 +5,7 @@ import type { PartnerRegistrationWebAction } from "@/components/partner-registra
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
 import type { AdminPartnerFileCategory } from "@/lib/admin-partner-file-import";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
 
 export type PartnerServiceNewScreenProps = {
   companyId: string;

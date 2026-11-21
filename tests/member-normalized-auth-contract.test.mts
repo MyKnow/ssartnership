@@ -4,6 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { MEMBER_EVENT_CANDIDATE_SELECT } from "../src/lib/members/projections.ts";
+
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 function readRepoFile(path: string) {
@@ -78,21 +80,13 @@ test("관리자 권한은 admin_profiles와 MM 디렉터리만 기준으로 관�
   );
 });
 
-test("운영 bootstrap과 Preview seed도 정규화된 관리자 관계를 사용한다", () => {
+test("운영 bootstrap도 정규화된 관리자 관계를 사용한다", () => {
   const bootstrap = readRepoFile("scripts/bootstrap-super-admin.mjs");
-  const previewSync = readRepoFile("scripts/supabase-sync-preview.mjs");
 
   assert.match(bootstrap, /\.from\("mm_user_directory"\)/);
   assert.match(bootstrap, /\.eq\("mattermost_account_id", directory\.id\)/);
   assert.match(bootstrap, /\.from\("admin_profiles"\)/);
   assert.doesNotMatch(bootstrap, /admin_permission_id/);
-
-  assert.match(previewSync, /insert into public\.admin_profiles/);
-  assert.match(previewSync, /join public\.mm_user_directory directory/);
-  assert.doesNotMatch(
-    previewSync,
-    /update public\.members\s+set admin_permission_id/,
-  );
 });
 
 test("정책 동의는 회원 mirror 대신 consent ledger를 기준으로 판정한다", () => {
@@ -316,9 +310,10 @@ test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용�
 });
 
 test("운영 알림 수신자는 활성 상태와 알림 조회 권한으로 결정한다", () => {
-  const operationalNotifications = readRepoFile(
-    "src/lib/operational-notifications.ts",
-  );
+  const operationalNotifications = [
+    "src/lib/operational-notifications/admin.ts",
+    "src/lib/operational-notifications/repository.supabase.ts",
+  ].map(readRepoFile).join("\n");
 
   assert.match(operationalNotifications, /listAdminAccounts\(\)/);
   assert.match(operationalNotifications, /account\.isActive/);
@@ -337,14 +332,15 @@ test("운영 알림 수신자는 활성 상태와 알림 조회 권한으로 결
 });
 
 test("이벤트 보상 후보는 세대·MM 디렉터리·정책 consent ledger로 구성한다", () => {
-  const eventRewards = readRepoFile("src/lib/promotions/event-rewards.ts");
+  const eventRewards = readRepoFile("src/lib/promotions/event-rewards-repository.ts");
 
   assert.match(eventRewards, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(eventRewards, /\.from\("member_policy_consents"\)/);
   assert.match(eventRewards, /\.eq\("policy_document_id", policyDocumentId\)/);
-  assert.match(
-    eventRewards,
-    /\.select\("id,display_name,mattermost_account_id,generation,campus,created_at"\)/,
+  assert.match(eventRewards, /\.select\(MEMBER_EVENT_CANDIDATE_SELECT\)/);
+  assert.equal(
+    MEMBER_EVENT_CANDIDATE_SELECT,
+    "id,display_name,mattermost_account_id,generation,campus,created_at",
   );
   assert.match(eventRewards, /\.order\("generation", \{ ascending: false \}\)/);
   assert.doesNotMatch(
@@ -451,24 +447,19 @@ test("회원 mock도 canonical 뷰 모델을 사용한다", () => {
   assert.doesNotMatch(mockReviewRepository, /member\?\.display_name|member\?\.year/);
 });
 
-test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
+test("활성 회원 가져오기는 디렉터리 FK·세대 필드로 원자적 생성을 요청한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
-  const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
-  const rollback = readRepoFile("src/lib/member-manual-add/rollback.ts");
+  const manualImport = ["repository.supabase", "recipients.server", "delivery.server"].map((name) => readRepoFile(`src/lib/member-manual-import/${name}.ts`)).join("\n");
 
   assert.match(lookup, /findMmUserDirectoryEntryByUserId/);
   assert.match(lookup, /\.eq\("mattermost_account_id", directory\.id\)/);
   assert.doesNotMatch(lookup, /\.from\("members"\)[\s\S]{0,400}\.eq\("mm_user_id"/);
 
-  assert.match(provision, /mattermost_account_id/);
-  assert.match(provision, /staff_source_generation/);
-  assert.match(provision, /resolveManualMemberResolution/);
-  assert.match(provision, /withActiveMattermostSenderForGeneration/);
-  assert.doesNotMatch(provision, /avatar_base64|avatar_content_type|avatar_url/);
-
-  assert.match(rollback, /mattermost_account_id/);
-  assert.doesNotMatch(
-    rollback,
-    /mm_user_id|mm_username|avatar_base64|avatar_content_type|avatar_url|\byear:/,
-  );
+  assert.match(manualImport, /\.rpc\(\s*"checkpoint_manual_member_import_member"/);
+  assert.match(manualImport, /p_mattermost_account_id: input\.mattermostAccountId/);
+  assert.match(manualImport, /p_generation: input\.row\.generation/);
+  assert.match(manualImport, /p_staff_source_generation: input\.staffSourceGeneration/);
+  assert.match(manualImport, /resolveManualMemberResolution/);
+  assert.match(manualImport, /withActiveMattermostSenderForGeneration/);
+  assert.doesNotMatch(manualImport, /avatar_base64|avatar_content_type|avatar_url/);
 });

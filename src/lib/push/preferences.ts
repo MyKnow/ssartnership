@@ -86,45 +86,11 @@ export function getActiveSubscriptionPushPreferences(
   };
 }
 
+/** Device lifecycle writers share the consent-safe patch boundary. */
 export async function upsertMemberPushPreferences(
   memberId: string,
   value: Partial<PushPreferenceState>,
-) {
-  const current = await getMemberPushPreferences(memberId);
-  const next: PushPreferenceState = {
-    enabled: value.enabled ?? current.enabled,
-    announcementEnabled:
-      value.announcementEnabled ?? current.announcementEnabled,
-    newPartnerEnabled: value.newPartnerEnabled ?? current.newPartnerEnabled,
-    expiringPartnerEnabled:
-      value.expiringPartnerEnabled ?? current.expiringPartnerEnabled,
-    reviewEnabled: value.reviewEnabled ?? current.reviewEnabled,
-    mmEnabled: value.mmEnabled ?? current.mmEnabled,
-    marketingEnabled: value.marketingEnabled ?? current.marketingEnabled,
-  };
-  if (isMockDataSource()) {
-    return next;
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from("push_preferences").upsert(
-    {
-      member_id: memberId,
-      enabled: next.enabled,
-      announcement_enabled: next.announcementEnabled,
-      new_partner_enabled: next.newPartnerEnabled,
-      expiring_partner_enabled: next.expiringPartnerEnabled,
-      review_enabled: next.reviewEnabled,
-      mm_enabled: next.mmEnabled,
-      marketing_enabled: next.marketingEnabled,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "member_id" },
-  );
-
-  if (error) {
-    throw wrapPushDbError(error, "Push 설정을 저장하지 못했습니다.");
-  }
-
-  return next;
+): Promise<PushPreferenceState> {
+  const { updateMemberNotificationPreferences } = await import("../notification-preferences.ts");
+  return updateMemberNotificationPreferences(memberId, value);
 }

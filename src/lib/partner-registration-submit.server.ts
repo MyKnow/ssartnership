@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import ExcelJS from "exceljs";
 import {
   type AdminPartnerFileCategory,
   ADMIN_PARTNER_FILE_MAX_BYTES,
@@ -12,6 +11,7 @@ import {
   type PartnerBranchDraft,
   type PartnerBranchInputRow,
 } from "@/lib/partner-branch-registration";
+import { readPartnerBranchXlsxRows } from "@/lib/partner-branch-xlsx-rows";
 import {
   PARTNER_REGISTRATION_GALLERY_MAX_FILES,
   resolvePartnerRegistrationCategory,
@@ -34,8 +34,10 @@ import {
 } from "@/lib/image-upload/policy";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
+import { partnerRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
+import { logServerError } from "@/lib/server-log";
 
 export type PartnerRegistrationMediaPayload = {
   thumbnailUrl: string | null;
@@ -94,16 +96,10 @@ function buildRegistrationBenefitGroupRows(
   }));
 }
 
-export async function loadPartnerRegistrationCategories() {
-  const result = await getSupabaseAdminClient()
-    .from("categories")
-    .select("id,key,label")
-    .order("created_at", { ascending: true });
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
-  return (result.data ?? []) as AdminPartnerFileCategory[];
+export async function loadPartnerRegistrationCategories(): Promise<
+  AdminPartnerFileCategory[]
+> {
+  return partnerRepository.getCategoryOptions();
 }
 
 async function rollbackCreatedPartnerRegistrationRequest(input: {
@@ -128,10 +124,7 @@ async function rollbackCreatedPartnerRegistrationRequest(input: {
     result.status === "rejected" ? [result.reason] : [],
   );
   if (cleanupErrors.length > 0) {
-    console.error(
-      "[partner-registration] created request rollback failed",
-      cleanupErrors,
-    );
+    for (const cleanupError of cleanupErrors) logServerError("[partner-registration] created request rollback failed", cleanupError);
     throw new Error("partner_registration_cleanup_failed", {
       cause: { originalError: input.originalError, cleanupErrors },
     });
@@ -217,32 +210,6 @@ export async function resolvePartnerRegistrationMediaPayload(
   }
 }
 
-function getCellText(cell: ExcelJS.Cell) {
-  const value = cell.value;
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-  if (typeof value === "object") {
-    if ("text" in value && typeof value.text === "string") {
-      return value.text.trim();
-    }
-    if ("result" in value) {
-      return String(value.result ?? "").trim();
-    }
-    if ("richText" in value && Array.isArray(value.richText)) {
-      return value.richText.map((item) => item.text).join("").trim();
-    }
-  }
-  return String(value).trim();
-}
-
-function normalizeHeader(value: string) {
-  return value.trim().replace(/\s+/g, "");
-}
-
 async function parsePartnerRegistrationBranchXlsxFile(
   file: File,
   values: PartnerRegistrationResolvedValues,
@@ -261,42 +228,9 @@ async function parsePartnerRegistrationBranchXlsxFile(
     throw new Error("지점 목록 시트를 찾지 못했습니다.");
   }
 
-  const headerByColumn = new Map<number, string>();
-  worksheet.getRow(1).eachCell((cell, columnNumber) => {
-    const header = normalizeHeader(getCellText(cell));
-    if (header) {
-      headerByColumn.set(columnNumber, header);
-    }
-  });
-
-  const rows: PartnerBranchInputRow[] = [];
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) {
-      return;
-    }
-    const rowValues = new Map<string, string>();
-    row.eachCell((cell, columnNumber) => {
-      const header = headerByColumn.get(columnNumber);
-      if (!header) {
-        return;
-      }
-      rowValues.set(header, getCellText(cell));
-    });
-    const hasAnyValue = Array.from(rowValues.values()).some(Boolean);
-    if (!hasAnyValue) {
-      return;
-    }
-    rows.push({
-      benefitGroupLabel: rowValues.get("혜택그룹"),
-      branchName: rowValues.get("지점명"),
-      address: rowValues.get("주소"),
-      branchCode: rowValues.get("지점코드"),
-      branchType: rowValues.get("직영/가맹") ?? rowValues.get("지점유형"),
-      mapUrl: rowValues.get("지도URL"),
-      phone: rowValues.get("전화번호"),
-      memo: rowValues.get("메모") ?? rowValues.get("운영메모"),
-    });
-  });
+  const rows: PartnerBranchInputRow[] = readPartnerBranchXlsxRows(worksheet).map(
+    (row) => row.values,
+  );
 
   const parsed = normalizePartnerBranchRows(rows, {
     companyName: values.companyName,
@@ -425,18 +359,15 @@ export async function insertPartnerRegistrationRequest({
         === (context.requestedByPartnerAccountId ?? null),
     );
     if (existingRequestError || !hasSameScope) {
-      console.error(
+      logServerError(
         "[partner-registration] request idempotency lookup failed",
-        existingRequestError?.message ?? insertResult.error.message,
+        existingRequestError ?? insertResult.error,
       );
       throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
     persistedRequestId = existing?.id ?? "";
   } else if (insertResult.error) {
-    console.error(
-      "[partner-registration] request insert failed",
-      insertResult.error.message,
-    );
+    logServerError("[partner-registration] request insert failed", insertResult.error);
     return rethrowAfterPartnerMediaCleanup({
       urls: media.uploadedUrls,
       originalError: new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."),
@@ -463,10 +394,7 @@ export async function insertPartnerRegistrationRequest({
         originalError: benefitGroupResult.error,
       });
     }
-    console.error(
-      "[partner-registration] benefit group insert failed",
-      benefitGroupResult.error.message,
-    );
+    logServerError("[partner-registration] benefit group insert failed", benefitGroupResult.error);
     throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
   }
 
@@ -499,10 +427,7 @@ export async function insertPartnerRegistrationRequest({
           originalError: branchResult.error,
         });
       }
-      console.error(
-        "[partner-registration] branch insert failed",
-        branchResult.error.message,
-      );
+      logServerError("[partner-registration] branch insert failed", branchResult.error);
       throw new Error("지점 목록을 저장하지 못했습니다. 입력값을 확인해 주세요.");
     }
   }

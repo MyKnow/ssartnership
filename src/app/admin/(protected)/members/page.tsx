@@ -39,6 +39,7 @@ import {
   getSsafyCycleSettings,
   normalizeSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -129,7 +130,7 @@ async function AdminMembersContent({
   adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
   params: AdminMemberSearchParams;
 }) {
-  const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
+  const memberError = pickAllowedEntry(adminMembersErrorMessages, params.error);
   const hasMoreBackfill =
     getAdminMemberSearchParam(params, "hasMore") === "1"
     && Boolean(getAdminMemberSearchParam(params, "nextCursor"));

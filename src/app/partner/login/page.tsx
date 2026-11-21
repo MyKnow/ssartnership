@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import PartnerLoginScreen from "@/components/partner/PartnerLoginScreen";
+import {
+  resolvePartnerPostLoginHref,
+  sanitizePartnerReturnTo,
+} from "@/lib/partner-auth/return-to";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { loginAction } from "./_actions/login";
@@ -24,12 +28,18 @@ export default async function PartnerLoginPage({
 }: {
   searchParams?: Promise<PartnerLoginSearchParams>;
 }) {
+  const params = (await searchParams) ?? {};
+  const returnTo = sanitizePartnerReturnTo(readSearchParam(params.returnTo));
   const session = await getPartnerSession();
   if (session) {
-    redirect(session.mustChangePassword ? "/partner/change-password" : "/partner");
+    redirect(
+      resolvePartnerPostLoginHref({
+        mustChangePassword: session.mustChangePassword,
+        returnTo,
+      }),
+    );
   }
 
-  const params = (await searchParams) ?? {};
   const errorCode = readSearchParam(params.error);
   const defaultLoginId = readSearchParam(params.loginId);
   const setupStatus = readSearchParam(params.setup);
@@ -43,6 +53,7 @@ export default async function PartnerLoginPage({
       action={loginAction}
       defaultLoginId={defaultLoginId}
       setupCompleted={setupStatus === "completed"}
+      returnTo={returnTo}
       fieldErrors={fieldErrors}
       formErrorMessage={formErrorMessage}
     />

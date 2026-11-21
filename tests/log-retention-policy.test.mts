@@ -30,11 +30,16 @@ test("로그 보존 cron은 매일 실행되고 만료 로그 수를 감사 로�
   const route = await readProjectFile(
     "src/app/api/cron/purge-expired-operational-logs/route.ts",
   );
-  const vercel = await readProjectFile("vercel.json");
+  const schedules = await readProjectFile(
+    "deploy/self-host-operations/production-cron/schedules.json",
+  );
 
   assert.match(route, /ensureCronApiAccess/);
   assert.match(route, /getCronErrorResponse\("purge-expired-operational-logs"\)/);
   assert.match(route, /purge_expired_operational_logs/);
   assert.match(route, /log_retention_purge/);
-  assert.match(vercel, /\/api\/cron\/purge-expired-operational-logs/);
+  assert.match(
+    schedules,
+    /"path":"\/api\/cron\/purge-expired-operational-logs","schedule":"50 18 \* \* \*"/,
+  );
 });

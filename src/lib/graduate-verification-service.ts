@@ -1,3 +1,6 @@
+import { PROFILE_IMAGE_RETENTION_DAYS } from "@/lib/repositories/supabase/member-profile-image-records.supabase";
+import { attachCommonProfileImageUpload, type CommonProfileImageUpload } from "@/lib/member-profile-image-upload.server";
+export { approveMemberProfileImageReplacement, rejectMemberProfileImageReplacement, rejectMemberActiveProfilePhoto, submitMemberProfileImageReplacement, replaceMemberProfileImageByAdmin } from "./member-profile-image-service";
 import { randomUUID } from "node:crypto";
 import {
   createGraduateVerificationSubmission,
@@ -22,13 +25,6 @@ import {
   type GraduateStoredUpload,
 } from "@/lib/graduate-verification-storage";
 import {
-  resolveImageTransformPolicy,
-} from "@/lib/image-upload/policy";
-import {
-  type ImageUploadActor,
-} from "@/lib/image-upload/repository";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
-import {
   sendGraduateAccountSetupEmail,
   sendGraduateVerificationRejectionEmail,
   sendGraduateVerificationResubmissionEmail,
@@ -36,6 +32,8 @@ import {
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { expectNoError } from "@/lib/expect-no-error";
+import { ADMIN_REVIEW_NOTE_MAX_LENGTH } from "@/lib/admin-review-queue";
 
 type GraduateChallengeRow = {
   id: string;
@@ -66,18 +64,7 @@ type GraduateImageRow = {
   storage_path: string;
 };
 
-type MemberProfileImageRow = {
-  id: string;
-  member_id: string | null;
-  status: string;
-};
 
-type CommonProfileImageUpload = {
-  storagePath: string;
-  sha256: string;
-  width: number;
-  height: number;
-};
 
 type GraduateEmailMember = {
   id: string;
@@ -298,7 +285,7 @@ async function markPreviousImageSuperseded(input: {
     .from("member_profile_images")
     .update({
       status: "superseded",
-      delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      delete_after: new Date(Date.now() + PROFILE_IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
     })
     .eq("id", input.profileImageId)
     .select("id,storage_path")
@@ -309,49 +296,6 @@ async function markPreviousImageSuperseded(input: {
   return (data ?? null) as GraduateImageRow | null;
 }
 
-async function attachCommonProfileImageUpload(input: {
-  actor: ImageUploadActor;
-  purpose: "profile" | "graduate-verification" | "manual-member-import";
-  uploadId: string;
-  destinationPath: string;
-  resource: { type: string; id: string };
-}): Promise<CommonProfileImageUpload> {
-  const attached = await getImageUploadRepository().attach({
-    actor: input.actor,
-    purpose: input.purpose,
-    uploadId: input.uploadId,
-    role: "profile",
-    policy: resolveImageTransformPolicy(input.purpose, "profile"),
-    destination: {
-      bucket: MEMBER_PROFILE_IMAGES_BUCKET,
-      path: input.destinationPath,
-      isPublic: false,
-      cacheControl: "private, no-store",
-    },
-    resource: input.resource,
-  });
-  if (attached.width !== 640 || attached.height !== 640) {
-    throw new Error("프로필 사진 크기를 확인하지 못했습니다.");
-  }
-  return {
-    storagePath: attached.path,
-    sha256: attached.sha256,
-    width: attached.width,
-    height: attached.height,
-  };
-}
-
-async function findMemberProfileImageByStoragePath(storagePath: string) {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("member_profile_images")
-    .select("id,member_id,status")
-    .eq("storage_path", storagePath)
-    .maybeSingle();
-  if (error) {
-    throw new Error("프로필 사진 상태를 확인하지 못했습니다.");
-  }
-  return (data as MemberProfileImageRow | null) ?? null;
-}
 
 export async function submitGraduateVerificationRequest(input: {
   challengeId: string;
@@ -679,8 +623,8 @@ export async function requestGraduateVerificationResubmission(input: {
 }) {
   const targets = getGraduateResubmissionTargets(input.targets);
   const note = input.note?.trim() || null;
-  if (note && note.length > 500) {
-    throw new Error("보완 요청 사유는 500자 이하로 입력해 주세요.");
+  if (note && note.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
+    throw new Error(`보완 요청 사유는 ${ADMIN_REVIEW_NOTE_MAX_LENGTH}자 이하로 입력해 주세요.`);
   }
   await markGraduateVerificationInReview({
     requestId: input.requestId,
@@ -718,19 +662,27 @@ export async function requestGraduateVerificationResubmission(input: {
       note,
       requestKind: parseGraduateVerificationRequestKind(data.request_kind) ?? "graduate_signup",
     });
-    await supabase
-      .from("graduate_verification_requests")
-      .update({
-        resubmission_email_sent_at: new Date().toISOString(),
-        resubmission_email_last_error_at: null,
-      })
-      .eq("id", data.id);
+    await expectNoError(
+      supabase
+        .from("graduate_verification_requests")
+        .update({
+          resubmission_email_sent_at: new Date().toISOString(),
+          resubmission_email_last_error_at: null,
+        })
+        .eq("id", data.id),
+      "[graduate-verification] resubmission email state update failed",
+      { properties: { requestId: data.id } },
+    );
     return { targets, emailSent: true };
   } catch {
-    await supabase
-      .from("graduate_verification_requests")
-      .update({ resubmission_email_last_error_at: new Date().toISOString() })
-      .eq("id", data.id);
+    await expectNoError(
+      supabase
+        .from("graduate_verification_requests")
+        .update({ resubmission_email_last_error_at: new Date().toISOString() })
+        .eq("id", data.id),
+      "[graduate-verification] resubmission email error state update failed",
+      { properties: { requestId: data.id } },
+    );
     return { targets, emailSent: false };
   }
 }
@@ -978,8 +930,8 @@ export async function rejectGraduateVerificationRequest(input: {
   reason: string;
 }) {
   const reason = input.reason.trim();
-  if (!reason || reason.length > 500) {
-    throw new Error("반려 사유를 1~500자로 입력해 주세요.");
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
+    throw new Error(`반려 사유를 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`);
   }
   await markGraduateVerificationInReview({
     requestId: input.requestId,
@@ -996,7 +948,7 @@ export async function rejectGraduateVerificationRequest(input: {
       rejection_reason: reason,
       reviewed_at: new Date().toISOString(),
       decided_at: new Date().toISOString(),
-      certificate_delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      certificate_delete_after: new Date(Date.now() + PROFILE_IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
     })
     .eq("id", input.requestId)
     .eq("status", "in_review")
@@ -1014,7 +966,7 @@ export async function rejectGraduateVerificationRequest(input: {
         reviewer_admin_profile_id: reviewerAdminProfileId,
         review_reason: reason,
         reviewed_at: new Date().toISOString(),
-        delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        delete_after: new Date(Date.now() + PROFILE_IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
       })
       .eq("id", request.profile_image_id);
   }
@@ -1044,253 +996,3 @@ export async function rejectGraduateVerificationRequest(input: {
 
   return { emailSent };
 }
-
-export async function approveMemberProfileImageReplacement(input: {
-  imageId: string;
-  adminId: string;
-}) {
-  const { data, error } = await getSupabaseAdminClient().rpc(
-    "approve_member_profile_image_replacement",
-    { p_image_id: input.imageId, p_admin_id: input.adminId },
-  );
-  if (error || typeof data !== "string") {
-    throw new Error("본인 사진 교체를 승인하지 못했습니다.");
-  }
-  return data;
-}
-
-export async function rejectMemberProfileImageReplacement(input: {
-  imageId: string;
-  adminId: string;
-  reason: string;
-}) {
-  const reason = input.reason.trim();
-  if (!reason || reason.length > 500) {
-    throw new Error("반려 사유를 1~500자로 입력해 주세요.");
-  }
-  const { data, error } = await getSupabaseAdminClient().rpc(
-    "reject_member_profile_image_replacement",
-    {
-      p_image_id: input.imageId,
-      p_admin_id: input.adminId,
-      p_reason: reason,
-    },
-  );
-  if (error || typeof data !== "string") {
-    throw new Error("본인 사진 교체 반려를 처리하지 못했습니다.");
-  }
-  return data;
-}
-
-export async function rejectMemberActiveProfilePhoto(input: {
-  memberId: string;
-  adminId: string;
-  reason: string;
-}) {
-  const reason = input.reason.trim();
-  if (!reason || reason.length > 500) {
-    throw new Error("반려 사유는 1~500자로 입력해 주세요.");
-  }
-  const { data, error } = await getSupabaseAdminClient().rpc(
-    "reject_member_active_profile_photo",
-    {
-      p_member_id: input.memberId,
-      p_admin_id: input.adminId,
-      p_reason: reason,
-    },
-  );
-  if (error || typeof data !== "string") {
-    throw new Error("기존 프로필 사진을 반려하지 못했습니다.");
-  }
-  return data;
-}
-
-type ResolvedMemberProfileReplacement = {
-  path: string;
-  sha256: string;
-  width: number;
-  height: number;
-};
-
-async function resolveMemberProfileReplacement(input: {
-  uploadId: string;
-  actor: ImageUploadActor;
-  destinationPath: string;
-  resource: { type: string; id: string };
-}): Promise<ResolvedMemberProfileReplacement> {
-  const attached = await attachCommonProfileImageUpload({
-    actor: input.actor,
-    purpose: "profile",
-    uploadId: input.uploadId,
-    destinationPath: input.destinationPath,
-    resource: input.resource,
-  });
-  return { ...attached, path: attached.storagePath };
-}
-
-export async function submitMemberProfileImageReplacement(input: {
-  memberId: string;
-  uploadId: string;
-}) {
-  const supabase = getSupabaseAdminClient();
-  const { data: member, error: memberError } = await supabase
-    .from("members")
-    .select("id")
-    .eq("id", input.memberId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (memberError || !member?.id) {
-    throw new Error("회원 정보를 확인하지 못했습니다.");
-  }
-  const image = await resolveMemberProfileReplacement({
-    uploadId: input.uploadId,
-    actor: { kind: "member", id: input.memberId },
-    destinationPath: `members/${input.memberId}/uploads/${input.uploadId}.webp`,
-    resource: { type: "member_profile_replacement", id: input.memberId },
-  });
-  const existing = await findMemberProfileImageByStoragePath(image.path);
-  if (existing) {
-    if (existing.member_id !== input.memberId) {
-      throw new Error("프로필 사진의 회원 연결을 확인하지 못했습니다.");
-    }
-    return { imageId: existing.id };
-  }
-  let profileImageId: string | null = null;
-  try {
-    const { error: supersedeError } = await supabase
-      .from("member_profile_images")
-      .update({
-        status: "superseded",
-        delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .eq("member_id", input.memberId)
-      .is("graduate_verification_request_id", null)
-      .eq("status", "pending");
-    if (supersedeError) {
-      throw new Error("기존 사진 변경 대기를 정리하지 못했습니다.");
-    }
-    const { data, error } = await supabase
-      .from("member_profile_images")
-      .insert({
-        member_id: input.memberId,
-        storage_path: image.path,
-        sha256: image.sha256,
-        content_type: "image/webp",
-        width: image.width,
-        height: image.height,
-        source: "member_upload",
-        status: "pending",
-      })
-      .select("id")
-      .single();
-    if (error || !data?.id) throw new Error("본인 사진 변경 요청을 저장하지 못했습니다.");
-    profileImageId = data.id;
-    return { imageId: data.id };
-  } catch (error) {
-    if (profileImageId) {
-      await supabase
-        .from("member_profile_images")
-        .delete()
-        .eq("id", profileImageId)
-        .eq("status", "pending");
-    }
-    // Keep the attached common image for a retry with the same upload ID.
-    throw error;
-  }
-}
-
-/**
- * Administrators set a member photo directly. The row is created as pending
- * only long enough for the existing locked approval RPC to atomically
- * supersede the old active image and point the member at the new one.
- */
-export async function replaceMemberProfileImageByAdmin(input: {
-  memberId: string;
-  uploadId: string;
-  adminId: string;
-}) {
-  const supabase = getSupabaseAdminClient();
-  const { data: member, error: memberError } = await supabase
-    .from("members")
-    .select("id")
-    .eq("id", input.memberId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (memberError || !member?.id) {
-    throw new Error("회원 정보를 확인하지 못했습니다.");
-  }
-  const image = await resolveMemberProfileReplacement({
-    uploadId: input.uploadId,
-    actor: { kind: "admin", id: input.adminId },
-    destinationPath: `members/${input.memberId}/admin-uploads/${input.uploadId}.webp`,
-    resource: { type: "admin_member_profile_replacement", id: input.memberId },
-  });
-  const existing = await findMemberProfileImageByStoragePath(image.path);
-  if (existing) {
-    if (existing.member_id !== input.memberId) {
-      throw new Error("프로필 사진의 회원 연결을 확인하지 못했습니다.");
-    }
-    if (existing.status === "pending") {
-      await approveMemberProfileImageReplacement({
-        imageId: existing.id,
-        adminId: input.adminId,
-      });
-    }
-    return { imageId: existing.id };
-  }
-  let profileImageId: string | null = null;
-  try {
-    const { error: supersedeError } = await supabase
-      .from("member_profile_images")
-      .update({
-        status: "superseded",
-        delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .eq("member_id", input.memberId)
-      .is("graduate_verification_request_id", null)
-      .eq("status", "pending");
-    if (supersedeError) {
-      throw new Error("기존 사진 변경 대기를 정리하지 못했습니다.");
-    }
-
-    const { data, error } = await supabase
-      .from("member_profile_images")
-      .insert({
-        member_id: input.memberId,
-        storage_path: image.path,
-        sha256: image.sha256,
-        content_type: "image/webp",
-        width: image.width,
-        height: image.height,
-        source: "manual_admin",
-        status: "pending",
-      })
-      .select("id")
-      .single();
-    if (error || !data?.id) {
-      throw new Error("관리자 사진 변경을 저장하지 못했습니다.");
-    }
-    profileImageId = data.id;
-    await approveMemberProfileImageReplacement({
-      imageId: data.id,
-      adminId: input.adminId,
-    });
-    return { imageId: data.id };
-  } catch (error) {
-    if (profileImageId) {
-      await supabase
-        .from("member_profile_images")
-        .delete()
-        .eq("id", profileImageId)
-        .eq("status", "pending");
-    }
-    // Keep the attached common image for a retry with the same upload ID.
-    throw error;
-  }
-}
-
-// Backward-compatible aliases while graduate verification actions move to the
-// dedicated common profile-photo review surface.
-export const approveGraduateProfileImageReplacement = approveMemberProfileImageReplacement;
-export const rejectGraduateProfileImageReplacement = rejectMemberProfileImageReplacement;
-export const submitGraduateProfileImageReplacement = submitMemberProfileImageReplacement;

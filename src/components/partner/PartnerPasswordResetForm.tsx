@@ -1,11 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
-import FormMessage from "@/components/ui/FormMessage";
-import Input from "@/components/ui/Input";
-import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
+import PortalButton, { PortalButtonLink } from "@/components/portal-v2/PortalButton";
+import {
+  PortalField,
+  PortalInput,
+  portalFieldProps,
+} from "@/components/portal-v2/PortalFormControls";
+import PortalFormMessage from "@/components/portal-v2/PortalFormMessage";
+import { focusField } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
@@ -100,42 +103,49 @@ export default function PartnerPasswordResetForm() {
 
   if (success) {
     return (
-      <div className="space-y-4">
-        <Card className="space-y-3 p-5">
-          <p className="text-sm font-medium text-foreground">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 rounded-pv2-control border border-pv2-border bg-pv2-grid p-4">
+          <p role="status" className="pv2-label text-pv2-text">
             {success.emailSentTo}로 임시 비밀번호를 보냈습니다.
           </p>
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="pv2-body text-ko-pretty text-pv2-muted">
             이메일을 확인한 뒤, 임시 비밀번호로 로그인하세요.
             로그인 후에는 반드시 새 비밀번호로 변경해야 합니다.
           </p>
           {success.temporaryPassword ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                임시 비밀번호
-              </p>
-              <p className="mt-2 font-mono text-sm text-foreground">
+            <div className="rounded-pv2-control border border-dashed border-pv2-border-strong bg-pv2-surface px-4 py-3">
+              <p className="pv2-caption text-pv2-muted">임시 비밀번호</p>
+              <p className="mt-1 font-mono pv2-body text-pv2-text">
                 {success.temporaryPassword}
               </p>
             </div>
           ) : null}
-        </Card>
+        </div>
 
         <div className="flex flex-wrap gap-3">
-          <Button href="/partner/login">로그인 페이지</Button>
-          <Button variant="ghost" href="/partner/reset">
-            다시 발급
-          </Button>
+          <PortalButtonLink href="/partner/login" variant="primary">
+            로그인 페이지
+          </PortalButtonLink>
+          <PortalButtonLink href="/partner/reset">다시 발급</PortalButtonLink>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        담당자 이메일
-        <Input
+    <div className="flex flex-col gap-4">
+      <PortalField
+        name="email"
+        label="담당자 이메일"
+        hint="초기 설정이 완료된 계정이라면 등록된 이메일로 임시 비밀번호가 전송됩니다."
+        error={fieldError ?? undefined}
+        required
+      >
+        <PortalInput
+          {...portalFieldProps("email", {
+            error: fieldError ?? undefined,
+            hasHint: true,
+          })}
           ref={emailRef}
           value={email}
           onChange={(event) => {
@@ -147,25 +157,20 @@ export default function PartnerPasswordResetForm() {
           autoComplete="email"
           inputMode="email"
           disabled={pending}
-          aria-invalid={Boolean(fieldError) || undefined}
-          className={getFieldErrorClass(Boolean(fieldError))}
         />
-        {fieldError ? <FormMessage variant="error">{fieldError}</FormMessage> : null}
-      </label>
+      </PortalField>
+      {formError ? <PortalFormMessage variant="error">{formError}</PortalFormMessage> : null}
 
-      <FormMessage>
-        초기 설정이 완료된 계정이라면, 등록된 이메일로 임시 비밀번호가
-        전송됩니다.
-      </FormMessage>
-      {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
-
-      <Button
-        onClick={handleReset}
-        loading={pending}
-        loadingText="임시 비밀번호 발급 중"
-      >
-        임시 비밀번호 받기
-      </Button>
+      <div>
+        <PortalButton
+          variant="primary"
+          onClick={handleReset}
+          loading={pending}
+          loadingText="임시 비밀번호 발급 중"
+        >
+          임시 비밀번호 받기
+        </PortalButton>
+      </div>
     </div>
   );
 }

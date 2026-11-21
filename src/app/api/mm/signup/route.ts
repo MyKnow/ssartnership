@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import {
   getActiveRequiredPolicies,
@@ -33,6 +32,7 @@ import { setUserSession, UserSessionIssueError } from "@/lib/user-auth";
 import { attachMattermostSignupProfileImage } from "@/lib/member-signup-profile";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { rollbackCreatedSignupMember } from "@/lib/member-signup-rollback";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -81,7 +81,7 @@ async function discardSignupProfileUpload(input: {
     actor: { kind: "signup", id: input.ownerId },
     purpose: "member-signup-profile",
     uploadId: input.uploadId,
-  }).catch(() => undefined);
+  }).catch((error) => logServerError("[mm/signup] image cleanup pending", error));
 }
 
 export async function POST(request: Request) {
@@ -276,15 +276,15 @@ export async function POST(request: Request) {
         freshAuthentication: true,
       });
     } catch (error) {
-      await discardSignupProfileUpload({
-        uploadId: parsed.data.profileImageUploadId,
-        ownerId: verification.signupUploadOwnerId,
-      });
       await rollbackCreatedSignupMember({
         memberId: inserted.id,
         originalError: error,
         deleteMember: (memberId) =>
           supabase.from("members").delete().eq("id", memberId),
+        discardUpload: () => discardSignupProfileUpload({
+          uploadId: parsed.data.profileImageUploadId,
+          ownerId: verification.signupUploadOwnerId,
+        }),
       });
       throw error;
     }
@@ -299,7 +299,6 @@ export async function POST(request: Request) {
       actorId: inserted.id,
       properties: { source: "mattermost_code", generation: verification.subjectGeneration },
     });
-    revalidatePath("/");
     return NextResponse.json({ ok: true, redirectTo: sanitizeReturnTo(
       typeof body === "object" && body && !Array.isArray(body)
         ? (body as Record<string, unknown>).returnTo as string | undefined

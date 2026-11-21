@@ -61,7 +61,7 @@ test("fixture environment excludes inherited provider credentials and deployment
   assert.equal(result.PATH, "/usr/bin");
   assert.equal(result.SUPABASE_SERVICE_ROLE_KEY, undefined);
   assert.equal(result.SELF_HOST_BUILD, undefined);
-  assert.equal(result.NEXT_PUBLIC_SITE_URL, "http://127.0.0.1:3150");
+  assert.equal(result.NEXT_PUBLIC_SITE_URL, "http://localhost:3150");
   assert.equal(result.NODE_ENV, "production");
   for (const port of ["80", "65536", "3150 --hostname 0.0.0.0", "../3100"]) assert.throws(() => productionFixtureEnvironment({}, port));
 });

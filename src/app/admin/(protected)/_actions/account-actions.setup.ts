@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { sendPartnerPortalInitialSetupEmail } from "@/lib/partner-email";
+import { logServerError } from "@/lib/server-log";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import {
   logAdminAction,
@@ -26,8 +28,11 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
   let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;
   try {
     issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
-  } catch {
-    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies?tab=accounts",
+      getSafeAdminActionErrorCode(error, "partner_account_setup_link_failed"),
+    );
   }
 
   await logAdminAction("partner_account_initial_setup_link_generate", {
@@ -62,8 +67,11 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
   let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;
   try {
     issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
-  } catch {
-    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies?tab=accounts",
+      getSafeAdminActionErrorCode(error, "partner_account_setup_link_failed"),
+    );
   }
 
   try {
@@ -73,8 +81,17 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
       loginId: issued.account.login_id,
       setupUrl: issued.setupUrl,
     });
-  } catch {
-    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
+  } catch (error) {
+    // The new link is already stored, so this is a delivery failure, not an
+    // input error: tell the operator to fix mail or hand over a new URL.
+    // Delivery errors can echo the recipient address; the helper redacts it.
+    logServerError("[admin] partner initial setup email failed", error, {
+      accountId: issued.account.id,
+    });
+    redirectAdminActionError(
+      "/admin/companies?tab=accounts",
+      "partner_account_setup_email_failed",
+    );
   }
 
   const { error: sentAtError } = await supabase
@@ -86,7 +103,10 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
     .eq("id", issued.account.id);
 
   if (sentAtError) {
-    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
+    // The mail is already delivered; only the "sent" timestamp is missing.
+    logServerError("[admin] partner initial setup sent-at update failed", sentAtError, {
+      accountId: issued.account.id,
+    });
   }
 
   await logAdminAction("partner_account_initial_setup_link_send", {

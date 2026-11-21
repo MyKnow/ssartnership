@@ -2,7 +2,7 @@ import EventLanding from "@/components/events/EventLanding";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import type { EventCampaign } from "@/lib/promotions/catalog";
-import type { EventRewardSummary } from "@/lib/promotions/event-rewards";
+import type { EventRewardSummary } from "@/lib/promotions/event-rewards-types";
 import { serializeJsonLd } from "@/lib/seo";
 
 export type EventPageViewProps = {

@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { cn } from "@/lib/cn";
@@ -35,8 +36,7 @@ export default function PartnerAudienceSection({
                   fieldErrors?.appliesTo ? "border-danger/40 ring-2 ring-danger/15" : null,
                 )}
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="appliesTo"
                   value={option.value}
                   checked={checked}

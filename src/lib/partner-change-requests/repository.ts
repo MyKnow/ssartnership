@@ -1,4 +1,4 @@
-import { isPartnerPortalMock } from "../partner-portal.ts";
+import { isPartnerPortalMock } from "../partner-auth/portal.ts";
 import {
   approveMockPartnerChangeRequest,
   cancelMockPartnerChangeRequest,
@@ -39,56 +39,27 @@ export async function updatePartnerImmediateFields(
   return updateSupabasePartnerImmediateFields(input);
 }
 
-export const partnerChangeRequestRepository: PartnerChangeRequestRepository = {
-  async getRequestContext(companyIds: string[], partnerId: string, accountId?: string) {
-    if (isPartnerPortalMock) {
-      return getMockPartnerChangeRequestContext(companyIds, partnerId, accountId);
-    }
-    return getSupabaseRequestContext(companyIds, partnerId, accountId);
-  },
+const mockRepository = {
+  getRequestContext: getMockPartnerChangeRequestContext,
+  listPendingRequests: listMockPartnerChangeRequests,
+  listPendingRequestsPage: listMockPartnerChangeRequestPage,
+  createRequest: createMockPartnerChangeRequest,
+  cancelRequest: cancelMockPartnerChangeRequest,
+  approveRequest: approveMockPartnerChangeRequest,
+  rejectRequest: rejectMockPartnerChangeRequest,
+} satisfies PartnerChangeRequestRepository;
 
-  async listPendingRequests(companyIds?: string[]) {
-    if (isPartnerPortalMock) {
-      return listMockPartnerChangeRequests(companyIds);
-    }
-    return getSupabasePendingRequests(companyIds);
-  },
+const supabaseRepository = {
+  getRequestContext: getSupabaseRequestContext,
+  listPendingRequests: getSupabasePendingRequests,
+  listPendingRequestsPage: getSupabasePendingRequestPage,
+  createRequest: createSupabaseRequest,
+  cancelRequest: cancelSupabaseRequest,
+  approveRequest: approveSupabaseRequest,
+  rejectRequest: rejectSupabaseRequest,
+} satisfies PartnerChangeRequestRepository;
 
-  async listPendingRequestsPage(input: PartnerChangeRequestListInput) {
-    if (isPartnerPortalMock) {
-      return listMockPartnerChangeRequestPage(input);
-    }
-    return getSupabasePendingRequestPage(input);
-  },
-
-  async createRequest(input: PartnerChangeRequestCreateInput) {
-    if (isPartnerPortalMock) {
-      return createMockPartnerChangeRequest(input);
-    }
-    return createSupabaseRequest(input);
-  },
-
-  async cancelRequest(input: PartnerChangeRequestCancelInput) {
-    if (isPartnerPortalMock) {
-      return cancelMockPartnerChangeRequest(input);
-    }
-    return cancelSupabaseRequest(input);
-  },
-
-  async approveRequest(input: PartnerChangeRequestReviewInput) {
-    if (isPartnerPortalMock) {
-      return approveMockPartnerChangeRequest(input);
-    }
-    return approveSupabaseRequest(input);
-  },
-
-  async rejectRequest(input: PartnerChangeRequestReviewInput) {
-    if (isPartnerPortalMock) {
-      return rejectMockPartnerChangeRequest(input);
-    }
-    return rejectSupabaseRequest(input);
-  },
-};
+export const partnerChangeRequestRepository: PartnerChangeRequestRepository = isPartnerPortalMock ? mockRepository : supabaseRepository;
 
 export async function getPartnerChangeRequestContext(
   companyIds: string[],

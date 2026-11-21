@@ -1,14 +1,16 @@
 "use client";
 
+import ErrorDigest from "@/components/errors/ErrorDigest";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 
 export default function AdminProtectedError({
-  reset,
+  error,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <main className="min-h-screen bg-background py-10 sm:py-16">
@@ -21,8 +23,9 @@ export default function AdminProtectedError({
               일시적인 문제가 발생했습니다. 다시 시도하거나 관리자 홈으로 이동해 주세요.
             </p>
           </div>
+          <ErrorDigest digest={error.digest} />
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={reset}>다시 시도</Button>
+            <Button onClick={retry}>다시 시도</Button>
             <Button href="/admin" variant="secondary">관리 홈</Button>
           </div>
         </Card>

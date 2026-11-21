@@ -10,6 +10,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import Surface from "@/components/ui/Surface";
 import {
   buildAdminGlobalSearchHref,
@@ -17,6 +18,7 @@ import {
   type AdminGlobalSearchMember,
   type AdminGlobalSearchPartner,
 } from "@/lib/admin-global-search";
+import { ADMIN_SEARCH_QUERY_MAX_LENGTH } from "@/lib/admin-search-query";
 
 export type { AdminGlobalSearchMember, AdminGlobalSearchPartner } from "@/lib/admin-global-search";
 
@@ -126,10 +128,10 @@ export default function AdminGlobalSearchResultsView({
               <Input
                 id="admin-global-search-query"
                 name="q"
-                type="search"
+                {...SEARCH_INPUT_ATTRIBUTES}
                 defaultValue={query}
                 minLength={2}
-                maxLength={80}
+                maxLength={ADMIN_SEARCH_QUERY_MAX_LENGTH}
                 autoComplete="off"
                 aria-describedby="admin-global-search-query-help"
                 placeholder="이름, ID, 제휴처명을 입력하세요"

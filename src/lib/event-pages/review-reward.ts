@@ -11,6 +11,7 @@ export const REVIEW_REWARD_EVENT: EventCampaign = {
   endsAt: "2026-06-30T23:59:59+09:00",
   heroImageSrc: "/ads/review-reward.svg",
   heroImageAlt: "제휴처 리뷰 작성으로 추첨권을 받는 이벤트",
+  shareImageSrc: "/ads/review-reward-og.png",
   conditions: [
     {
       key: "review",

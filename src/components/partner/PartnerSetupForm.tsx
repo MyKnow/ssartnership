@@ -3,16 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
-import Button from "@/components/ui/Button";
-import FormMessage from "@/components/ui/FormMessage";
-import PasswordInput from "@/components/ui/PasswordInput";
-import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
+import PortalButton from "@/components/portal-v2/PortalButton";
+import { PortalField, portalFieldProps } from "@/components/portal-v2/PortalFormControls";
+import PortalFormMessage from "@/components/portal-v2/PortalFormMessage";
+import PortalPasswordInput from "@/components/portal-v2/PortalPasswordInput";
+import { focusField } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { validateAuthPasswordPairDraft } from "@/lib/auth-form-validation";
-import type { PartnerPortalSetupContext } from "@/lib/partner-portal";
+import type { PartnerPortalSetupContext } from "@/lib/partner-auth/portal";
 import {
   getPartnerPortalSetupErrorMessage,
-} from "@/lib/partner-portal-errors";
+} from "@/lib/partner-auth/portal-errors";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import {
   copyPasswordToClipboard,
@@ -144,81 +145,80 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="space-y-4">
-        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-          <span className="flex items-center justify-between gap-3">
-            <span>새 비밀번호</span>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleGeneratePassword}
-              disabled={pending || isLocked}
-            >
-              <Sparkles size={16} />
-              랜덤 생성
-            </Button>
-          </span>
-          <PasswordInput
-            ref={passwordRef}
-            value={password}
-            autoComplete="new-password"
-            onChange={(event) => {
-              setPassword(event.target.value);
-              setFieldErrors((prev) => ({ ...prev, password: undefined }));
-              setFormError(null);
-            }}
-            placeholder="영문/숫자/특수문자 포함 8자 이상"
-            disabled={pending}
-            aria-invalid={Boolean(fieldErrors.password) || undefined}
-            className={getFieldErrorClass(Boolean(fieldErrors.password))}
-          />
-          {fieldErrors.password ? (
-            <FormMessage variant="error">{fieldErrors.password}</FormMessage>
-          ) : null}
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-          비밀번호 확인
-          <PasswordInput
-            ref={confirmPasswordRef}
-            value={confirmPassword}
-            autoComplete="new-password"
-            onChange={(event) => {
-              setConfirmPassword(event.target.value);
-              setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-              setFormError(null);
-            }}
-            placeholder="다시 입력해 주세요"
-            disabled={pending}
-            aria-invalid={Boolean(fieldErrors.confirmPassword) || undefined}
-            className={getFieldErrorClass(Boolean(fieldErrors.confirmPassword))}
-          />
-          {fieldErrors.confirmPassword ? (
-            <FormMessage variant="error">{fieldErrors.confirmPassword}</FormMessage>
-          ) : null}
-        </label>
-
-        <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
-        {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
+    <div className="flex flex-col gap-4">
+      <PortalField
+        name="partner-setup-password"
+        label="새 비밀번호"
+        hint={PASSWORD_POLICY_MESSAGE}
+        error={fieldErrors.password}
+        required
+      >
+        <PortalPasswordInput
+          {...portalFieldProps("partner-setup-password", {
+            error: fieldErrors.password,
+            hasHint: true,
+          })}
+          ref={passwordRef}
+          value={password}
+          autoComplete="new-password"
+          onChange={(event) => {
+            setPassword(event.target.value);
+            setFieldErrors((prev) => ({ ...prev, password: undefined }));
+            setFormError(null);
+          }}
+          placeholder="영문/숫자/특수문자 포함 8자 이상"
+          disabled={pending}
+        />
+      </PortalField>
+      <div>
+        <PortalButton
+          icon={<Sparkles className="size-4" />}
+          onClick={handleGeneratePassword}
+          disabled={pending || isLocked}
+        >
+          랜덤 생성
+        </PortalButton>
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface-inset/80 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">설정 완료</p>
-          <p className="text-sm leading-6 text-muted-foreground">
-            완료하면 파트너사 포털 로그인 화면으로 이동합니다.
-          </p>
-        </div>
-        <Button
-          className="mt-4 w-full sm:mt-0 sm:w-auto"
+      <PortalField
+        name="partner-setup-confirmPassword"
+        label="비밀번호 확인"
+        error={fieldErrors.confirmPassword}
+        required
+      >
+        <PortalPasswordInput
+          {...portalFieldProps("partner-setup-confirmPassword", {
+            error: fieldErrors.confirmPassword,
+          })}
+          ref={confirmPasswordRef}
+          value={confirmPassword}
+          autoComplete="new-password"
+          onChange={(event) => {
+            setConfirmPassword(event.target.value);
+            setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+            setFormError(null);
+          }}
+          placeholder="다시 입력해 주세요"
+          disabled={pending}
+        />
+      </PortalField>
+
+      {formError ? <PortalFormMessage variant="error">{formError}</PortalFormMessage> : null}
+
+      <div className="flex flex-col gap-3 border-t border-pv2-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="pv2-caption text-ko-pretty text-pv2-muted">
+          완료하면 파트너사 포털 로그인 화면으로 이동합니다.
+        </p>
+        <PortalButton
+          variant="primary"
+          className="w-full sm:w-auto"
           onClick={handleSubmit}
           disabled={pending || isLocked}
           loading={pending}
           loadingText="설정 중"
         >
           초기 설정 완료
-        </Button>
+        </PortalButton>
       </div>
     </div>
   );

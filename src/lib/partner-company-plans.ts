@@ -191,3 +191,102 @@ export function isPartnerPlanWindowOrderValid(input: {
     expiresAtMs > startedAtMs
   );
 }
+
+/**
+ * Plan expiry policy (refactor program default decision "파트너 플랜 만료":
+ * manual grace, see docs/plans/active/refactor-program-2026-10.md): a paid plan
+ * (Partner/Boost) is never demoted automatically when `plan_expires_at`
+ * passes. The stored tier stays effective as a manual grace period until an
+ * admin reviews the contract and changes the plan, so expiry is read-only
+ * state for display and follow-up.
+ *
+ * This covers `plan_expires_at` only. The unpaid-invoice overdue adjustment
+ * (`process_partner_billing_overdue_downgrades`, run by
+ * `/api/cron/partner-billing`) is a separate billing rule and can still move a
+ * plan to Basic when a pending invoice stays unpaid past its due date and
+ * grace period.
+ */
+export const PARTNER_PLAN_EXPIRY_POLICY = "manual_grace" as const;
+/** Shared "만료 임박" window for the admin plan list and the partner portal. */
+export const PARTNER_PLAN_EXPIRING_SOON_DAYS = 30;
+
+const DAY_MS = 86_400_000;
+
+export type PartnerPlanExpiryStatus =
+  | "not_applicable"
+  | "no_expiry"
+  | "active"
+  | "expiring_soon"
+  | "expired";
+
+export type PartnerPlanExpiryState = {
+  status: PartnerPlanExpiryStatus;
+  /** Whole days until expiry, rounded up; negative once expired. */
+  daysUntilExpiry: number | null;
+  /** True for an expired paid plan that is kept only by the manual grace. */
+  requiresManualReview: boolean;
+};
+
+export function getDaysUntilPartnerPlanDate(
+  value?: string | null,
+  referenceTime: string | number | Date = Date.now(),
+) {
+  if (!value) {
+    return null;
+  }
+
+  const targetMs = new Date(value).getTime();
+  const referenceMs = new Date(referenceTime).getTime();
+  if (Number.isNaN(targetMs) || Number.isNaN(referenceMs)) {
+    return null;
+  }
+
+  return Math.ceil((targetMs - referenceMs) / DAY_MS);
+}
+
+/**
+ * Basic follows the partnership period, so only paid tiers report plan
+ * expiry. The tier itself is not changed here (see PARTNER_PLAN_EXPIRY_POLICY).
+ */
+export function getPartnerPlanExpiryState(input: {
+  planTier: PartnerCompanyPlanTier;
+  planExpiresAt?: string | null;
+  now?: string | number | Date;
+}): PartnerPlanExpiryState {
+  if (input.planTier === "basic") {
+    return {
+      status: "not_applicable",
+      daysUntilExpiry: null,
+      requiresManualReview: false,
+    };
+  }
+
+  const now = input.now ?? Date.now();
+  const expiresMs = input.planExpiresAt
+    ? new Date(input.planExpiresAt).getTime()
+    : Number.NaN;
+  const nowMs = new Date(now).getTime();
+  if (Number.isNaN(expiresMs) || Number.isNaN(nowMs)) {
+    return { status: "no_expiry", daysUntilExpiry: null, requiresManualReview: false };
+  }
+
+  const daysUntilExpiry = getDaysUntilPartnerPlanDate(input.planExpiresAt, nowMs);
+  if (expiresMs <= nowMs) {
+    const elapsedDays = daysUntilExpiry ?? 0;
+    return {
+      status: "expired",
+      // Avoid -0 for plans that expired less than a day ago.
+      daysUntilExpiry: elapsedDays < 0 ? elapsedDays : 0,
+      requiresManualReview: true,
+    };
+  }
+
+  return {
+    status:
+      daysUntilExpiry !== null && daysUntilExpiry <= PARTNER_PLAN_EXPIRING_SOON_DAYS
+        ? "expiring_soon"
+        : "active",
+    daysUntilExpiry,
+    requiresManualReview: false,
+  };
+}

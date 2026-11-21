@@ -1,18 +1,27 @@
 import {
+  getPartnerPlanExpiryState,
   normalizePartnerCompanyPlanTier,
   resolvePartnerBrandPlanWindow,
 } from "@/lib/partner-company-plans";
 import { normalizePartnerPlanUpgradeRequestStatus } from "@/lib/partner-plan-upgrades";
 import { getPartnerBillingInvoiceSummariesForUpgradeRequests } from "@/lib/partner-plan-service";
-import { normalizePartnerVisibility } from "@/lib/partner-visibility";
+import {
+  normalizeAdminPartnerListCompany,
+  toAdminPartnerListItem,
+  type AdminPartnerListItem,
+  type AdminPartnerListRow,
+} from "@/lib/admin-partner-list-item";
 import type { AdminPartnerListFilters } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getAdminSearchLikePattern } from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import { CATEGORIES_CACHE_TAG } from "@/lib/cache-tags";
+import { SLOW_CHANGING_DATA_CACHE_SECONDS } from "@/lib/cache-ttl";
 
 export const ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS = 3_000;
-export const ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS = 60;
+export const ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS =
+  SLOW_CHANGING_DATA_CACHE_SECONDS;
 
 type PartnerCompanyRow = {
   id: string;
@@ -56,25 +65,6 @@ type PartnerPlanEventRow = {
   brand?: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
-type AdminPartnerListRow = {
-  id: string;
-  name: string;
-  category_id?: string | null;
-  company_id?: string | null;
-  location?: string | null;
-  managed_campus_slugs?: string[] | null;
-  map_url?: string | null;
-  period_start?: string | null;
-  period_end?: string | null;
-  applies_to?: string[] | null;
-  visibility?: string | null;
-  plan_tier?: string | null;
-  plan_started_at?: string | null;
-  plan_expires_at?: string | null;
-  plan_updated_at?: string | null;
-  company?: PartnerCompanyRow | PartnerCompanyRow[] | null;
-};
-
 type AdminPartnerCategoryRow = {
   id: string;
   key: string;
@@ -95,19 +85,9 @@ const getCachedAdminPartnerCategories = unstable_cache(
   ["admin-partner-categories"],
   {
     revalidate: ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS,
-    tags: ["categories"],
+    tags: [CATEGORIES_CACHE_TAG],
   },
 );
-
-function normalizePartnerCompany(value: unknown): PartnerCompanyRow | null {
-  if (!value) {
-    return null;
-  }
-  if (Array.isArray(value)) {
-    return (value[0] as PartnerCompanyRow | undefined) ?? null;
-  }
-  return typeof value === "object" ? (value as PartnerCompanyRow) : null;
-}
 
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
@@ -230,14 +210,7 @@ async function getAdminPartnerListReadModelUnbounded({
   const categories = categoriesResult;
 
   const partnerRows = (partnersResult.data ?? []) as unknown as AdminPartnerListRow[];
-  const partners = partnerRows.map((partner) => ({
-    ...partner,
-    category_id: partner.category_id ?? "",
-    company_id: partner.company_id ?? null,
-    location: partner.location ?? "",
-    visibility: normalizePartnerVisibility(partner.visibility),
-    company: normalizePartnerCompany(partner.company),
-  }));
+  const partners: AdminPartnerListItem[] = partnerRows.map(toAdminPartnerListItem);
   const totalPartnerCount = showPlans ? partners.length : partnersResult.count ?? 0;
   const totalPartnerPages = Math.max(
     1,
@@ -246,7 +219,7 @@ async function getAdminPartnerListReadModelUnbounded({
   const scopedPartnerIds = new Set(partners.map((partner) => partner.id));
   const scopedCompanyIds = new Set(
     partners
-      .map((partner) => partner.company_id ?? partner.company?.id ?? null)
+      .map((partner) => partner.companyId ?? partner.company?.id ?? null)
       .filter((companyId): companyId is string => Boolean(companyId)),
   );
   const hasPartnerLoadError = Boolean(partnersResult.error);
@@ -256,33 +229,35 @@ async function getAdminPartnerListReadModelUnbounded({
     (partner) => partner.visibility === "confidential",
   ).length;
   const privateCount = partners.filter((partner) => partner.visibility === "private").length;
-  const planBrands = partners.map((partner) => {
-    const planTier = normalizePartnerCompanyPlanTier(
-      (partner as { plan_tier?: string | null }).plan_tier,
-    );
+  const planExpiryReferenceTime = Date.now();
+  const planBrands = partnerRows.map((partner) => {
+    const company = normalizeAdminPartnerListCompany(partner.company);
+    const planTier = normalizePartnerCompanyPlanTier(partner.plan_tier);
     const planWindow = resolvePartnerBrandPlanWindow({
       planTier,
-      periodStart: (partner as { period_start?: string | null }).period_start ?? null,
-      periodEnd: (partner as { period_end?: string | null }).period_end ?? null,
-      planStartedAt:
-        (partner as { plan_started_at?: string | null }).plan_started_at ?? null,
-      planExpiresAt:
-        (partner as { plan_expires_at?: string | null }).plan_expires_at ?? null,
+      periodStart: partner.period_start ?? null,
+      periodEnd: partner.period_end ?? null,
+      planStartedAt: partner.plan_started_at ?? null,
+      planExpiresAt: partner.plan_expires_at ?? null,
     });
 
     return {
       id: partner.id,
       name: partner.name,
-      companyId: partner.company_id ?? partner.company?.id ?? "",
-      companyName: partner.company?.name ?? "미지정",
-      location: partner.location,
+      companyId: partner.company_id ?? company?.id ?? "",
+      companyName: company?.name ?? "미지정",
+      location: partner.location ?? "",
       periodStart: partner.period_start ?? null,
       periodEnd: partner.period_end ?? null,
       planTier,
       planStartedAt: planWindow.planStartedAt,
       planExpiresAt: planWindow.planExpiresAt,
-      planUpdatedAt:
-        (partner as { plan_updated_at?: string | null }).plan_updated_at ?? null,
+      planExpiry: getPartnerPlanExpiryState({
+        planTier,
+        planExpiresAt: planWindow.planExpiresAt,
+        now: planExpiryReferenceTime,
+      }),
+      planUpdatedAt: partner.plan_updated_at ?? null,
     };
   });
   const mappedPlanRequests = (

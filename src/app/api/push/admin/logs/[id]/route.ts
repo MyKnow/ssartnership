@@ -5,6 +5,7 @@ import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { withServerTiming } from "@/lib/server-timing";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,7 @@ export async function DELETE(
       );
       return NextResponse.json({ ok: true });
     } catch (error) {
-      console.error("[push-admin-logs] delete failed", error);
+      logServerError("[push-admin-logs] delete failed", error);
       const message = getSafeAdminMessage(
         error,
         "알림 운영 로그 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.",

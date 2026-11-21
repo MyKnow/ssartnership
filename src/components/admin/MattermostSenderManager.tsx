@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -13,6 +14,7 @@ import type {
 } from "@/lib/mattermost-senders/types";
 import type { MattermostSenderHealthStatus } from "@/lib/mattermost-senders/health";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
+import { formatKoreanDateTimeLocalValue } from "@/lib/datetime";
 import {
   parseMattermostSenderCredentialInput,
   type MattermostSenderCredentialFieldErrors,
@@ -52,9 +54,10 @@ const HEALTH_VARIANTS: Record<
   blocked: "danger",
 };
 
+// DB 시각은 UTC 문자열로 오므로 잘라 쓰지 않고 KST "YYYY-MM-DD HH:mm"으로 바꾼다.
 function formatTimestamp(value: string | null) {
   if (!value) return "—";
-  return value.slice(0, 16).replace("T", " ");
+  return formatKoreanDateTimeLocalValue(value).replace("T", " ") || "—";
 }
 
 function formatLastTest(sender: MattermostSenderMetadata) {
@@ -273,11 +276,19 @@ export default function MattermostSenderManager({
           </p>
         </div>
         {visibleSenders.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface-muted px-4 py-5 text-sm text-muted-foreground">
-            {generationLabel
-              ? `${generationLabel}에 등록된 Sender가 없습니다. 위에서 후보를 저장해 주세요.`
-              : "등록된 Sender가 없습니다. 기수를 입력해 후보를 먼저 저장해 주세요."}
-          </div>
+          <EmptyState
+            size="sm"
+            title={
+              generationLabel
+                ? `${generationLabel}에 등록된 Sender가 없습니다.`
+                : "등록된 Sender가 없습니다."
+            }
+            description={
+              generationLabel
+                ? "위에서 후보를 저장해 주세요."
+                : "기수를 입력해 후보를 먼저 저장해 주세요."
+            }
+          />
         ) : (
           <div className="grid gap-3">
             {visibleSenders.map((sender) => {

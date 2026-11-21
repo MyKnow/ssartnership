@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
-import { canAdmin } from "@/lib/admin-permissions";
+import { getAdminApiPermissionSession } from "@/lib/admin-access";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   prepareManualMemberImport,
@@ -30,12 +29,9 @@ async function requireImportAdmin(request: NextRequest): Promise<ImportAdminResu
   })) {
     return { response: NextResponse.json({ message: "요청을 확인해 주세요." }, { status: 403 }) };
   }
-  const session = await getAdminSession();
-  if (!session) return { response: NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 }) };
-  if (!canAdmin(session.account.permissions, "members", "create")) {
-    return { response: NextResponse.json({ message: "회원 생성 권한이 필요합니다." }, { status: 403 }) };
-  }
-  return { adminId: session.adminId };
+  const result = await getAdminApiPermissionSession(request, "members", "create");
+  if ("response" in result) return { response: result.response };
+  return { adminId: result.session.adminId };
 }
 
 function parsePhotoManifest(value: unknown) {

@@ -16,14 +16,19 @@ import {
   isMemberEmailVerificationCodeFailure,
 } from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import {
+  readPreviousMemberEmailState,
+  scheduleMemberEmailChangeNotice,
+} from "@/lib/member-email-change-notice.server";
 import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { isSixDigitCode } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -40,13 +45,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json(
-      { ok: false, message: "로그인이 필요합니다." },
-      { status: 401 },
-    );
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   let body: {
     email?: unknown;
@@ -71,7 +74,7 @@ export async function POST(request: Request) {
   }
   const email = normalizeMemberEmail(body?.email);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
-  if (!email || !/^\d{6}$/.test(code)) {
+  if (!email || !isSixDigitCode(code)) {
     return NextResponse.json(
       { ok: false, message: "이메일과 6자리 인증 코드를 확인해 주세요." },
       { status: 400 },
@@ -124,6 +127,10 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  // Read before the binding replaces it: a changed address notifies the
+  // previously verified one after the response.
+  const previousEmailState = await readPreviousMemberEmailState(session.userId);
 
   try {
     const completion = await completeMemberEmailVerification({
@@ -179,6 +186,13 @@ export async function POST(request: Request) {
     stage: "verify",
     status: "success",
     actorId: session.userId,
+  });
+  scheduleMemberEmailChangeNotice({
+    previous: previousEmailState,
+    nextEmailNormalized: email,
+    memberId: session.userId,
+    flow: "verification",
+    context,
   });
   revalidatePath("/certification");
   revalidatePath("/certification/email");

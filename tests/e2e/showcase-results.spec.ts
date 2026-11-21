@@ -67,6 +67,13 @@ for (const winner of ["submitter", "experiencer", "none"] as const) {
     await expect(page.getByText("학습 기록과 일정 관리가 편리했어요. 모바일에서도 잘 보여요.")).toBeVisible();
     await expect(page.getByText("숨김 리뷰 본문")).toHaveCount(0);
     await expect(page.getByText("다른 출품자의 비공개 리뷰")).toHaveCount(0);
+    const reviewToggle = page.locator("summary").filter({ hasText: "받은 리뷰 1개" });
+    const target = await reviewToggle.boundingBox();
+    expect(target?.height).toBeGreaterThanOrEqual(44);
+    await reviewToggle.press("Enter");
+    await expect(page.getByText("학습 기록과 일정 관리가 편리했어요. 모바일에서도 잘 보여요.")).toBeHidden();
+    await reviewToggle.press("Enter");
+    await expect(page.getByText("학습 기록과 일정 관리가 편리했어요. 모바일에서도 잘 보여요.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Green Route", exact: true })).toHaveCount(0);
     const forms = page.locator('a[href*="forms.gle"]');
     if (winner === "none") {

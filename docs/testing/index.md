@@ -15,3 +15,5 @@ last_verified: 2026-08-29
 
 - [위험에 따른 테스트 전략](./strategy.md)
 - [2026-09-20 전체 테스트 분류](./audits/2026-09-20-test-rationalization.md)
+
+- [2026-10 개발 도구 평가](./audits/2026-10-refactor-tooling.md)

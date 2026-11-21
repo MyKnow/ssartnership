@@ -51,7 +51,8 @@ export default function PartnerDetailHeroContent({
           data-partner-detail-hero-actions
           role="group"
           aria-label="제휴처 보조 기능"
-          className="col-start-2 row-start-1 self-center justify-self-end gap-0 border-border/70 bg-surface-control p-1 shadow-flat sm:col-start-3 sm:row-start-2"
+          density="tight"
+          className="col-start-2 row-start-1 self-center justify-self-end border-border/70 bg-surface-control p-1 shadow-flat sm:col-start-3 sm:row-start-2"
         >
           {currentUserId ? (
             <PartnerFavoriteButton
@@ -64,8 +65,7 @@ export default function PartnerDetailHeroContent({
           ) : (
             <PartnerFavoriteCountLabel
               favoriteCount={favoriteCount}
-              reducedVerticalPadding
-              className="!h-8 !min-w-0 !px-2 text-[11px]"
+              size="compact"
             />
           )}
           <ShareLinkButton

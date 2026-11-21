@@ -1,5 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { normalizeSsafyCycleSettings } from "./ssafy-cycle-settings-core";
+import { SSAFY_CYCLE_SETTINGS_CACHE_TAG } from "./cache-tags";
+import { SLOW_CHANGING_DATA_CACHE_SECONDS } from "./cache-ttl";
 export * from "./ssafy-cycle-settings-core";
 
 async function loadSupabaseAdminClient() {
@@ -7,8 +9,7 @@ async function loadSupabaseAdminClient() {
   return getSupabaseAdminClient();
 }
 
-const SSAFY_CYCLE_SETTINGS_CACHE_TAG = "ssafy-cycle-settings";
-const SSAFY_CYCLE_SETTINGS_CACHE_SECONDS = 60;
+const SSAFY_CYCLE_SETTINGS_CACHE_SECONDS = SLOW_CHANGING_DATA_CACHE_SECONDS;
 
 export type SsafyCycleSettingsErrorCode = "db_error";
 

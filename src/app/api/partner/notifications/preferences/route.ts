@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import {
   getPartnerOperationalNotificationPreferences,
   upsertPartnerOperationalNotificationPreferences,
@@ -13,6 +13,7 @@ import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -21,10 +22,11 @@ function toOptionalBoolean(value: unknown) {
 }
 
 export async function GET() {
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   try {
     return NextResponse.json({
       preferences: await getPartnerOperationalNotificationPreferences(
@@ -32,7 +34,7 @@ export async function GET() {
       ),
     });
   } catch (error) {
-    console.error("[partner-notification-preferences] read failed", error);
+    logServerError("[partner-notification-preferences] read failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림 설정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -53,10 +55,11 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   try {
     const body = await readRouteJsonBodyWithinLimit<Record<string, unknown>>(
       request,
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-notification-preferences] update failed", error);
+      logServerError("[partner-notification-preferences] update failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

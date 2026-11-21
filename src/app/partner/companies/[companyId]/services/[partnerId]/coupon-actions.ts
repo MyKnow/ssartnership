@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { parseCreateAdCouponForm } from "@/lib/ad-package-validation";
 import { adPackageRepository } from "@/lib/repositories";
 import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
-import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
+import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { parseCouponCodeWorkbook } from "@/lib/ad-coupon-code-import.server";
 

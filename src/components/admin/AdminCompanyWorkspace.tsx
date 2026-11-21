@@ -6,7 +6,7 @@ import AdminTabs from "@/components/admin/AdminTabs";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
 import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 import {
   buildAdminCompanyTabHref,

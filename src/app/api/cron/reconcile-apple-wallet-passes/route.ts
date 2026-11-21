@@ -1,4 +1,3 @@
-import { unstable_noStore as noStore } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { scheduleProductEventLog } from "@/lib/activity-logs";
 import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
@@ -25,7 +24,6 @@ function logWalletReconcileEvent(properties: Record<string, unknown>) {
 }
 
 export async function GET(request: NextRequest) {
-  noStore();
   const denied = ensureCronApiAccess(request, {
     headers: { "cache-control": "no-store" },
   });

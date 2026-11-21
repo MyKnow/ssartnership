@@ -88,7 +88,7 @@ export const Summary: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByText(/policy:비밀번호는 8~64자, 영문\/숫자\/특수문자를 모두 포함해야 합니다\./),
+      canvas.getByText(/policy:비밀번호는 8~64자, 영문\/숫자\/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다\./),
     ).toBeInTheDocument();
     await expect(canvas.getByText("normalize-mm:te.st_user")).toBeInTheDocument();
     await expect(canvas.getByText("normalize-admin:admin.user")).toBeInTheDocument();

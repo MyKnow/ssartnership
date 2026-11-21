@@ -10,6 +10,7 @@ import {
 } from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
           { status: error.status },
         );
       }
-      console.error("[admin-push-unsubscribe] unsubscribe failed", error);
+      logServerError("[admin-push-unsubscribe] unsubscribe failed", error);
       return NextResponse.json(
         {
           message: getSafeAdminMessage(

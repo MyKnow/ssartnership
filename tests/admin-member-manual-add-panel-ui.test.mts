@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("수동 회원 행은 기수·캠퍼스 선택과 사진 파일 선택을 제공한다", async () => {
-  const source = await readFile(
-    new URL("../src/components/admin/AdminMemberManualAddPanel.tsx", import.meta.url),
-    "utf8",
-  );
+  const source = (await Promise.all([
+    "../src/components/admin/AdminMemberManualAddPanel.tsx",
+    "../src/components/admin/useAdminMemberManualImport.ts",
+  ].map((path) => readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
 
   assert.match(source, /getManualMemberImportGenerationOptions/);
   assert.match(source, /MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS/);

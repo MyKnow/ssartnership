@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
+  assertPushNotificationPermissionGranted,
   getServiceWorkerRegistration,
   isIosDevice,
   isStandaloneDisplay,
+  requestPushNotificationPermission,
 } from "./device";
 
 export function usePushDeviceState() {
@@ -87,18 +89,9 @@ export function usePushDeviceState() {
   }, []);
 
   async function requestNotificationPermission() {
-    if (!("Notification" in window)) {
-      throw new Error("이 브라우저에서는 알림 권한을 사용할 수 없습니다.");
-    }
-
-    const nextPermission =
-      Notification.permission === "granted"
-        ? "granted"
-        : await Notification.requestPermission();
+    const nextPermission = await requestPushNotificationPermission();
     setPermission(nextPermission);
-    if (nextPermission !== "granted") {
-      throw new Error("브라우저에서 알림 권한을 허용해 주세요.");
-    }
+    assertPushNotificationPermissionGranted(nextPermission);
   }
 
   return {

@@ -182,7 +182,7 @@ test("회원가입 완료 버튼은 비밀번호가 비어 있거나 불일치�
 test("회원가입 비밀번호 정책과 확인값 오류는 공통 helper로 즉시 계산한다", () => {
   assert.equal(
     getMemberSignupPasswordError(invalidPassword, false),
-    "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.",
+    "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다.",
   );
   assert.equal(
     getMemberSignupPasswordError("Password!123", false),

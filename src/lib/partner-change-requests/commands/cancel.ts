@@ -11,11 +11,14 @@ import {
   REQUEST_SELECT,
   type PartnerChangeRequestCancelInput,
   type PartnerChangeRequestRow,
+  type PartnerChangeRequestSupabaseClient,
   wrapPartnerChangeRequestDbError,
 } from "../shared.ts";
 
-export async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInput) {
-  const supabase = getSupabaseAdminClient();
+export async function cancelSupabaseRequest(
+  input: PartnerChangeRequestCancelInput,
+  supabase: PartnerChangeRequestSupabaseClient = getSupabaseAdminClient(),
+) {
   const { data: request, error: requestError } = await supabase
     .from("partner_change_requests")
     .select(REQUEST_SELECT)
@@ -64,7 +67,10 @@ export async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInp
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  // Only a still-pending request may be cancelled. Approval locks the row and
+  // requires `pending`, so losing this race means the request was already
+  // resolved and its requested media may now be the partner's current media.
+  const { data: cancelledRow, error } = await supabase
     .from("partner_change_requests")
     .update({
       status: "cancelled",
@@ -72,12 +78,21 @@ export async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInp
       cancelled_at: now,
       updated_at: now,
     })
-    .eq("id", input.requestId);
+    .eq("id", input.requestId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw wrapPartnerChangeRequestDbError(
       error,
       "변경 요청 상태를 저장하지 못했습니다.",
+    );
+  }
+  if (!cancelledRow) {
+    throw new PartnerChangeRequestError(
+      "already_resolved",
+      "이미 처리된 요청입니다.",
     );
   }
 

@@ -1,8 +1,11 @@
 import type { AdChannel } from "@/lib/ad-packages";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
+  PARTNER_PLAN_EXPIRING_SOON_DAYS,
+  getDaysUntilPartnerPlanDate,
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
+  type PartnerPlanExpiryState,
 } from "@/lib/partner-company-plans";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
@@ -99,7 +102,11 @@ export function matchesPartnerPlanFilter(
     case "pending":
       return brand.hasPendingRequest;
     case "expiring":
-      return brand.daysUntil !== null && brand.daysUntil >= 0 && brand.daysUntil <= 30;
+      return (
+        brand.daysUntil !== null &&
+        brand.daysUntil >= 0 &&
+        brand.daysUntil <= PARTNER_PLAN_EXPIRING_SOON_DAYS
+      );
     default:
       return brand.planTier === filter;
   }
@@ -124,7 +131,10 @@ export function getPartnerPlanExpiryStatus(
   }
   return {
     label: `${prefix} D-${daysUntil}`,
-    tone: daysUntil <= 30 ? ("warning" as const) : ("neutral" as const),
+    tone:
+      daysUntil <= PARTNER_PLAN_EXPIRING_SOON_DAYS
+        ? ("warning" as const)
+        : ("neutral" as const),
   };
 }
 
@@ -239,20 +249,24 @@ export function getPartnerPlanDaysUntil(
   value?: string | null,
   referenceTime: string | number | Date = Date.now(),
 ) {
-  if (!value) {
-    return null;
-  }
+  return getDaysUntilPartnerPlanDate(value, referenceTime);
+}
 
-  const date = new Date(value);
-  const referenceDate = new Date(referenceTime);
-  if (
-    Number.isNaN(date.getTime()) ||
-    Number.isNaN(referenceDate.getTime())
-  ) {
-    return null;
+/** Admin badge for a plan's read-only expiry state (no automatic demotion). */
+export function getAdminPartnerPlanExpiryBadge(state: PartnerPlanExpiryState) {
+  switch (state.status) {
+    case "expired":
+      return { label: "플랜 만료 · 수동 유예", tone: "danger" as const };
+    case "expiring_soon":
+      return {
+        label: `플랜 만료 D-${Math.max(state.daysUntilExpiry ?? 0, 0)}`,
+        tone: "warning" as const,
+      };
+    case "no_expiry":
+      return { label: "플랜 만료일 미설정", tone: "neutral" as const };
+    default:
+      return null;
   }
-
-  return Math.ceil((date.getTime() - referenceDate.getTime()) / 86_400_000);
 }
 
 export function formatPartnerPlanMonthlyPrice(tier: PartnerCompanyPlanTier) {

@@ -1,11 +1,17 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import {
+  CATEGORIES_CACHE_TAG,
+  PARTNERS_CACHE_TAG,
+  SSAFY_CYCLE_SETTINGS_CACHE_TAG,
+} from "@/lib/cache-tags";
 import { getServerActionLogContext, logAdminAudit } from "../../../../lib/activity-logs.ts";
 import {
   buildAdminMutationAuditProperties,
   type AdminMutationAuditOutcome,
 } from "@/lib/admin-mutation-audit";
+import { type AdminRedirectErrorCode, type DynamicAdminActionErrorCode } from "@/lib/admin-action-errors";
 
 export async function logAdminAction(
   action: Parameters<typeof logAdminAudit>[0]["action"],
@@ -51,8 +57,15 @@ export function scheduleAdminActionFailureLog(
   });
 }
 
+/*
+ * Partner and category helpers run only inside admin Server Actions (the
+ * "use server" barrel and partner-registrations/actions.ts), so they expire the
+ * public catalog tags with updateTag: the admin who saved sees fresh data on the
+ * next request instead of one stale-while-revalidate response. Route handlers
+ * and cron jobs must keep revalidateTag(tag, "max"); updateTag throws there.
+ */
 export function revalidateAdminAndPublicPaths(partnerId?: string) {
-  revalidateTag("partners", "max");
+  updateTag(PARTNERS_CACHE_TAG);
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/partner-requests");
@@ -72,12 +85,8 @@ export function revalidatePartnerPortalPaths(partnerId?: string) {
 }
 
 export function revalidateCategoryData() {
-  revalidateTag("categories", "max");
+  updateTag(CATEGORIES_CACHE_TAG);
   revalidatePath("/admin/categories");
-}
-
-export function revalidatePartnerData() {
-  revalidateTag("partners", "max");
 }
 
 export function revalidatePartnerAccountData() {
@@ -86,7 +95,7 @@ export function revalidatePartnerAccountData() {
 }
 
 export function revalidatePartnerCompanyData() {
-  revalidateTag("partners", "max");
+  updateTag(PARTNERS_CACHE_TAG);
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/companies");
@@ -115,7 +124,7 @@ export function revalidateMemberPaths() {
 }
 
 export function revalidateCyclePaths() {
-  revalidateTag("ssafy-cycle-settings", "max");
+  revalidateTag(SSAFY_CYCLE_SETTINGS_CACHE_TAG, "max");
   revalidatePath("/admin");
   revalidatePath("/admin/cycle");
   revalidatePath("/admin/members");
@@ -125,9 +134,13 @@ export function revalidateCyclePaths() {
   revalidatePath("/certification");
 }
 
+/**
+ * 관리자 server action 실패를 `?error=<code>`로 돌려보낸다(쿼리 규약은 docs 참고).
+ * `code`는 메시지 맵에 등록된 정적 코드이거나 getSafeAdminActionErrorCode가 거른 동적 코드여야 한다.
+ */
 export function redirectAdminActionError(
   path: string,
-  code: string,
+  code: AdminRedirectErrorCode | DynamicAdminActionErrorCode,
   audit?: {
     action: Parameters<typeof logAdminAudit>[0]["action"];
     targetType?: string | null;

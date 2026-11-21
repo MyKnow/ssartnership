@@ -5,21 +5,28 @@ import type {
   MemberSortOption,
   NotificationPreferenceFilterOption,
   YearFilterOption,
-} from "@/components/admin/member-manager/selectors";
+} from "@/lib/admin-member-selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
+import { getEffectiveMarketingConsentMemberIds } from "@/lib/notifications/marketing-consent";
 import {
   getAdminSearchLikePattern,
   normalizeAdminSearchQuery,
 } from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import {
+  ADMIN_READ_BURST_CACHE_SECONDS,
+  SLOW_CHANGING_DATA_CACHE_SECONDS,
+} from "@/lib/cache-ttl";
 
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 5_000;
 export const ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS = 750;
-export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60;
-export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3;
+export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS =
+  SLOW_CHANGING_DATA_CACHE_SECONDS;
+export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
 
 type MemberPolicyConsentRow = {
   member_id: string | null;
@@ -319,24 +326,6 @@ export function parseAdminMemberListFilters(
       getAdminMemberSearchParam(params, "marketingEnabled"),
     ),
   };
-}
-
-function getEffectiveMarketingConsentMemberIds(
-  policyConsentMemberIds: ReadonlySet<string>,
-  preferences: readonly MemberMarketingPreferenceRow[],
-) {
-  const enabledMemberIds = new Set(
-    preferences.flatMap((preference) =>
-      preference.member_id && preference.marketing_enabled === true
-        ? [preference.member_id]
-        : [],
-    ),
-  );
-  return new Set(
-    Array.from(policyConsentMemberIds).filter((memberId) =>
-      enabledMemberIds.has(memberId),
-    ),
-  );
 }
 
 function toAdminMemberCount(value: number | string | null | undefined) {

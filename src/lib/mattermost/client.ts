@@ -177,7 +177,35 @@ export class MattermostClient {
     }
   }
 
-  private async request(path: string, init: RequestInit = {}) {
+  /**
+   * 일시적인 응답 지연으로 Sender가 바로 cooldown에 들어가지 않도록 timeout은
+   * 1회 재시도한다. 재시도는 두 번 처리돼도 사용자에게 보이는 결과가 같은
+   * 요청(조회, 기존 DM 채널을 돌려주는 채널 생성, 로그인 — 응답을 받지 못한
+   * 첫 세션 토큰은 어디에도 전달되지 않고 만료된다)에만 허용하고, 메시지
+   * 게시처럼 중복 부작용이 생기는 요청은 재시도하지 않는다.
+   */
+  private async request(
+    path: string,
+    init: RequestInit = {},
+    options: { retryOnTimeout?: boolean } = {},
+  ) {
+    const method = (init.method ?? "GET").toUpperCase();
+    const retryOnTimeout = options.retryOnTimeout ?? method === "GET";
+    try {
+      return await this.requestOnce(path, init);
+    } catch (error) {
+      if (
+        retryOnTimeout
+        && error instanceof MattermostApiError
+        && error.code === "timeout"
+      ) {
+        return this.requestOnce(path, init);
+      }
+      throw error;
+    }
+  }
+
+  private async requestOnce(path: string, init: RequestInit) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -201,13 +229,17 @@ export class MattermostClient {
   }
 
   private async login(credentials: MattermostSenderCredentials) {
-    const response = await this.request("/api/v4/users/login", {
-      method: "POST",
-      body: JSON.stringify({
-        login_id: credentials.loginId,
-        password: credentials.password,
-      }),
-    });
+    const response = await this.request(
+      "/api/v4/users/login",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          login_id: credentials.loginId,
+          password: credentials.password,
+        }),
+      },
+      { retryOnTimeout: true },
+    );
     if (!response.ok) {
       throw new MattermostApiError(getResponseErrorCode(response), response.status);
     }
@@ -224,10 +256,14 @@ export class MattermostClient {
 
   private async logout(token: string) {
     try {
-      await this.request("/api/v4/users/logout", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await this.request(
+        "/api/v4/users/logout",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+        { retryOnTimeout: false },
+      );
     } catch {
       // Cleanup is best effort. The session token is never retained or logged.
     }
@@ -359,11 +395,16 @@ export class MattermostClient {
     targetUserId: string,
     message: string,
   ) {
-    const channelResponse = await this.request("/api/v4/channels/direct", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify([senderUserId, targetUserId]),
-    });
+    // 같은 두 사용자의 DM 채널 생성은 기존 채널을 돌려주므로 재시도해도 안전하다.
+    const channelResponse = await this.request(
+      "/api/v4/channels/direct",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify([senderUserId, targetUserId]),
+      },
+      { retryOnTimeout: true },
+    );
     if (!channelResponse.ok) {
       throw new MattermostApiError(getResponseErrorCode(channelResponse), channelResponse.status);
     }
@@ -375,11 +416,16 @@ export class MattermostClient {
       throw new MattermostApiError("invalid_response", channelResponse.status);
     }
 
-    const postResponse = await this.request("/api/v4/posts", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ channel_id: channelId, message }),
-    });
+    // 게시는 timeout 뒤에도 서버에 반영됐을 수 있어 중복 발송을 막기 위해 재시도하지 않는다.
+    const postResponse = await this.request(
+      "/api/v4/posts",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ channel_id: channelId, message }),
+      },
+      { retryOnTimeout: false },
+    );
     if (!postResponse.ok) {
       throw new MattermostApiError(getResponseErrorCode(postResponse), postResponse.status);
     }

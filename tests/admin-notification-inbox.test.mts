@@ -408,7 +408,7 @@ test("알림 발송 후처리 경고는 provider 오류 원문을 UI 계약에 �
   assert.match(deliverySource, /푸시 알림 전송에 실패했습니다\./);
   assert.match(
     deliverySource,
-    /console\.error\("\[admin-notification-ops\] push delivery failed"/,
+    /logServerError\("\[admin-notification-ops\] push delivery failed"/,
   );
   assert.doesNotMatch(
     deliverySource,

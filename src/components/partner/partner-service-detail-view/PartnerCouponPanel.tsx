@@ -5,7 +5,9 @@ import Card from "@/components/ui/Card";
 import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
 import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
+import { formatKoreanIsoDate } from "@/lib/datetime";
 import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
+import { FOUR_DIGIT_PIN_INPUT_PATTERN, FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 export default function PartnerCouponPanel({
   coupons,
@@ -63,8 +65,8 @@ export default function PartnerCouponPanel({
             name="onsitePassword"
             type="text"
             inputMode="numeric"
-            pattern="[0-9]{4}"
-            maxLength={4}
+            pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+            maxLength={FOUR_DIGIT_PIN_LENGTH}
             autoComplete="off"
             placeholder="제휴처에서 사용할 4자리 PIN"
             required
@@ -87,7 +89,7 @@ export default function PartnerCouponPanel({
             <div key={coupon.id} className="rounded-2xl border border-border bg-surface-muted p-4">
               <p className="font-semibold text-foreground">{coupon.title}</p>
               <p className="mt-1 text-sm text-muted-foreground">{coupon.discountLabel || "혜택 미입력"}</p>
-              <p className="mt-2 text-xs text-muted-foreground">사용 {coupon.usageStartsAt.slice(0, 10)} ~ {coupon.usageEndsAt.slice(0, 10)}</p>
+              <p className="mt-2 text-xs text-muted-foreground">사용 {formatKoreanIsoDate(coupon.usageStartsAt)} ~ {formatKoreanIsoDate(coupon.usageEndsAt)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 회원별 발급 · 일 {coupon.perMemberDailyIssueLimit ?? "무제한"} · 주 {coupon.perMemberWeeklyIssueLimit ?? "무제한"} · 월 {coupon.perMemberMonthlyIssueLimit ?? "무제한"}
               </p>

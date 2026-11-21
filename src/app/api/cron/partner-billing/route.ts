@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { runPartnerBillingOverdueDowngrades } from "@/lib/partner-plan-service";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    console.error("[partner-billing-cron] failed", error);
+    logServerError("[partner-billing-cron] failed", error);
 
     return getCronErrorResponse("partner-billing");
   }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import { SIX_DIGIT_CODE_LENGTH } from "@/lib/validation";
 
 type Message = {
   tone: "error" | "info";
@@ -95,7 +96,7 @@ export default function GraduatePasswordResetForm() {
           <Input
             inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={SIX_DIGIT_CODE_LENGTH}
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
             placeholder="000000"

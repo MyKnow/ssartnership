@@ -3,12 +3,12 @@ title: SSARTNERSHIP Repository Knowledge Map
 type: index
 status: current
 authority: normative
-last_verified: 2026-08-29
+last_verified: 2026-10-05
 ---
 
 # SSARTNERSHIP Repository Knowledge Map
 
-이 문서는 사람과 Agent가 프로젝트 지식을 찾는 첫 진입점이다. `AGENTS.md`는 작업 규칙과 이 지도로 가는 링크만 제공하고, 상세한 제품·기술·운영 지식은 `docs/`에서 관리한다.
+이 문서는 사람과 Agent가 프로젝트 지식을 찾는 첫 진입점이다. `README.md`는 저장소 첫 화면의 진입 안내, `AGENTS.md`는 작업 규칙과 이 지도로 가는 링크만 제공하고, 상세한 제품·기술·운영 지식은 `docs/`에서 관리한다. 두 파일의 로컬 링크도 `npm run check:docs`가 검사한다.
 
 ## Source of Truth
 
@@ -16,7 +16,7 @@ last_verified: 2026-08-29
 | --- | --- | --- |
 | 무엇을 왜 제공하는가 | [제품 지식](./product/index.md), [요구사항](./requirements/index.md), [기능 명세](./specs/index.md) | 승인된 제품 문서와 관련 Issue |
 | 시스템은 어떻게 구성되는가 | [아키텍처](./architecture/index.md), [의사결정](./decisions/index.md) | 아키텍처 문서와 ADR |
-| 실제로 지금 무엇이 구현되어 있는가 | 관련 architecture 문서 | `src/**`, `supabase/schema.sql`, migrations, tests |
+| 실제로 지금 무엇이 구현되어 있는가 | 관련 architecture 문서 | `src/**`, `supabase/migrations`(스키마 정본)와 파생 스냅샷 `supabase/schema.sql`, tests |
 | 지금 무엇을 진행하고 있는가 | [실행 계획](./plans/index.md) | active plan, GitHub Issue/PR, Git, CI |
 | 어떻게 개발·배포·복구하는가 | [운영 문서](./operations/index.md) | runbook과 저장소 실행 스크립트 |
 | 품질 기준과 검증 결과는 무엇인가 | [보안](./security/index.md), [성능](./performance/index.md), [테스트](./testing/index.md), [디자인 시스템](./design-system/index.md) | 기준 문서, 테스트, 시점 감사 |

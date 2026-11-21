@@ -5,12 +5,12 @@ import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
 import SectionHeading from '@/components/ui/SectionHeading';
 import Select from '@/components/ui/Select';
-import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from './types';
+import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from '../../../lib/log-insights/types';
 import {
   formatDateTime,
   getGroupBadgeClass,
   getStatusBadgeClass,
-} from './utils';
+} from '../../../lib/log-insights/utils';
 import AdminLogDetailDisclosure from './AdminLogDetailDisclosure';
 
 export function AdminLogsExplorer({
@@ -302,8 +302,8 @@ export function AdminLogsExplorer({
                 : '식별 정보와 경로는 마스킹된 상태로 행위, 상태, 대상 유형을 검색·필터링할 수 있습니다.'}
             />
             <Badge className="w-fit bg-surface text-muted-foreground">
-              필터 결과 {filteredTotal.toLocaleString()}건 / 전체{' '}
-              {totalLogs.toLocaleString()}건
+              필터 결과 {filteredTotal.toLocaleString("ko-KR")}건 / 전체{' '}
+              {totalLogs.toLocaleString("ko-KR")}건
             </Badge>
           </div>
 

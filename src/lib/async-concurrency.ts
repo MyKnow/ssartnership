@@ -52,3 +52,53 @@ export async function mapWithConcurrency<T, R>(
   });
   return results;
 }
+
+export type ConcurrencyLimiter = {
+  /** 슬롯이 빌 때까지 FIFO로 기다린 뒤 task를 실행한다. 실패해도 슬롯을 돌려준다. */
+  run<T>(task: () => Promise<T>): Promise<T>;
+  readonly activeCount: number;
+  readonly pendingCount: number;
+};
+
+/**
+ * 호출 지점이 여러 요청에 흩어진 무거운 작업(예: 이미지 디코드)을 프로세스 단위로
+ * 묶어 동시에 `concurrency`개까지만 실행한다. 대기열은 도착 순서를 지킨다.
+ */
+export function createConcurrencyLimiter(concurrency: number): ConcurrencyLimiter {
+  const limit = normalizeConcurrency(concurrency);
+  let active = 0;
+  const waiting: Array<() => void> = [];
+
+  const release = () => {
+    const next = waiting.shift();
+    if (next) {
+      // 슬롯을 비우지 않고 다음 대기자에게 그대로 넘겨 새 호출이 끼어들지 못하게 한다.
+      next();
+      return;
+    }
+    active -= 1;
+  };
+
+  return {
+    async run<T>(task: () => Promise<T>) {
+      if (active >= limit) {
+        await new Promise<void>((resolve) => {
+          waiting.push(resolve);
+        });
+      } else {
+        active += 1;
+      }
+      try {
+        return await task();
+      } finally {
+        release();
+      }
+    },
+    get activeCount() {
+      return active;
+    },
+    get pendingCount() {
+      return waiting.length;
+    },
+  };
+}

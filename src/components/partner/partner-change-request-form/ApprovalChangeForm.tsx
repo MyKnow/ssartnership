@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { type FormEvent, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import FormSection from "@/components/ui/FormSection";
@@ -19,7 +22,7 @@ import type {
 import { cn } from "@/lib/cn";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH } from "@/lib/partner-detail-description";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
 import { FieldGroup } from "./FieldGroup";
 import FloatingSubmitButton from "./FloatingSubmitButton";
 
@@ -212,9 +215,8 @@ export function ApprovalChangeForm({
                       포털 노출 대상을 선택합니다.
                     </p>
                   </div>
-                  <input
+                  <Checkbox
                     id={id}
-                    type="checkbox"
                     name="appliesTo"
                     value={option.value}
                     defaultChecked={defaultChecked}

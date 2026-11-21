@@ -254,3 +254,43 @@ $baseline_guard$;`, "create schema if not exists self_host;", "create table if n
   }
   return `${lines.concat(`select pg_advisory_unlock(${LOCK});`).join("\n")}\n`;
 }
+
+const PUBLIC_ROUTINES = `from pg_catalog.pg_proc routine
+  join pg_catalog.pg_namespace namespace on namespace.oid = routine.pronamespace
+  where namespace.nspname = 'public'
+    and not exists (
+      select 1 from pg_catalog.pg_depend dependency
+      where dependency.classid = 'pg_catalog.pg_proc'::pg_catalog.regclass
+        and dependency.objid = routine.oid and dependency.deptype = 'e'
+    )`;
+const BROWSER_TABLE_PRIVILEGES = "'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'";
+
+/**
+ * Read-only exposure probe: public routines executable by the browser roles,
+ * and public tables without RLS or with any browser-role privilege. Prints
+ * "<routines>\t<tables>" and never changes data.
+ */
+export function renderPublicExposureCheckSql() {
+  return `\\set ON_ERROR_STOP on
+begin isolation level repeatable read read only;
+set local statement_timeout = '30s';
+select
+  (select count(*) ${PUBLIC_ROUTINES}
+    and (pg_catalog.has_function_privilege('anon', routine.oid, 'EXECUTE')
+      or pg_catalog.has_function_privilege('authenticated', routine.oid, 'EXECUTE'))),
+  (select count(*) from pg_catalog.pg_tables browser_table
+    where browser_table.schemaname = 'public'
+      and (not browser_table.rowsecurity
+        or pg_catalog.has_table_privilege('anon', pg_catalog.format('%I.%I', browser_table.schemaname, browser_table.tablename), ${BROWSER_TABLE_PRIVILEGES})
+        or pg_catalog.has_table_privilege('authenticated', pg_catalog.format('%I.%I', browser_table.schemaname, browser_table.tablename), ${BROWSER_TABLE_PRIVILEGES})));
+commit;
+`;
+}
+
+/** Parses the probe output into exposed routine and table counts. */
+export function parsePublicExposure(output) {
+  const row = String(output).split(/\r?\n/u).map((line) => line.trim()).find((line) => /^\d+\t\d+$/u.test(line));
+  if (!row) return null;
+  const [routines, tables] = row.split("\t").map(Number);
+  return { routines, tables };
+}

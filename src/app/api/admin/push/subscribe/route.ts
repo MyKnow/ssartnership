@@ -15,6 +15,7 @@ import {
 } from "@/lib/request-body-limit";
 import { upsertOperationalPushSubscription } from "@/lib/operational-notifications";
 import { withServerTiming } from "@/lib/server-timing";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, preferences });
     } catch (error) {
       if (shouldLogNotificationRouteError(error)) {
-        console.error("[admin-push-subscribe] subscription failed", error);
+        logServerError("[admin-push-subscribe] subscription failed", error);
       }
       const safeError = getSafeNotificationRouteError(
         error,

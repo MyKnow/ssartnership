@@ -7,9 +7,22 @@ function ToastDemo() {
   const { notify } = useToast();
 
   return (
-    <Button type="button" onClick={() => notify("공유 링크가 복사되었습니다.")}>
-      토스트 열기
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" onClick={() => notify("공유 링크가 복사되었습니다.")}>
+        토스트 열기
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() =>
+          notify("복사에 실패했습니다. 직접 선택해 복사해 주세요.", {
+            tone: "error",
+          })
+        }
+      >
+        실패 토스트 열기
+      </Button>
+    </div>
   );
 }
 
@@ -62,5 +75,22 @@ export const Dismissible: Story = {
     await waitFor(() =>
       expect(canvas.queryByRole("status")).not.toBeInTheDocument(),
     );
+  },
+};
+
+export const ErrorTone: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "실패 토스트 열기" }),
+    );
+
+    const alert = canvas.getByRole("alert");
+    await expect(alert).toHaveTextContent(
+      "복사에 실패했습니다. 직접 선택해 복사해 주세요.",
+    );
+    const toast = alert.closest<HTMLElement>("[data-toast-item]");
+    await expect(toast).toHaveAttribute("data-toast-tone", "error");
+    await expect(canvas.queryByRole("status")).not.toBeInTheDocument();
   },
 };

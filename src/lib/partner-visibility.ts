@@ -9,9 +9,11 @@ export const PARTNER_VISIBILITY_VALUES = [
   "public",
   "confidential",
   "private",
-] as const;
+] as const satisfies readonly PartnerVisibility[];
 
 export type PartnerVisibilityState = PartnerVisibility | "upcoming" | "expired";
+/** 내용 대신 잠금 카드로 보여 주는 공개 상태(대외비·비공개). */
+export type PartnerLockKind = Exclude<PartnerVisibility, "public">;
 type PartnerPeriod = {
   start?: string | null;
   end?: string | null;
@@ -112,7 +114,7 @@ export function canViewPartnerDetails(
 export function getPartnerLockKind(
   visibility: PartnerVisibility,
   authenticated: boolean,
-): "confidential" | "private" | null {
+): PartnerLockKind | null {
   if (visibility === "private") {
     return "private";
   }
@@ -122,7 +124,7 @@ export function getPartnerLockKind(
   return null;
 }
 
-export function getPartnerLockCopy(lockKind: "confidential" | "private") {
+export function getPartnerLockCopy(lockKind: PartnerLockKind) {
   switch (lockKind) {
     case "confidential":
       return {

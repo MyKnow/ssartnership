@@ -1,9 +1,11 @@
+import { pickAllowedEntry } from "@/lib/safe-messages";
+
 export type NotificationTemplateFeedback = {
   tone: "info" | "error";
   message: string;
 };
 
-const STATUS_MESSAGES: Record<string, NotificationTemplateFeedback> = {
+const STATUS_MESSAGES = {
   updated: {
     tone: "info",
     message: "알림 템플릿을 저장했습니다.",
@@ -16,9 +18,9 @@ const STATUS_MESSAGES: Record<string, NotificationTemplateFeedback> = {
     tone: "info",
     message: "선택한 회원에게 템플릿 테스트 발송을 완료했습니다.",
   },
-};
+} satisfies Record<string, NotificationTemplateFeedback>;
 
-const ERROR_MESSAGES: Record<string, NotificationTemplateFeedback> = {
+const ERROR_MESSAGES = {
   invalid_request: {
     tone: "error",
     message: "입력한 템플릿·채널·수신 회원 정보를 확인해 주세요.",
@@ -35,7 +37,10 @@ const ERROR_MESSAGES: Record<string, NotificationTemplateFeedback> = {
     tone: "error",
     message: "테스트 발송에 실패했습니다. 채널 설정과 수신 회원 상태를 확인해 주세요.",
   },
-};
+} satisfies Record<string, NotificationTemplateFeedback>;
+
+/** 알림 템플릿 화면이 소유한 `?error=` 코드. */
+export type NotificationTemplateErrorCode = keyof typeof ERROR_MESSAGES;
 
 const GENERIC_ERROR: NotificationTemplateFeedback = {
   tone: "error",
@@ -46,7 +51,11 @@ export function getNotificationTemplateFeedback(input: {
   status?: string | null;
   error?: string | null;
 }) {
-  if (input.status) return STATUS_MESSAGES[input.status] ?? null;
-  if (input.error) return ERROR_MESSAGES[input.error] ?? GENERIC_ERROR;
+  if (input.status) {
+    return pickAllowedEntry<NotificationTemplateFeedback>(STATUS_MESSAGES, input.status);
+  }
+  if (input.error) {
+    return pickAllowedEntry<NotificationTemplateFeedback>(ERROR_MESSAGES, input.error) ?? GENERIC_ERROR;
+  }
   return null;
 }

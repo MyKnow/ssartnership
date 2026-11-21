@@ -7,15 +7,9 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { getSignedUserSession } from "@/lib/user-auth";
-
-function safeDecodeSegment(value: string) {
-  try {
-    return decodeURIComponent(value).trim();
-  } catch {
-    return "";
-  }
-}
+import { requireMemberApiSession } from "@/lib/member-api-session";
+import { readRouteParam } from "@/lib/route-params";
+import { logServerError } from "@/lib/server-log";
 
 export async function POST(
   request: Request,
@@ -32,16 +26,14 @@ export async function POST(
     );
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json(
-      { message: "로그인이 필요합니다." },
-      { status: 401 },
-    );
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   const resolvedParams = await params;
-  const partnerId = resolvedParams?.id ? safeDecodeSegment(resolvedParams.id) : "";
+  const partnerId = readRouteParam(resolvedParams?.id);
   if (!partnerId) {
     return NextResponse.json(
       { message: "유효한 제휴처를 찾을 수 없습니다." },
@@ -93,7 +85,7 @@ export async function POST(
     );
     return NextResponse.json({ favorite: payload.favorite });
   } catch (error) {
-    console.error("[partner-favorite] update failed", error);
+    logServerError("[partner-favorite] update failed", error);
     const safeError = getSafePublicRouteError(
       error,
       "즐겨찾기를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",

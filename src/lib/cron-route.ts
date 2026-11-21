@@ -1,4 +1,8 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server.js";
+
+/** Matches the self-hosted runtime validation for every secret variable. */
+export const CRON_SECRET_MIN_LENGTH = 32;
 
 const CRON_ERROR_MESSAGES = {
   "anonymize-deleted-members": "탈퇴 회원 익명화를 완료하지 못했습니다.",
@@ -24,14 +28,34 @@ type CronResponseOptions = {
   headers?: HeadersInit;
 };
 
+/**
+ * Compares the presented bearer credential in constant time. A missing or
+ * short configured secret fails closed instead of accepting `Bearer `.
+ */
+export function isAuthorizedCronRequest(
+  authorization: string | null,
+  secret: string | undefined,
+) {
+  if (!secret || secret.length < CRON_SECRET_MIN_LENGTH || !authorization) {
+    return false;
+  }
+  const expected = Buffer.from(`Bearer ${secret}`, "utf8");
+  const provided = Buffer.from(authorization, "utf8");
+  if (provided.length !== expected.length) {
+    return false;
+  }
+  return timingSafeEqual(provided, expected);
+}
+
 export function ensureCronApiAccess(
   request: Pick<Request, "headers">,
   options?: CronResponseOptions,
 ) {
-  const secret = process.env.CRON_SECRET;
   if (
-    secret
-    && request.headers.get("authorization") === `Bearer ${secret}`
+    isAuthorizedCronRequest(
+      request.headers.get("authorization"),
+      process.env.CRON_SECRET,
+    )
   ) {
     return null;
   }

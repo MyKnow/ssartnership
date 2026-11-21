@@ -1,11 +1,13 @@
 ---
 title: 문서·테스트 정비 작업 기록
 type: task-list
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # 문서·테스트 정비 작업 기록
+
+> 종료 정리(2026-10-05): Issue #474는 2026-09-20에 종료됐다. 아래 미체크 두 항목(PR 첫 CI·`dev` 통합, `main` 승격)의 exact-SHA 결과는 본문에 적은 대로 [Issue #474](https://github.com/MyKnow/ssartnership/issues/474) 기록이 정본이다.
 
 ## 진행
 

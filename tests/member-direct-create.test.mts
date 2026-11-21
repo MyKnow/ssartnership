@@ -45,10 +45,21 @@ test("관리자 직접 회원 생성은 외부 계정명과 구분되지 않는 
       displayName: "이름을 입력해 주세요.",
       generation: "기수는 0~99 사이의 숫자로 입력해 주세요.",
       campus: "캠퍼스는 80자 이내로 입력해 주세요.",
-      temporaryPassword: "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.",
+      temporaryPassword: "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다.",
       temporaryPasswordConfirmation: "비밀번호가 일치하지 않습니다.",
     },
   });
+});
+
+test("직접 회원 생성은 부분 파싱된 기수를 저장하지 않는다", () => {
+  for (const generation of ["15.9", "15junk", "1e1"]) {
+    const result = validateDirectMemberCreateInput({
+      loginId: "manual-seoul.001", displayName: "테스트 회원", generation, campus: "서울",
+      temporaryPassword: "SafePass1!", temporaryPasswordConfirmation: "SafePass1!",
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.ok(result.fieldErrors.generation, generation);
+  }
 });
 
 test("직접 회원 생성 DB payload에는 해시된 비밀번호와 전용 ID만 포함한다", () => {

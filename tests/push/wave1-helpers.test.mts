@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AdminNotificationOperationLog } from "../../src/lib/admin-notification-ops.ts";
+import type { AdminNotificationOperationLog } from "../../src/lib/admin-notification-ops-types.ts";
 
 type PushModule = typeof import("../../src/lib/push.ts");
 type PushSelectorModule = typeof import("../../src/components/admin/push-manager/selectors.ts");
@@ -34,11 +34,13 @@ test("push audience parser validates scope-specific inputs", async () => {
     memberIds: ["member-1"],
   });
 
-  assert.throws(() => parsePushAudience({ scope: "year", year: "" }), (error) => {
-    assert.ok(error instanceof PushError);
-    assert.equal(error.code, "invalid_request");
-    return true;
-  });
+  for (const year of ["", "15.9", "15junk", "1e1"]) {
+    assert.throws(() => parsePushAudience({ scope: "year", year }), (error) => {
+      assert.ok(error instanceof PushError);
+      assert.equal(error.code, "invalid_request");
+      return true;
+    });
+  }
 });
 
 test("push payload helpers validate inputs and normalize destinations", async () => {

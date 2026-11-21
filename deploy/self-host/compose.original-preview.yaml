@@ -10,6 +10,9 @@ services:
     image: ${SELF_HOST_IMAGE:?receiver supplies an immutable app image}
     init: true
     restart: unless-stopped
+    # Next drains in-flight requests on SIGTERM. Keep this grace plus startup
+    # below the relay's 20s lb_try_duration so new requests wait, not 502.
+    stop_grace_period: 15s
     # original_default is an internal-only restored Supabase network. Keep the
     # app attached to the existing edge network as well so Docker can publish
     # the loopback host port for the reverse proxy and receiver health probe.
@@ -28,6 +31,14 @@ services:
       PORT: "3000"
       SELF_HOST_MODE: real
       SELF_HOST_VITALS_ENABLED: "1"
+      # Server-rendered dates are Korean local time (the image default too).
+      TZ: Asia/Seoul
+      # Outlive the relay Caddy's 2m idle upstream keepalive.
+      KEEP_ALIVE_TIMEOUT: "130000"
+    # Optimized images survive deploys. start.sh empties the data cache on
+    # every start because tag invalidation lives only in process memory.
+    volumes:
+      - original-app-next-cache:/app/.next/cache
     healthcheck:
       test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -158,6 +169,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
 volumes:
+  original-app-next-cache:
   original-prometheus-data:
   original-alertmanager-data:
   original-grafana-data:

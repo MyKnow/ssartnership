@@ -1,4 +1,5 @@
 import { partnerRepository } from "@/lib/repositories";
+import type { PublicPartnerSeoEntry } from "@/lib/repositories/partner-repository";
 import { SITE_LEGACY_NAME, SITE_NAME, SITE_RSS_URL } from "@/lib/site";
 import { buildRssFeedXml, type RssFeedItem } from "@/lib/rss.ts";
 import { buildSiteUrl } from "@/lib/seo";
@@ -13,19 +14,28 @@ function formatPeriod(start?: string | null, end?: string | null) {
   return `${startLabel} ~ ${endLabel}`;
 }
 
+/**
+ * Maps the public SEO projection to feed items. pubDate is when the partner
+ * was registered, so repeated requests return the same items and readers only
+ * see a partner as new once.
+ */
+export function toPartnerRssFeedItems(
+  partners: readonly PublicPartnerSeoEntry[],
+): RssFeedItem[] {
+  return partners.map((partner) => ({
+    title: partner.name,
+    link: toAbsoluteUrl(`/partners/${encodeURIComponent(partner.id)}`),
+    description: `${SITE_NAME}의 ${partner.categoryLabel} 정보입니다. ${partner.location} · ${formatPeriod(partner.period.start, partner.period.end)}.`,
+    pubDate: partner.createdAt,
+    category: partner.categoryLabel,
+  }));
+}
+
 export async function buildPartnerRssFeedItems(): Promise<RssFeedItem[]> {
   const partners = await partnerRepository.getPublicPartnerSeoEntries({
     limit: 20,
   });
-  const now = Date.now();
-
-  return partners.map((partner, index) => ({
-    title: partner.name,
-    link: toAbsoluteUrl(`/partners/${encodeURIComponent(partner.id)}`),
-    description: `${SITE_NAME}의 ${partner.categoryLabel} 정보입니다. ${partner.location} · ${formatPeriod(partner.period.start, partner.period.end)}.`,
-    pubDate: new Date(now - index * 60_000),
-    category: partner.categoryLabel,
-  }));
+  return toPartnerRssFeedItems(partners);
 }
 
 export async function buildPartnerRssFeedXml() {

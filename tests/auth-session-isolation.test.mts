@@ -18,11 +18,8 @@ test("회원 로그아웃은 회원·관리자 세션을 함께 폐기한다", (
 });
 
 test("회원 로그인 성공 시 이전 관리자 세션을 재사용하지 않는다", () => {
-  const mattermostLoginRoute = readRepoFile("src/app/api/mm/login/route.ts");
   const unifiedLoginRoute = readRepoFile("src/app/api/auth/login/route.ts");
 
-  for (const route of [mattermostLoginRoute, unifiedLoginRoute]) {
-    assert.match(route, /clearAdminSession/);
-    assert.match(route, /freshAuthentication:\s*true/);
-  }
+  assert.match(unifiedLoginRoute, /clearAdminSession/);
+  assert.match(unifiedLoginRoute, /freshAuthentication:\s*true/);
 });

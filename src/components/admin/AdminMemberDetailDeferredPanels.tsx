@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import type { AdminMemberDetailOperationalReadModel } from "@/lib/admin-member-detail.server";
 import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
-import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 

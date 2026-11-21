@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { lookupNtsBusinessStatus } from "@/lib/nts-business-status";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
-import { getPartnerSession } from "@/lib/partner-session";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import {
   PartnerPortalRouteBodyError,
   readPartnerPortalJsonBody,
 } from "@/lib/partner-auth/route-body";
 import { consumePartnerBusinessStatusLookupQuota } from "@/lib/partner-business-status-rate-limit";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -20,10 +21,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getPartnerSession();
-  if (!session || session.mustChangePassword) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   let body: Record<string, unknown>;
   try {
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
     const result = await lookupNtsBusinessStatus(businessRegistrationNumber);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[partner-business-status] lookup failed", error);
+    logServerError("[partner-business-status] lookup failed", error);
     return NextResponse.json(
       { message: "사업자 상태조회를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요." },
       { status: 503 },

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { FaGithub } from "react-icons/fa";
 import {
   BellIcon,
   BugAntIcon,
@@ -94,7 +93,7 @@ export default function Footer() {
               rel="noreferrer"
               className="w-full justify-start gap-2"
             >
-              <FaGithub className="h-5 w-5" />
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.34-3.79-1.34-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.71 2.08 3.25 1.23.1-.72.4-1.21.72-1.49-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.97 0 0 .95-.3 3.1 1.15a10.8 10.8 0 0 1 5.63 0c2.14-1.45 3.09-1.15 3.09-1.15.61 1.54.23 2.69.11 2.97.73.79 1.16 1.79 1.16 3.02 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.04.76 2.1v3.1c0 .3.2.65.77.54A11.25 11.25 0 0 0 12 .75Z" /></svg>
               {githubHandle}
             </Button>
           </FooterSection>

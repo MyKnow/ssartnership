@@ -19,7 +19,7 @@ export function productionFixtureEnvironment(base, port, inherited = process.env
   Object.assign(environment, base, {
     CI: "1", NODE_ENV: "production", SELF_HOST_E2E_BUILD: "1",
     NEXT_DIST_DIR: FIXTURE_DIST, NEXT_TELEMETRY_DISABLED: "1",
-    NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${port}`, NEXT_PUBLIC_VAPID_PUBLIC_KEY: "",
+    NEXT_PUBLIC_SITE_URL: `http://localhost:${port}`, NEXT_PUBLIC_VAPID_PUBLIC_KEY: "",
     NODE_OPTIONS: "--max-old-space-size=3072",
   });
   fixtureBuildProfile(environment);

@@ -24,7 +24,7 @@ export default function SupportTemplateActions({
       await navigator.clipboard.writeText(copyText);
       notify("문의 템플릿을 복사했습니다.");
     } catch {
-      notify("복사에 실패했습니다.");
+      notify("복사에 실패했습니다.", { tone: "error" });
     } finally {
       setCopyPending(false);
     }

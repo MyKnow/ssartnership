@@ -13,6 +13,7 @@ last_verified: 2026-08-29
 - [공개 취약점 신고 정책](../SECURITY.md)
 - [관리자 접근 제어](./admin-access-control.md)
 - [관리자 로그인 강화](./admin-login-hardening.md)
+- [클라이언트 IP 신뢰 계약](./client-ip-trust.md)
 - [Service Role 접근 경계](./service-role-boundary.md)
 
 ## Point-in-time audits

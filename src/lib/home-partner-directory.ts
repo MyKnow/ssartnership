@@ -2,16 +2,17 @@ import {
   filterHomePartners,
   normalizeHomePartners,
   type HomePartnerSortOption,
-} from "@/components/home-view/selectors";
+} from "@/lib/home-partner-selectors";
 import { unstable_rethrow } from "next/navigation";
+import { describeServerError, logServerError } from "@/lib/server-log";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
 import {
-  getHomePartnerMemberState,
+  buildHomePartnerDirectoryMemberState,
+  getHomeMemberFavoritePartnerIds,
   getHomePartnerPopularityById,
-  normalizeHomePartnerStateIds,
-  type HomePartnerMemberState,
   type HomePartnerState,
 } from "@/lib/home-partner-state";
+import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { partnerRepository } from "@/lib/repositories";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
@@ -80,10 +81,10 @@ export type HomePartnerDirectoryDependencies = {
   getPopularityByPartnerId(
     partnerIds: string[],
   ): Promise<Record<string, PartnerPopularityMetrics>>;
-  getMemberState(input: {
-    partnerIds: string[];
-    currentUserId?: string | null;
-  }): Promise<HomePartnerMemberState>;
+  /** Every favorite partner id of the member (empty for guests). */
+  getMemberFavoritePartnerIds(
+    currentUserId: string | null,
+  ): Promise<Set<string>>;
 };
 
 const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
@@ -91,66 +92,22 @@ const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
   getPartners: (context) => partnerRepository.getPartners(context),
   getPublicDirectoryPartners: (context) => partnerRepository.getPublicDirectoryPartners(context),
   getPopularityByPartnerId: getHomePartnerPopularityById,
-  getMemberState: getHomePartnerMemberState,
+  getMemberFavoritePartnerIds: (currentUserId) => getHomeMemberFavoritePartnerIds(currentUserId, { failOnError: true }),
 };
 
-type ErrorLike = {
-  cause?: unknown;
-  code?: unknown;
-  message?: unknown;
-  name?: unknown;
-};
-
-const HOME_DIRECTORY_ERROR_MESSAGE_LIMIT = 512;
-const HOME_DIRECTORY_SECRET_VALUE_PATTERN =
-  /((?:api[-_]?key|authorization|client[-_]?secret|cookie|credential|password|private[-_]?key|secret|session|token)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^,;]+)/gi;
-const HOME_DIRECTORY_BEARER_VALUE_PATTERN = /(bearer\s+)[^\s,;]+/gi;
-const HOME_DIRECTORY_URL_CREDENTIAL_PATTERN =
-  /([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s/@]+@/gi;
-
-function toErrorLike(error: unknown): ErrorLike {
-  return error && typeof error === "object" ? (error as ErrorLike) : {};
-}
-
-function normalizeDiagnosticText(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) {
-    return undefined;
+function getHomeDirectoryErrorCause(error: unknown) {
+  try {
+    const cause = error && typeof error === "object" && "cause" in error
+      ? error.cause
+      : undefined;
+    const { code, ...summary } = describeServerError(cause);
+    // Properties treat generic `code` fields as sensitive. This is the
+    // allowlisted provider error code from describeServerError, not a user code.
+    return { ...summary, ...(code ? { errorCode: code } : {}) };
+  } catch {
+    // A provider's throwing getter must not break the recoverable page state.
+    return {};
   }
-
-  const redacted = value
-    .replace(HOME_DIRECTORY_SECRET_VALUE_PATTERN, "$1[redacted]")
-    .replace(HOME_DIRECTORY_BEARER_VALUE_PATTERN, "$1[redacted]")
-    .replace(HOME_DIRECTORY_URL_CREDENTIAL_PATTERN, "$1[redacted]@");
-  return redacted.length <= HOME_DIRECTORY_ERROR_MESSAGE_LIMIT
-    ? redacted
-    : `${redacted.slice(0, HOME_DIRECTORY_ERROR_MESSAGE_LIMIT - 1)}…`;
-}
-
-function normalizeDiagnosticCode(value: unknown) {
-  return typeof value === "string" && /^[a-z0-9._-]{1,80}$/i.test(value)
-    ? value
-    : undefined;
-}
-
-function getHomeDirectoryErrorDiagnostics(error: unknown) {
-  const candidate = toErrorLike(error);
-  const cause = toErrorLike(candidate.cause);
-  const errorName = normalizeDiagnosticText(candidate.name);
-  const errorMessage = normalizeDiagnosticText(candidate.message);
-  const errorCode = normalizeDiagnosticCode(candidate.code);
-  const causeName = normalizeDiagnosticText(cause.name);
-  const causeMessage = normalizeDiagnosticText(cause.message);
-  const causeCode = normalizeDiagnosticCode(cause.code);
-
-  return {
-    reasonCode: "directory_load_failed",
-    ...(errorName ? { errorName } : {}),
-    ...(errorMessage ? { errorMessage } : {}),
-    ...(errorCode ? { errorCode } : {}),
-    ...(causeName ? { causeName } : {}),
-    ...(causeMessage ? { causeMessage } : {}),
-    ...(causeCode ? { causeCode } : {}),
-  };
 }
 
 function maskExpiredPartnerActions(partners: Partner[]) {
@@ -236,6 +193,14 @@ export async function loadHomePartnerDirectory({
 }: LoadHomePartnerDirectoryInput,
 dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencies,
 ): Promise<LoadedHomePartnerDirectory> {
+  // The member's favorites do not depend on ranking, so they load alongside
+  // the catalog and popularity instead of after them.
+  const favoritePartnerIdsPromise = dependencies.getMemberFavoritePartnerIds(
+    currentUserId,
+  );
+  // This only prevents an early unhandled rejection; the original promise is
+  // awaited below and any failure reaches the recoverable directory error.
+  favoritePartnerIdsPromise.catch(() => undefined);
   const [categories, partners] = await Promise.all([
     dependencies.getCategories(),
     viewerAuthenticated
@@ -248,31 +213,33 @@ dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencie
           viewerAudience,
         }),
   ]);
-  const viewPartners = maskExpiredPartnerActions(partners);
+  // Signed-in viewers get the same lean card payload as guests: the full rows
+  // keep the thumbnail fallback, but gallery images, benefit ledgers and
+  // conditions never reach the client props (search text is precomputed).
+  const viewPartners = maskExpiredPartnerActions(
+    viewerAuthenticated ? partners.map(toLeanPublicDirectoryPartner) : partners,
+  );
   const resolvedQuery = normalizeHomePartnerDirectoryQuery(query);
   const popularityCandidates = buildHomePartnerDirectory({
     partners: viewPartners,
     viewerAuthenticated,
     popularityByPartnerId: {},
   });
-  const partnerPopularityById = await dependencies.getPopularityByPartnerId(
-    popularityCandidates.displayPartnerIds,
-  );
+  const [partnerPopularityById, favoritePartnerIds] = await Promise.all([
+    dependencies.getPopularityByPartnerId(popularityCandidates.displayPartnerIds),
+    favoritePartnerIdsPromise,
+  ]);
   const directory = buildHomePartnerDirectory({
     partners: viewPartners,
     viewerAuthenticated,
     popularityByPartnerId: partnerPopularityById,
     query: resolvedQuery,
   });
-  const preloadPartnerIds = normalizeHomePartnerStateIds(
-    directory.displayPartnerIds,
-  );
-  const memberState = await dependencies.getMemberState({
-    partnerIds: preloadPartnerIds,
-    currentUserId,
-  });
   const partnerState: HomePartnerState = {
-    ...memberState,
+    ...buildHomePartnerDirectoryMemberState(
+      directory.displayPartnerIds,
+      favoritePartnerIds,
+    ),
     partnerPopularityById,
   };
 
@@ -295,10 +262,10 @@ export async function loadHomePartnerDirectoryState(
     };
   } catch (error) {
     unstable_rethrow(error);
-    console.error(
-      "[home-partner-directory] directory unavailable",
-      getHomeDirectoryErrorDiagnostics(error),
-    );
+    logServerError("[home-partner-directory] directory unavailable", error, {
+      reasonCode: "directory_load_failed",
+      cause: getHomeDirectoryErrorCause(error),
+    });
     return { status: "unavailable" };
   }
 }

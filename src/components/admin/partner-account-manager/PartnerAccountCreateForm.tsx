@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -90,8 +93,7 @@ export default function PartnerAccountCreateForm({
           </div>
           <label className="flex items-center gap-3 text-sm font-medium text-foreground">
             <input type="hidden" name="isActive" value="false" />
-            <input
-              type="checkbox"
+            <Checkbox
               name="isActive"
               value="true"
               defaultChecked

@@ -11,5 +11,8 @@ Group=root
 UMask=0077
 Nice=10
 TimeoutStartSec=15min
+# flock exits 75 when another heavy job (backup, E2E) holds the lock. That is
+# a skipped poll, not a failure; the next timer run retries.
+SuccessExitStatus=75
 Environment=PATH=/opt/ssartnership/node24:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock /opt/ssartnership/node24/node /opt/ssartnership/control/current/scripts/self-host-ci/receive-release.mjs production

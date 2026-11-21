@@ -18,6 +18,7 @@ import {
 import { getAdminPartnerDetailCoreReadModel } from "@/lib/admin-partner-detail.server";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +60,10 @@ async function AdminPartnerDetailEditContent({
   );
   const detailHref = appendReturnTo(detailPath, returnTo);
   const retryHref = appendReturnTo(editPath, returnTo);
-  const partnerError = query.error
-    ? (adminPartnerEditErrorMessages[String(query.error)] ?? null)
-    : null;
+  const partnerError = pickAllowedEntry(
+    adminPartnerEditErrorMessages,
+    Array.isArray(query.error) ? query.error[0] : query.error,
+  );
   const partnerSaved = query.success === "updated";
   const canUpdatePartner = canAdmin(
     adminSession.account.permissions,

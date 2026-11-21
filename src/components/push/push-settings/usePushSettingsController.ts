@@ -13,9 +13,9 @@ import {
 } from "./api";
 import { derivePushSettingsStatus } from "./status";
 import {
+  getOrCreatePushSubscription,
   getPushSettingsClientError,
   getServiceWorkerRegistration,
-  urlBase64ToUint8Array,
 } from "./device";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type {
@@ -24,17 +24,15 @@ import type {
   PushSettingsCardProps,
 } from "./types";
 import { usePushDeviceState } from "./usePushDeviceState";
-
-const PUSH_PREFERENCE_KEYS = new Set<PreferenceKey>([
-  "announcementEnabled",
-  "newPartnerEnabled",
-  "expiringPartnerEnabled",
-  "reviewEnabled",
-]);
+import {
+  buildNotificationPreferencePatch,
+  parseNotificationPreferencePatch,
+} from "@/lib/notifications/preference-patch";
 
 export function usePushSettingsController({
   configured,
   initialPreferences,
+  marketingPolicy,
 }: PushSettingsCardProps) {
   const { notify } = useToast();
   const [preferences, setPreferences] = useState(initialPreferences);
@@ -135,11 +133,11 @@ export function usePushSettingsController({
 
   async function handleSubscribe() {
     if (!configured) {
-      notify("서버 알림 설정이 완료된 뒤 사용할 수 있습니다.");
+      notify("서버 알림 설정이 완료된 뒤 사용할 수 있습니다.", { tone: "error" });
       return;
     }
     if (!deviceState.supported) {
-      notify("현재 브라우저는 Web Push를 지원하지 않습니다.");
+      notify("현재 브라우저는 Web Push를 지원하지 않습니다.", { tone: "error" });
       return;
     }
     if (deviceState.iosNeedsInstall) {
@@ -149,21 +147,14 @@ export function usePushSettingsController({
       return;
     }
     if (!vapidPublicKey) {
-      notify("알림 공개키가 설정되지 않았습니다.");
+      notify("알림 공개키가 설정되지 않았습니다.", { tone: "error" });
       return;
     }
 
     setPendingAction("subscribe");
     try {
       await deviceState.requestNotificationPermission();
-      const registration = await getServiceWorkerRegistration();
-      let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        });
-      }
+      const subscription = await getOrCreatePushSubscription(vapidPublicKey);
 
       const data = await subscribePushDevice(subscription.toJSON());
       deviceState.markSubscribed(subscription.endpoint);
@@ -183,7 +174,7 @@ export function usePushSettingsController({
       await refreshDevices(subscription.endpoint);
       notify("기기 알림을 켰습니다.");
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 구독").message);
+      notify(getPushSettingsClientError(error, "알림 구독").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -207,20 +198,14 @@ export function usePushSettingsController({
         `이 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
       );
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 해제").message);
+      notify(getPushSettingsClientError(error, "알림 해제").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
   }
 
-  async function handleUnsubscribeAll(options: { confirm?: boolean } = {}) {
-    if (options.confirm && typeof window !== "undefined") {
-      const ok = window.confirm("모든 기기에서 알림을 끄시겠습니까?");
-      if (!ok) {
-        return;
-      }
-    }
-
+  // 전체 기기 푸시 끄기는 다시 켤 수 있는 설정 변경이라 확인 단계를 두지 않는다.
+  async function handleUnsubscribeAll() {
     setPendingAction("all-off");
     try {
       const registration = await getServiceWorkerRegistration();
@@ -242,24 +227,24 @@ export function usePushSettingsController({
         `모든 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
       );
     } catch (error) {
-      notify(getPushSettingsClientError(error, "전체 알림 해제").message);
+      notify(getPushSettingsClientError(error, "전체 알림 해제").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
   }
 
   async function updatePreference(key: PreferenceKey, nextValue: boolean) {
-    const nextPreferences = {
-      ...preferences,
-      [key]: nextValue,
-    };
-    if (PUSH_PREFERENCE_KEYS.has(key) && nextValue) {
-      nextPreferences.enabled = true;
+    const parsed = parseNotificationPreferencePatch(
+      buildNotificationPreferencePatch(key, nextValue, marketingPolicy),
+    );
+    if (!parsed.ok) {
+      notify(parsed.message, { tone: "error" });
+      return;
     }
 
     setPendingAction("preference");
     try {
-      const data = await savePushPreferences(nextPreferences);
+      const data = await savePushPreferences(parsed.value);
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
@@ -276,7 +261,7 @@ export function usePushSettingsController({
         notify("알림 설정을 저장했습니다.");
       }
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 설정 저장").message);
+      notify(getPushSettingsClientError(error, "알림 설정 저장").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -292,18 +277,21 @@ export function usePushSettingsController({
     }
 
     if (key === "enabled" && !nextValue) {
-      await handleUnsubscribeAll({ confirm: false });
+      await handleUnsubscribeAll();
       return;
     }
 
-    const nextPreferences = {
-      ...preferences,
-      [key]: nextValue,
-    };
+    const parsed = parseNotificationPreferencePatch(
+      buildNotificationPreferencePatch(key, nextValue),
+    );
+    if (!parsed.ok) {
+      notify(parsed.message, { tone: "error" });
+      return;
+    }
 
     setPendingAction("preference");
     try {
-      const data = await savePushPreferences(nextPreferences);
+      const data = await savePushPreferences(parsed.value);
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
@@ -311,7 +299,7 @@ export function usePushSettingsController({
       }
       notify("알림 설정을 저장했습니다.");
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 설정 저장").message);
+      notify(getPushSettingsClientError(error, "알림 설정 저장").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -333,7 +321,7 @@ export function usePushSettingsController({
       await refreshDevices();
       notify("기기 연결을 해제했습니다.");
     } catch (error) {
-      notify(getPushSettingsClientError(error, "기기 연결 해제").message);
+      notify(getPushSettingsClientError(error, "기기 연결 해제").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }

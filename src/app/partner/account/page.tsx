@@ -8,8 +8,8 @@ import {
 } from "@/app/partner/account/actions";
 import { getPartnerBillingProfilesForCompanies } from "@/lib/partner-billing-profiles";
 import { getPartnerBillingActionErrorMessage } from "@/lib/partner-billing-action-errors";
-import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-auth/portal-paths";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { readFirstSearchParam } from "@/lib/search-params";

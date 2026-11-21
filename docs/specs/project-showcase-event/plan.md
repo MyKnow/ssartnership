@@ -1,13 +1,17 @@
 ---
 title: SSAFY 프로젝트 쇼케이스 구현 계획
 type: implementation-plan
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # SSAFY 프로젝트 쇼케이스 구현 계획
 
+> 종료 정리(2026-10-05): Issue #512 절의 미체크 항목은 구현 계획 당시의 목록이다. 구현과 화면 확인은 [작업 기록](./tasks.md)의 #512 절에서 완료됐고, 배포 적용은 같은 문서의 종료 정리를 따른다.
+
 ## Issue #576 종료 결과 안내
+
+- dev 역반영에서는 최신 토큰·접근성 계약에 맞춰 동적 viewport 높이, 공용 포커스 링, 44px 리뷰 접기 영역을 사용한다. 기존 SEO canonical 및 홈 캐시를 유지한다.
 
 - 배포 선행 보안 수정: [sharp 공식 권고](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)에 따라 0.35.5 이상을 설치하고, [source-map-js 공식 패치](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) 1.2.2를 고정한다. [braces 미수정 권고](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)는 이미 dev에서 검토한 depth guard 패키지와 byte 검증·회귀 검사만 가져와 해결한다. 다른 dev 변경은 포함하지 않는다.
 

@@ -7,14 +7,18 @@ import {
   SITE_KEYWORDS,
   SITE_NAME,
   SITE_RSS_URL,
+  SITE_THEME_COLOR_DARK,
+  SITE_THEME_COLOR_LIGHT,
   SITE_TITLE,
 } from "@/lib/site";
-import { createCanonicalAlternates, getMetadataBase } from "@/lib/seo";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { DEFAULT_OPEN_GRAPH_IMAGE, getMetadataBase } from "@/lib/seo";
 import PwaProvider from "@/components/PwaProvider";
 import SelfHostedWebVitals from "@/components/SelfHostedWebVitals";
 import { shouldLoadSelfHostedTelemetry } from "@/lib/telemetry-mode";
+// Pretendard는 설치된 패키지의 unicode-range 분할(dynamic-subset) CSS를 번들해
+// `/_next/static/media`에서 자체 서빙한다. 외부 CDN 렌더 차단 요청을 만들지 않고,
+// 패밀리명 "Pretendard Variable"이 globals.css의 --font-sans 1순위와 일치한다.
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,8 +35,9 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+  // Each indexable page declares its own canonical path. A root canonical would
+  // be inherited by every segment and point unrelated pages at the home page.
   alternates: {
-    ...createCanonicalAlternates("/"),
     types: {
       "application/rss+xml": SITE_RSS_URL,
     },
@@ -42,27 +47,17 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: SITE_NAME,
   },
+  // Title and description are left out on purpose: Next.js fills og:title,
+  // og:description, and the Twitter card from each page's own metadata, so
+  // pages without an openGraph block do not advertise the home page text.
   openGraph: {
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-    url: "/",
     siteName: SITE_NAME,
     locale: "ko_KR",
     type: "website",
-    images: [
-      {
-        url: "/icon-512.png",
-        width: 512,
-        height: 512,
-        alt: SITE_TITLE,
-      },
-    ],
+    images: [DEFAULT_OPEN_GRAPH_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-    images: ["/icon-512.png"],
   },
   keywords: SITE_KEYWORDS,
   applicationName: SITE_NAME,
@@ -74,16 +69,14 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f7fb" },
-    { media: "(prefers-color-scheme: dark)", color: "#07101d" },
+    { media: "(prefers-color-scheme: light)", color: SITE_THEME_COLOR_LIGHT },
+    { media: "(prefers-color-scheme: dark)", color: SITE_THEME_COLOR_DARK },
   ],
   colorScheme: "light dark",
   viewportFit: "cover",
 };
 
-const shouldLoadVercelTelemetry = process.env.VERCEL === "1";
 const loadSelfHostedTelemetry = shouldLoadSelfHostedTelemetry({
-  VERCEL: process.env.VERCEL,
   NEXT_PUBLIC_DATA_SOURCE: process.env.NEXT_PUBLIC_DATA_SOURCE,
 });
 
@@ -94,12 +87,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
-        />
-      </head>
       <body className="bg-background text-foreground antialiased">
         <ThemeProvider>
           <ToastProvider>
@@ -108,12 +95,7 @@ export default function RootLayout({
             {children}
           </ToastProvider>
         </ThemeProvider>
-        {shouldLoadVercelTelemetry ? (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        ) : loadSelfHostedTelemetry ? <SelfHostedWebVitals /> : null}
+        {loadSelfHostedTelemetry ? <SelfHostedWebVitals /> : null}
       </body>
     </html>
   );

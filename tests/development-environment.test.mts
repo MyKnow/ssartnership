@@ -210,7 +210,6 @@ test("배포 주입과 명시적 mock은 로컬 비밀 파일을 읽지 않는�
   for (const environment of [
     { CI: "1", NEXT_PUBLIC_DATA_SOURCE: "mock", NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock" },
     { SELF_HOST_BUILD: "1", NEXT_PUBLIC_DATA_SOURCE: "supabase", NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "supabase" },
-    { VERCEL: "1", NEXT_PUBLIC_DATA_SOURCE: "supabase", NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "supabase" },
     { NEXT_PUBLIC_DATA_SOURCE: "mock", NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock" },
   ]) {
     const result = loadEnvironmentProfile({ root, environment, command: "build", branch: "main" });

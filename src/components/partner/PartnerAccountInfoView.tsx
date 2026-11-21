@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
@@ -18,9 +21,11 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
+import { PARTNER_BILLING_FIELD_LIMITS } from "@/lib/partner-billing";
+import { formatKoreanDateTime } from "@/lib/datetime";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import { cn } from "@/lib/cn";
-import { getPartnerGlobalPortalHref } from "@/lib/partner-portal-paths";
+import { getPartnerGlobalPortalHref } from "@/lib/partner-auth/portal-paths";
 
 type BusinessStatusState =
   | { status: "idle" }
@@ -70,10 +75,11 @@ function getProfileDescription(profile: PartnerBillingProfileRecord) {
 }
 
 function formatBusinessStatusCheckedAt(date: Date) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return formatKoreanDateTime(date, {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
+    hour12: true,
+  });
 }
 
 function getBusinessStatusTone(
@@ -209,13 +215,17 @@ function BillingProfileCreateForm({
             프로필 이름
             <Input
               name="label"
-              maxLength={80}
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.profileLabel}
               placeholder="예: 본점 세금계산서"
             />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             입금자명
-            <Input name="payerName" maxLength={80} required />
+            <Input
+              name="payerName"
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.payerName}
+              required
+            />
           </label>
         </div>
 
@@ -226,7 +236,7 @@ function BillingProfileCreateForm({
               name="businessRegistrationNumber"
               inputMode="numeric"
               placeholder="000-00-00000"
-              maxLength={12}
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.businessRegistrationNumberInput}
               required
               value={businessRegistrationNumber}
               onChange={(event) => {
@@ -257,38 +267,57 @@ function BillingProfileCreateForm({
         <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-medium text-foreground">
             상호
-            <Input name="businessName" maxLength={120} required />
+            <Input
+              name="businessName"
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.businessName}
+              required
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             대표자명
-            <Input name="representativeName" maxLength={80} required />
+            <Input
+              name="representativeName"
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.representativeName}
+              required
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
             사업장 주소
-            <Input name="businessAddress" maxLength={300} required />
+            <Input
+              name="businessAddress"
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.businessAddress}
+              required
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             업태
-            <Input name="businessType" maxLength={80} required />
+            <Input
+              name="businessType"
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.businessType}
+              required
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             종목
-            <Input name="businessItem" maxLength={120} required />
+            <Input
+              name="businessItem"
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.businessItem}
+              required
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
             세금계산서 이메일
             <Input
               name="taxInvoiceEmail"
               type="email"
-              maxLength={254}
+              maxLength={PARTNER_BILLING_FIELD_LIMITS.taxInvoiceEmail}
               required
             />
           </label>
         </div>
 
         <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             name="isDefault"
             className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
           />

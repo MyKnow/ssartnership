@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
-import { canAdmin } from "@/lib/admin-permissions";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminApiPermissionSession } from "@/lib/admin-access";
 import { MANUAL_MEMBER_IMPORT_LIMITS } from "@/lib/member-manual-import/shared";
 import { reissueManualMemberImportSetup } from "@/lib/member-manual-import/service.server";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -27,13 +26,9 @@ export async function POST(
     })) {
       return NextResponse.json({ message: "요청을 확인해 주세요." }, { status: 403 });
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
-    }
-    if (!canAdmin(session.account.permissions, "members", "update")) {
-      return NextResponse.json({ message: "회원 수정 권한이 필요합니다." }, { status: 403 });
-    }
+    const auth = await timing.measure("auth", () => getAdminApiPermissionSession(request, "members", "update"));
+    if ("response" in auth) return auth.response;
+    const { session } = auth;
 
     let body: { confirmed?: unknown } | null;
     try {

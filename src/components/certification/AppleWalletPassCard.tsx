@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { CheckIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import { useId, useState } from "react";
@@ -7,6 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTime } from "@/lib/datetime";
 
 export type AppleWalletPassStatus =
   | "not_issued"
@@ -94,18 +98,16 @@ const STATUS_CONFIG: Record<AppleWalletPassStatus, StatusConfig> = {
 };
 
 function formatIssuedAt(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parsed);
+  return (
+    formatKoreanDateTime(value, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }) || null
+  );
 }
 
 function buildPrimaryButtonLabel(status: AppleWalletPassStatus) {
@@ -257,9 +259,8 @@ export default function AppleWalletPassCard({
                   className="flex cursor-pointer items-start gap-3 has-[:disabled]:cursor-not-allowed"
                 >
                   <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control">
-                    <input
+                    <Checkbox
                       id={consentId}
-                      type="checkbox"
                       className="peer sr-only"
                       checked={consented}
                       onChange={(event) => setConsented(event.target.checked)}

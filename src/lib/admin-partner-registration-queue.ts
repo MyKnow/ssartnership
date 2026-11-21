@@ -4,6 +4,7 @@ import {
   type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import type { PartnerVisibility } from "@/lib/types";
 
 export type AdminPartnerRegistrationRequestDataRow = {
   id: string;
@@ -132,7 +133,7 @@ export async function listAdminPartnerRegistrationRequestPage({
   status: PartnerRegistrationRequestStatus | null;
   search: string;
   source: PartnerRegistrationSource | null;
-  visibility: "public" | "confidential" | "private" | null;
+  visibility: PartnerVisibility | null;
   sort: PartnerRegistrationQueueSort;
   page: number;
   pageSize: number;

@@ -1,5 +1,5 @@
 import InlineMessage from "@/components/ui/InlineMessage";
-import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { getAdminActionErrorMessage } from "@/lib/admin-action-errors";
 
 export default function AdminMemberDetailStatusMessages({
   errorCode,
@@ -11,7 +11,7 @@ export default function AdminMemberDetailStatusMessages({
   memberSync?: string;
 }) {
   const actionError = errorCode
-    ? adminActionErrorMessages[errorCode] ?? "요청을 처리하지 못했습니다."
+    ? getAdminActionErrorMessage(errorCode) ?? "요청을 처리하지 못했습니다."
     : null;
 
   return (

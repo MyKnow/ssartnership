@@ -1,4 +1,12 @@
+import { pickAllowedEntry } from "@/lib/safe-messages";
+
 export type AdminReviewQueueFeedbackTone = "info" | "success" | "danger";
+
+/**
+ * 관리자 검토(반려·보완 요청) 사유 길이 상한. 검토 화면 입력 `maxLength`와
+ * server action·서비스 검증이 함께 참조한다.
+ */
+export const ADMIN_REVIEW_NOTE_MAX_LENGTH = 500;
 
 export type AdminReviewQueueFeedback = {
   tone: AdminReviewQueueFeedbackTone;
@@ -39,7 +47,7 @@ const SUCCESS_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
   },
 };
 
-const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
+const ERROR_MESSAGES = {
   invalid_fields: {
     tone: "danger",
     title: "입력을 확인해 주세요",
@@ -48,7 +56,7 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
   invalid_reason: {
     tone: "danger",
     title: "반려 사유를 확인해 주세요",
-    description: "반려 사유를 1~500자로 입력해 주세요.",
+    description: `반려 사유를 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`,
   },
   approval_failed: {
     tone: "danger",
@@ -96,10 +104,22 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     description:
       "제휴처 후속 처리를 완료하지 못해 신청 상태를 변경 전으로 되돌렸습니다. 운영 기록과 제휴처 목록을 확인한 뒤 다시 시도해 주세요.",
   },
+  partner_form_conversion_status_unrestored: {
+    tone: "danger",
+    title: "제휴처 생성을 완료하지 못했고 신청 상태도 되돌리지 못했습니다",
+    description:
+      "신청이 등록 완료로 남아 있어 이 화면에서는 바꿀 수 없습니다. 제휴처 목록에서 생성 여부를 확인한 뒤 운영 담당자에게 신청 상태 복구를 요청해 주세요.",
+  },
   partner_form_details_invalid: {
     tone: "danger",
     title: "신청 정보 저장을 확인해 주세요",
     description: "필수 항목과 링크·기간 형식을 확인한 뒤 다시 시도해 주세요.",
+  },
+  partner_form_status_locked: {
+    tone: "info",
+    title: "등록 완료 신청은 처리 상태를 바꿀 수 없습니다",
+    description:
+      "이미 제휴처로 등록된 신청입니다. 제휴처 정보와 공개 상태는 제휴처 상세 화면에서 관리해 주세요.",
   },
   partner_form_details_locked: {
     tone: "info",
@@ -116,7 +136,10 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     title: "접근 범위를 확인해 주세요",
     description: "현재 관리자에게 허용된 지역의 항목만 처리할 수 있습니다.",
   },
-};
+} satisfies Record<string, AdminReviewQueueFeedback>;
+
+/** 검토 큐 화면이 소유한 `?error=` 코드. */
+export type AdminReviewQueueErrorCode = keyof typeof ERROR_MESSAGES;
 
 const GENERIC_ERROR: AdminReviewQueueFeedback = {
   tone: "danger",
@@ -128,9 +151,9 @@ export function getAdminReviewQueueFeedback({
   error,
   success,
 }: FeedbackQuery): AdminReviewQueueFeedback | null {
-  if (success) return SUCCESS_MESSAGES[success] ?? null;
+  if (success) return pickAllowedEntry(SUCCESS_MESSAGES, success);
   if (!error) return null;
-  return ERROR_MESSAGES[error] ?? GENERIC_ERROR;
+  return pickAllowedEntry<AdminReviewQueueFeedback>(ERROR_MESSAGES, error) ?? GENERIC_ERROR;
 }
 
 export function appendAdminReviewQueueQuery(

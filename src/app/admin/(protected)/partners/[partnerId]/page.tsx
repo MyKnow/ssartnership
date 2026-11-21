@@ -18,7 +18,10 @@ import {
   generatePartnerPreviewLink,
   removePartnerPreviewLink,
 } from "@/app/admin/(protected)/_actions/partner-actions/preview";
-import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import {
+  adminActionErrorMessages,
+  adminPartnerCouponErrorMessages,
+} from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import {
@@ -41,6 +44,7 @@ import {
   getAdminPartnerDetailCoreReadModel,
   getAdminPartnerDetailOperationalReadModel,
 } from "@/lib/admin-partner-detail.server";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -70,9 +74,10 @@ async function AdminPartnerDetailContent({
     readFirstQueryValue(query.returnTo),
     "/admin/partners",
   );
-  const partnerError = query.error
-    ? (adminPartnerDetailErrorMessages[String(query.error)] ?? null)
-    : null;
+  const partnerError = pickAllowedEntry(
+    adminPartnerDetailErrorMessages,
+    readFirstQueryValue(query.error),
+  );
   const partnerSaved = query.success === "updated";
   const couponSuccessMessages: Record<string, string> = {
     "ad-coupon-created": "제휴처 쿠폰을 생성했습니다.",
@@ -83,30 +88,10 @@ async function AdminPartnerDetailContent({
   const couponSuccess = query.success
     ? (couponSuccessMessages[String(query.success)] ?? null)
     : null;
-  const couponErrorMessages: Record<string, string> = {
-    ad_coupon_create_failed:
-      "쿠폰을 생성하지 못했습니다. 입력값과 제휴처 상태를 확인한 뒤 다시 시도해 주세요.",
-    ad_coupon_update_failed:
-      "쿠폰을 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    ad_coupon_update_invalid_request: "쿠폰 수정 요청을 다시 확인해 주세요.",
-    ad_coupon_update_not_found:
-      "수정할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
-    ad_coupon_duplicate_failed:
-      "쿠폰을 복제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    ad_coupon_duplicate_invalid_request: "쿠폰 복제 요청을 다시 확인해 주세요.",
-    ad_coupon_duplicate_not_found:
-      "복제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
-    ad_coupon_delete_invalid_request: "쿠폰 삭제 요청을 다시 확인해 주세요.",
-    ad_coupon_delete_not_found:
-      "삭제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
-    ad_coupon_delete_has_history:
-      "발급 또는 사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 수정에서 상태를 종료로 변경해 주세요.",
-    ad_coupon_delete_failed:
-      "쿠폰을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-  };
-  const couponError = query.error
-    ? (couponErrorMessages[String(query.error)] ?? null)
-    : null;
+  const couponError = pickAllowedEntry<string>(
+    adminPartnerCouponErrorMessages,
+    readFirstQueryValue(query.error),
+  );
   const usageSuccessMessages: Record<string, string> = {
     "usage-created": "혜택 적용 이력을 추가했습니다.",
     "usage-updated": "혜택 적용 이력을 수정했습니다.",

@@ -54,19 +54,11 @@ test("관리자 회원 가져오기는 계약된 오류만 필드 복구 안내�
 });
 
 test("관리자 API는 내부 오류 원문 대신 안전한 복구 문구를 반환한다", async () => {
-  const [couponCodesSource, pushSubscribeSource] = await Promise.all([
-    readFile(
-      new URL("../src/app/api/admin/ad-coupons/[couponId]/codes/route.ts", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL("../src/app/api/admin/push/subscribe/route.ts", import.meta.url),
-      "utf8",
-    ),
-  ]);
+  const pushSubscribeSource = await readFile(
+    new URL("../src/app/api/admin/push/subscribe/route.ts", import.meta.url),
+    "utf8",
+  );
 
-  assert.doesNotMatch(couponCodesSource, /error\.message/);
   assert.doesNotMatch(pushSubscribeSource, /error\.message/);
-  assert.match(couponCodesSource, /코드 업로드에 실패했습니다\./);
   assert.match(pushSubscribeSource, /알림 구독에 실패했습니다\./);
 });

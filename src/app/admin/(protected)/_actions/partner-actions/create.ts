@@ -32,7 +32,6 @@ import {
 import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import {
   parsePartnerCompanyPayload,
@@ -48,6 +47,8 @@ import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { rollbackCreatedPartnerPersistence } from "@/lib/partner-create-rollback";
 import { resolvePartnerCreateInsertOutcome } from "@/lib/partner-create-idempotency";
+import { buildPartnerInsertRow } from "@/lib/partner-admin/partner-insert-row";
+import { logServerError } from "@/lib/server-log";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -313,36 +314,38 @@ async function createPartnerRecord(
       createdBrandProfileId = brandProfile.brandProfileId;
     }
 
-    const { error } = await supabase.from("partners").insert({
-      id: partnerId,
-      company_id: companyProvision.company?.id ?? null,
-      brand_profile_id: brandProfile.brandProfileId,
-      name: payload.name,
-      category_id: payload.categoryId,
-      location: payload.location,
-      detail_description: payload.detailDescription,
-      campus_slugs: payload.campusSlugs,
-      map_url: payload.mapUrl,
-      benefit_action_type: payload.benefitActionType,
-      benefit_action_link: payload.benefitActionLink,
-      benefit_verification_pin_hash: benefitVerificationPinHash?.hash ?? null,
-      benefit_verification_pin_salt: benefitVerificationPinHash?.salt ?? null,
-      reservation_link: payload.reservationLink,
-      inquiry_link: payload.inquiryLink,
-      period_start: payload.periodStart,
-      period_end: payload.periodEnd,
-      conditions: payload.conditions,
-      benefits: payload.benefits,
-      applies_to: payload.appliesTo,
-      thumbnail: media.thumbnail,
-      images: media.images,
-      tags: payload.tags,
-      visibility: payload.visibility,
-      benefit_visibility: payload.benefitVisibility,
-      managed_campus_slugs: managedCampusSlugs,
-      branch_scope_type: branchPayload.branchScopeType,
-      branch_scope_note: branchPayload.branchScopeNote,
-    });
+    const { error } = await supabase.from("partners").insert(
+      buildPartnerInsertRow({
+        id: partnerId,
+        companyId: companyProvision.company?.id ?? null,
+        brandProfileId: brandProfile.brandProfileId,
+        name: payload.name,
+        categoryId: payload.categoryId,
+        location: payload.location,
+        detailDescription: payload.detailDescription,
+        campusSlugs: payload.campusSlugs,
+        managedCampusSlugs,
+        mapUrl: payload.mapUrl,
+        benefitActionType: payload.benefitActionType,
+        benefitActionLink: payload.benefitActionLink,
+        benefitVerificationPinHash: benefitVerificationPinHash?.hash ?? null,
+        benefitVerificationPinSalt: benefitVerificationPinHash?.salt ?? null,
+        reservationLink: payload.reservationLink,
+        inquiryLink: payload.inquiryLink,
+        periodStart: payload.periodStart,
+        periodEnd: payload.periodEnd,
+        conditions: payload.conditions,
+        benefits: payload.benefits,
+        appliesTo: payload.appliesTo,
+        thumbnail: media.thumbnail,
+        images: media.images,
+        tags: payload.tags,
+        visibility: payload.visibility,
+        benefitVisibility: payload.benefitVisibility,
+        branchScopeType: branchPayload.branchScopeType,
+        branchScopeNote: branchPayload.branchScopeNote,
+      }),
+    );
 
     const insertOutcome = await resolvePartnerCreateInsertOutcome({
       insertError: error,
@@ -458,7 +461,6 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
   } = record;
 
   if (!created) {
-    revalidatePartnerData();
     revalidateAdminAndPublicPaths(partnerId);
     return;
   }
@@ -519,11 +521,10 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
         mapUrl: payload.mapUrl,
       });
     } catch (pushError) {
-      console.error("new partner push failed", pushError);
+      logServerError("new partner push failed", pushError);
     }
   }
 
-  revalidatePartnerData();
   revalidateAdminAndPublicPaths(partnerId);
 }
 

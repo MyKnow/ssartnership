@@ -11,17 +11,17 @@ import {
   parseUpdateAdCouponForm,
 } from "@/lib/ad-package-validation";
 import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
-import type { AdCampaignStatus } from "@/lib/ad-packages";
-import type { DeleteAdCouponResult } from "@/lib/repositories/ad-package-repository";
+import { AdStatusTransitionError, type AdCampaignStatus } from "@/lib/ad-packages";
+import type {
+  DeleteAdCouponResult,
+  UpdateAdCampaignStatusResult,
+} from "@/lib/repositories/ad-package-repository";
 import { adPackageRepository } from "@/lib/repositories";
 import { normalizeCouponCodeRows } from "@/lib/ad-coupon-domain";
 import { isUuid } from "@/lib/uuid";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, redirectAdminActionError } from "./shared-helpers";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
+import { readString } from "@/lib/form-data";
 
 function redirectAdvertisement(status: string): never {
   redirect(`/admin/advertisement?status=${encodeURIComponent(status)}`);
@@ -101,7 +101,7 @@ async function assertCampaignBelongsToPartner(
 }
 
 function requireCouponId(formData: FormData) {
-  const couponId = getString(formData, "couponId");
+  const couponId = readString(formData, "couponId");
   if (!isUuid(couponId)) {
     throw new Error("쿠폰 정보를 확인해 주세요.");
   }
@@ -154,14 +154,15 @@ export async function createAdCampaignAction(formData: FormData) {
 export async function updateAdCampaignStatusAction(formData: FormData) {
   const fallbackPath = "/admin/advertisement";
   await requireAdminPermission("home_ads", "update", { path: fallbackPath });
-  const campaignId = getString(formData, "campaignId");
+  const campaignId = readString(formData, "campaignId");
   if (!campaignId) {
     redirectAdminActionError(fallbackPath, "ad_campaign_invalid_request");
   }
   let status: AdCampaignStatus;
+  let update: UpdateAdCampaignStatusResult;
   try {
-    status = parseCampaignStatus(getString(formData, "status"));
-    await adPackageRepository.updateCampaignStatus({ campaignId, status });
+    status = parseCampaignStatus(readString(formData, "status"));
+    update = await adPackageRepository.updateCampaignStatus({ campaignId, status });
   } catch (error) {
     redirectAdminActionError(
       fallbackPath,
@@ -171,6 +172,22 @@ export async function updateAdCampaignStatusAction(formData: FormData) {
         targetType: "ad_campaign",
         targetId: campaignId,
         properties: { issue: 236 },
+      },
+    );
+  }
+  if (!update.ok) {
+    redirectAdminActionError(
+      fallbackPath,
+      update.reason === "invalid_transition"
+        ? "ad_campaign_invalid_status_transition"
+        : update.reason === "state_changed"
+          ? "ad_campaign_state_changed"
+          : "ad_campaign_invalid_request",
+      {
+        action: "ad_campaign_status_update",
+        targetType: "ad_campaign",
+        targetId: campaignId,
+        properties: { from: update.from ?? null, to: status, reason: update.reason },
       },
     );
   }
@@ -188,7 +205,7 @@ export async function updateAdCampaignStatusAction(formData: FormData) {
 }
 
 export async function createAdCouponAction(formData: FormData) {
-  const partnerId = getString(formData, "partnerId");
+  const partnerId = readString(formData, "partnerId");
   const session = await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
   const detailPath = getCouponDetailPath(partnerId);
   let coupon: Awaited<ReturnType<typeof adPackageRepository.createCoupon>>;
@@ -235,7 +252,7 @@ export async function createAdCouponAction(formData: FormData) {
 }
 
 export async function updateAdCouponAction(formData: FormData) {
-  const submittedPartnerId = getString(formData, "partnerId");
+  const submittedPartnerId = readString(formData, "partnerId");
   const fallbackPath = getCouponDetailPath(submittedPartnerId);
   let couponId: string;
   try {
@@ -267,6 +284,7 @@ export async function updateAdCouponAction(formData: FormData) {
     const managedPartner = await assertManagedAdPartner(session, existing.partnerId);
     const parsedInput = parseUpdateAdCouponForm(formData, {
       partnerPeriodEnd: managedPartner.periodEnd,
+      currentStatus: existing.status,
     });
     const input = {
       ...parsedInput,
@@ -288,7 +306,9 @@ export async function updateAdCouponAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       getCouponDetailPath(existing.partnerId),
-      getSafeAdminActionErrorCode(error, "ad_coupon_update_failed"),
+      error instanceof AdStatusTransitionError
+        ? error.code
+        : getSafeAdminActionErrorCode(error, "ad_coupon_update_failed"),
       {
         action: "ad_coupon_update",
         targetType: "ad_coupon",
@@ -313,7 +333,7 @@ export async function updateAdCouponAction(formData: FormData) {
 }
 
 export async function duplicateAdCouponAction(formData: FormData) {
-  const submittedPartnerId = getString(formData, "partnerId");
+  const submittedPartnerId = readString(formData, "partnerId");
   const fallbackPath = getCouponDetailPath(submittedPartnerId);
   let couponId: string;
   try {
@@ -364,7 +384,7 @@ export async function duplicateAdCouponAction(formData: FormData) {
 }
 
 export async function deleteAdCouponAction(formData: FormData) {
-  const submittedPartnerId = getString(formData, "partnerId");
+  const submittedPartnerId = readString(formData, "partnerId");
   const fallbackPath = isUuid(submittedPartnerId)
     ? `/admin/partners/${encodeURIComponent(submittedPartnerId)}`
     : "/admin/partners";
@@ -415,12 +435,20 @@ export async function deleteAdCouponAction(formData: FormData) {
     });
   }
   if (!deletion.ok) {
-    redirectAdminActionError(detailPath, "ad_coupon_delete_has_history", {
-      action: "ad_coupon_delete",
-      targetType: "ad_coupon",
-      targetId: couponId,
-      properties: { issue: 236, partnerId: existing.partnerId },
-    });
+    redirectAdminActionError(
+      detailPath,
+      deletion.reason === "active"
+        ? "ad_coupon_delete_active"
+        : deletion.reason === "state_changed"
+          ? "ad_coupon_delete_state_changed"
+          : "ad_coupon_delete_has_history",
+      {
+        action: "ad_coupon_delete",
+        targetType: "ad_coupon",
+        targetId: couponId,
+        properties: { issue: 236, partnerId: existing.partnerId, reason: deletion.reason },
+      },
+    );
   }
   await logAdminAction("ad_coupon_delete", {
     targetType: "ad_coupon",

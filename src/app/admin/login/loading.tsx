@@ -1,5 +1,11 @@
 import { AdminLoginSkeleton } from "@/components/loading/AdminPageSkeletons";
+import RouteLoadingStatus from "@/components/loading/RouteLoadingStatus";
 
 export default function AdminLoginLoading() {
-  return <AdminLoginSkeleton />;
+  return (
+    <>
+      <RouteLoadingStatus />
+      <AdminLoginSkeleton />
+    </>
+  );
 }

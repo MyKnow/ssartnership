@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
+/** 어드민 페이지 진입부(v2): 유일한 h1(Title 26·38), 설명, 주요 행동. */
 export default function AdminPageHeader({
   eyebrow,
   title,
@@ -17,21 +18,21 @@ export default function AdminPageHeader({
   return (
     <header
       className={cn(
-        "flex min-w-0 flex-col gap-4 border-b border-border/70 pb-5 sm:pb-6 lg:flex-row lg:items-end lg:justify-between",
+        "flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:justify-between",
         className,
       )}
     >
       <div className="min-w-0">
-        {eyebrow ? <p className="ui-kicker">{eyebrow}</p> : null}
-        <h1 className="ui-page-title text-ko-title mt-2">{title}</h1>
+        {eyebrow ? <p className="mb-1 pv2-caption text-pv2-muted">{eyebrow}</p> : null}
+        <h1 className="pv2-title text-ko-title text-pv2-text">{title}</h1>
         {description ? (
-          <div className="ui-body text-ko-pretty mt-2 max-w-3xl">
+          <div className="mt-2 max-w-3xl pv2-body text-ko-pretty text-pv2-muted">
             {description}
           </div>
         ) : null}
       </div>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+        <div className="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
           {actions}
         </div>
       ) : null}

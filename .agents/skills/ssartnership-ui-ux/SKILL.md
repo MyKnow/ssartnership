@@ -42,6 +42,9 @@ For a new surface, redesign, or information-architecture change, extend it with 
 - Use natural Korean wrapping for prose; constrain machine values separately. Add `min-w-0` and shrink-safe grid tracks where text can overflow.
 - Pair every changed interaction with loading, empty, error, and disabled/pending behavior as applicable.
 - Use concise, action-based Korean copy. An error states what happened and what the user can do next; it never exposes internal details.
+- Every interactive control has a touch target of at least 44×44px. A visually smaller control uses `Button size="compact"` or `TOUCH_TARGET_HIT_AREA_CLASS_NAME` instead of `!h-8 !min-h-0` overrides, and adjacent small targets keep `gap-3` so hit areas do not overlap.
+- Every interactive control shows a visible `focus-visible` ring from `src/components/ui/focus-ring.ts` (`ring-ring`); never add `outline-none` without that ring, and do not add new translucent `ring-primary/NN` focus rings.
+- Text keeps at least 4.5:1 contrast against its surface, and UI boundaries (focus rings, input borders, icon-only controls) keep at least 3:1.
 
 ## Dashboards And Analytics Workbooks
 

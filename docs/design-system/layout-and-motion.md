@@ -29,8 +29,9 @@ authority: normative
 - decorative layer는 정보 위계를 방해하지 않아야 한다
 
 ## Motion
-- `framer-motion`을 공용 모션 레이어로 사용한다
-- 기본 reveal: opacity + y 16px 내외
-- tab 전환: layout animation
-- modal/toast: short ease-out
-- reduced motion 사용 시 위치 변화와 duration을 축소하거나 제거한다
+- 모션 라이브러리는 쓰지 않는다. `framer-motion`은 관리자 번들 축소를 위해 제거했다([관리자 콘솔 성능 기준선](../performance/baselines/admin-console.md)).
+- 모션은 Tailwind transition 유틸리티와 `src/app/globals.css`의 keyframes로만 구현한다.
+- 목록·섹션의 등장 reveal 애니메이션은 기본으로 두지 않는다. 콘텐츠는 정적으로 렌더한다.
+- modal/toast/메뉴 패널: 짧은 ease-out transition(200ms 내외)
+- 자동 재생·반복 애니메이션(캐러셀, 인증 카드 장식)은 사용자가 멈출 수 있거나 정보 전달에 필수적이지 않아야 한다.
+- `prefers-reduced-motion: reduce`에서는 `globals.css`의 전역 규칙이 animation·transition 시간을 사실상 0으로 줄인다. 개별 컴포넌트는 필요하면 `motion-reduce:` 변형을 추가한다.

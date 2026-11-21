@@ -1,6 +1,6 @@
 "use client";
 
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   createContext,
   useCallback,
@@ -10,14 +10,23 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  resolveToastOptions,
+  type ResolvedToastOptions,
+  type ToastOptions,
+} from "@/components/ui/toast-options";
+
+export type { ToastOptions, ToastTone } from "@/components/ui/toast-options";
 
 type Toast = {
   id: string;
   message: string;
+  tone: ResolvedToastOptions["tone"];
+  role: ResolvedToastOptions["role"];
 };
 
 type ToastContextValue = {
-  notify: (message: string) => void;
+  notify: (message: string, options?: ToastOptions) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -49,19 +58,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const notify = useCallback((message: string) => {
+  const notify = useCallback((message: string, options?: ToastOptions) => {
     if (!mountedRef.current) {
       return;
     }
+    const { tone, role, durationMs } = resolveToastOptions(options);
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    setToasts((prev) => [...prev, { id, message }]);
+    setToasts((prev) => [...prev, { id, message, tone, role }]);
     const timer = window.setTimeout(() => {
       if (!mountedRef.current) {
         return;
       }
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
       removalTimersRef.current.delete(id);
-    }, 2500);
+    }, durationMs);
     removalTimersRef.current.set(id, timer);
   }, []);
 
@@ -72,15 +82,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <div
         data-toast-viewport
-        className="pointer-events-none fixed inset-x-4 bottom-4 z-[60] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6 sm:max-w-sm"
+        className="bottom-safe-toast pointer-events-none fixed inset-x-4 z-[60] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6 sm:max-w-sm"
       >
         {toasts.map((toast) => (
           <div
             key={toast.id}
             data-toast-item
+            data-toast-tone={toast.tone}
             className="ui-toast-glass pointer-events-auto flex min-h-11 w-full translate-y-0 items-center gap-2 rounded-[1.25rem] py-1 pl-4 pr-1 text-sm text-foreground opacity-100 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none sm:w-auto sm:min-w-[18rem]"
           >
-            <span role="status" className="min-w-0 flex-1">
+            {toast.tone === "error" ? (
+              <ExclamationCircleIcon
+                className="h-5 w-5 shrink-0 text-danger"
+                aria-hidden="true"
+              />
+            ) : null}
+            <span role={toast.role} className="min-w-0 flex-1">
               {toast.message}
             </span>
             <button

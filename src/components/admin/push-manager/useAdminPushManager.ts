@@ -9,7 +9,7 @@ import type {
   AdminNotificationPreview,
   AdminNotificationSendResult,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import { extractPartnerIdFromUrl } from "./constants";
 import {
   createAudienceYearOptions,
@@ -445,7 +445,11 @@ export function useAdminPushManager({
         data.result.channelResults.in_app.failed +
         data.result.channelResults.push.failed +
         data.result.channelResults.mm.failed;
-      notify(`알림 발송 완료: ${totalSent}건 성공, ${totalFailed}건 실패`);
+      // 일부라도 실패하면 2.5초 안내로 지나가지 않도록 오류 톤으로 알린다.
+      notify(
+        `알림 발송 완료: ${totalSent}건 성공, ${totalFailed}건 실패`,
+        totalFailed > 0 ? { tone: "error" } : undefined,
+      );
     } catch (error) {
       setErrorMessage(getSafeAdminMessage(error, "알림 발송에 실패했습니다."));
     } finally {

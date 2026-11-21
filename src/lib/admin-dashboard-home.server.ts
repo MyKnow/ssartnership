@@ -9,9 +9,11 @@ import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import { ADMIN_READ_BURST_CACHE_SECONDS } from "@/lib/cache-ttl";
 
 export const ADMIN_DASHBOARD_READ_MODEL_TIMEOUT_MS = 2_000;
-export const ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS = 3;
+export const ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
 
 export type AdminDashboardHomeData = {
   snapshot: AdminDashboardHomeSnapshot;

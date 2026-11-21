@@ -3,6 +3,7 @@ import { wrapPushDbError } from "./config.ts";
 import { getPushDeviceLabel } from "./device-label.ts";
 import type { SubscriptionInput } from "./types.ts";
 import { validateTrustedPushSubscription } from "./subscription-trust.ts";
+import { normalizeUserAgentHeader } from "../request-header-values.ts";
 import {
   getMemberPushPreferences,
   upsertMemberPushPreferences,
@@ -34,7 +35,7 @@ export async function upsertPushSubscription(params: {
       p256dh: validated.p256dh,
       auth: validated.auth,
       expiration_time: validated.expirationTime,
-      user_agent: userAgent?.trim() || null,
+      user_agent: normalizeUserAgentHeader(userAgent),
       is_active: true,
       failure_reason: null,
       last_failure_at: null,

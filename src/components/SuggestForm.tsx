@@ -16,6 +16,7 @@ import {
   type SuggestFieldName,
   validateSuggestForm,
 } from "@/lib/suggest-validation";
+import { firstInvalidField } from "@/lib/field-errors";
 
 const invalidFieldClassName =
   "border-danger/50 bg-danger/5 focus:border-danger focus:ring-danger/15";
@@ -42,7 +43,7 @@ function SuggestField({
             *
           </span>
         ) : (
-          <Badge className="!border-border/70 !bg-surface-muted/60 !px-2 !py-0.5 !text-[10px] !font-medium !tracking-normal !text-muted-foreground">
+          <Badge className="!border-border/70 !bg-surface-muted/60 !px-2 !py-0.5 !text-xs !font-medium !tracking-normal !text-muted-foreground">
             선택
           </Badge>
         )}
@@ -138,12 +139,10 @@ export default function SuggestForm() {
         const nextFieldErrors = validateSuggestForm(formState);
         setFieldErrors(nextFieldErrors);
 
-        const firstInvalidField = SUGGEST_FIELD_ORDER.find(
-          (fieldName) => nextFieldErrors[fieldName],
-        );
-        if (firstInvalidField) {
+        const invalidField = firstInvalidField(nextFieldErrors, SUGGEST_FIELD_ORDER);
+        if (invalidField) {
           setErrorMessage("입력값을 확인해 주세요.");
-          fieldRefs.current[firstInvalidField]?.focus();
+          fieldRefs.current[invalidField]?.focus();
           return;
         }
 

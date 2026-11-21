@@ -5,7 +5,7 @@ import {
 } from "@/lib/admin-partner-file-import";
 import { createAdminPartnerXlsxTemplate } from "@/lib/admin-partner-file-import.server";
 import { requireAdminPermission } from "@/lib/admin-access";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { partnerRepository } from "@/lib/repositories";
 
 export const dynamic = "force-dynamic";
 
@@ -30,23 +30,17 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = getSupabaseAdminClient();
-  const categoriesResult = await supabase
-    .from("categories")
-    .select("id,key,label")
-    .order("created_at", { ascending: true });
-
-  if (categoriesResult.error) {
+  let categories;
+  try {
+    categories = await partnerRepository.getCategoryOptions();
+  } catch {
     return NextResponse.json(
       { message: "카테고리 목록을 불러오지 못했습니다." },
       { status: 500 },
     );
   }
 
-  const buffer = await createAdminPartnerXlsxTemplate(
-    options,
-    categoriesResult.data ?? [],
-  );
+  const buffer = await createAdminPartnerXlsxTemplate(options, categories);
 
   return new NextResponse(buffer, {
     headers: {

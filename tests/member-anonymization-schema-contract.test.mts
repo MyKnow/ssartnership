@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const migrationName =
-  "20260813114408_connect_wallet_member_lifecycle.sql";
+  "20261005030746_harden_privileges_retention_and_lifecycle.sql";
 const transitionMigrationName =
   "20260813022030_require_member_anonymization_gate_for_recovery_withdrawal.sql";
 
@@ -184,7 +184,6 @@ test("member anonymization preserves the retention gate and current cleanup cont
 
   for (const relation of [
     "member_profile_images",
-    "member_ssafy_verifications",
     "member_email_challenges",
     "member_email_login_transitions",
     "member_password_action_tokens",
@@ -204,6 +203,13 @@ test("member anonymization preserves the retention gate and current cleanup cont
     /if not public\.purge_deleted_member_wallet_data_for_anonymization\(p_member_id\) then\s+raise exception 'member_wallet_lifecycle_anonymization_gate_failed';\s+end if;/i,
   );
 
+  // Legacy SSAFY Verify proofs are cleaned only while the table exists, so the
+  // table can be dropped without replacing this function first.
+  assert.match(
+    body,
+    /to_regclass\('public\.member_ssafy_verifications'\) is not null then\s+execute 'delete from public\.member_ssafy_verifications where member_id = \$1'\s+using p_member_id;/i,
+  );
+  assert.doesNotMatch(body, /^\s*delete from public\.member_ssafy_verifications/im);
   assert.match(
     body,
     /to_regclass\('public\.member_auth_identities'\) is not null/i,

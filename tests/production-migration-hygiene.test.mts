@@ -321,7 +321,6 @@ test("schema snapshot declares every added index and RPC after its dependencies"
     /^create table\b/gim,
     /^create type\b/gim,
     /^create domain\b/gim,
-    /^alter table\b/gim,
   ];
   for (const pattern of definitionPatterns) {
     for (const match of schema.matchAll(pattern)) {
@@ -330,6 +329,24 @@ test("schema snapshot declares every added index and RPC after its dependencies"
         `${match[0]} at offset ${match.index} must precede the parity section`,
       );
     }
+  }
+  // Later migration snapshots may tighten constraints or defaults of tables
+  // that already exist, but must not add columns the parity read models use.
+  for (const match of schema.matchAll(/^alter table (?:if exists )?(?:only )?(?:public\.)?([a-z_][a-z0-9_]*)\b([^;]*);/gim)) {
+    if (match.index < parityIndex) continue;
+    assert.doesNotMatch(
+      match[2],
+      /\badd column\b/i,
+      `alter table ${match[1]} at offset ${match.index} must not add columns after the parity section`,
+    );
+    const created = new RegExp(
+      `^create table (?:if not exists )?(?:public\\.)?${match[1]}\\s*\\(`,
+      "im",
+    ).exec(schema);
+    assert.ok(
+      created && created.index < parityIndex,
+      `${match[1]} must be created before the parity section`,
+    );
   }
 
   for (const [indexName, dependencies] of schemaIndexDependencies) {

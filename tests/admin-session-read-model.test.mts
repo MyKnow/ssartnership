@@ -5,7 +5,7 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
-test("관리자 세션은 좁은 snapshot RPC를 우선 사용하고 rolling deploy fallback을 유지한다", async () => {
+test("관리자 세션은 좁은 snapshot RPC만 사용하고 실패를 legacy 조회로 삼키지 않는다", async () => {
   const [accounts, auth, migration] = await Promise.all([
     read("src/lib/admin-accounts.ts"),
     read("src/lib/auth.ts"),
@@ -13,10 +13,22 @@ test("관리자 세션은 좁은 snapshot RPC를 우선 사용하고 rolling dep
   ]);
 
   assert.match(accounts, /get_admin_session_snapshot/);
-  assert.match(accounts, /getAdminAccountFromProfile\(memberId\)/);
   assert.match(accounts, /mapAdminSessionSnapshot/);
   assert.match(accounts, /listAdminAccountsFromRelation/);
-  assert.match(accounts, /listAdminAccountsLegacy/);
+  assert.doesNotMatch(
+    accounts,
+    /getAdminAccountFromProfile|listAdminAccountsLegacy|getAdminAccountFromProfileLegacy|rolling deploy/,
+  );
+  assert.match(
+    accounts,
+    /if \(error\) \{\s*logAdminAccountReadFailure\("get_admin_session_snapshot", error\);\s*throw new Error/,
+  );
+  assert.match(
+    accounts,
+    /if \(error\) \{\s*logAdminAccountReadFailure\("admin_profiles_relation", error\);\s*throw new Error/,
+  );
+  // getAdminSession turns a thrown snapshot read into "no admin session".
+  assert.match(auth, /try \{[\s\S]*getAdminAccountById\(payload\.adminId\)[\s\S]*\} catch/);
   assert.match(accounts, /unstable_cache/);
   assert.match(accounts, /ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS = 5/);
   assert.match(accounts, /ADMIN_ACCOUNTS_LIST_CACHE_TAG = "admin-accounts-list"/);

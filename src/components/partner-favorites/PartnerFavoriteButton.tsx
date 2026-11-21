@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
@@ -17,6 +16,8 @@ export default function PartnerFavoriteButton({
   initialFavorited,
   favoriteCount,
   onToggle,
+  pending = false,
+  onPendingChange,
   compact = false,
   reducedVerticalPadding = false,
   className,
@@ -24,12 +25,13 @@ export default function PartnerFavoriteButton({
   partnerId: string;
   initialFavorited: boolean;
   favoriteCount?: number | null;
-  onToggle?: (nextFavorited: boolean) => void;
+  onToggle?: (nextFavorited: boolean, count?: number) => void;
+  pending?: boolean;
+  onPendingChange?: (pending: boolean, outcome?: "success" | "failure") => void;
   compact?: boolean;
   reducedVerticalPadding?: boolean;
   className?: string;
 }) {
-  const router = useRouter();
   const { notify } = useToast();
   const [isFavorited, setIsFavorited] = useState(initialFavorited);
   const [count, setCount] = useState(favoriteCount ?? 0);
@@ -55,16 +57,19 @@ export default function PartnerFavoriteButton({
     : "!border-border/80 !bg-surface-control !text-foreground hover:!border-strong hover:!bg-surface-elevated";
 
   const handleClick = async () => {
-    if (isPending) {
+    if (isPending || pending) {
       return;
     }
 
     const nextFavorited = !isFavorited;
+    const previousCount = count;
     setIsPending(true);
+    onPendingChange?.(true);
     setIsFavorited(nextFavorited);
     setCount((current) => Math.max(0, current + (nextFavorited ? 1 : -1)));
     onToggle?.(nextFavorited);
 
+    let outcome: "success" | "failure" = "failure";
     try {
       const response = await fetch(`/api/partners/${partnerId}/favorite`, {
         method: "POST",
@@ -89,21 +94,26 @@ export default function PartnerFavoriteButton({
       if (typeof payload?.count === "number") {
         setCount(payload.count);
       }
+      onToggle?.(Boolean(payload?.favorite ?? nextFavorited), payload?.count);
+      // The response already carries the authoritative state and count, so the
+      // force-dynamic page is not re-rendered for a single toggle.
       notify(nextFavorited ? "즐겨찾기에 추가되었습니다." : "즐겨찾기가 해제되었습니다.");
-      router.refresh();
+      outcome = "success";
     } catch (error) {
       setIsFavorited(!nextFavorited);
-      setCount((current) => Math.max(0, current + (nextFavorited ? -1 : 1)));
-      onToggle?.(!nextFavorited);
+      setCount(previousCount);
+      onToggle?.(!nextFavorited, previousCount);
       notify(
         getClientSafeRequestError(error, {
           requestFailed: "즐겨찾기를 처리하지 못했습니다.",
           networkUnavailable:
             "즐겨찾기를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
         }).message,
+        { tone: "error" },
       );
     } finally {
       setIsPending(false);
+      onPendingChange?.(false, outcome);
     }
   };
 
@@ -119,7 +129,7 @@ export default function PartnerFavoriteButton({
         className,
       )}
       onClick={handleClick}
-      disabled={isPending}
+      disabled={isPending || pending}
       ariaLabel={label}
       ariaPressed={isFavorited}
       title={label}

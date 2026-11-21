@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import Card from "@/components/ui/Card";
+import { SVG_SOURCE_NOT_ALLOWED_MESSAGE } from "@/lib/image-upload/policy";
 import GraduateProfilePhotoForm from "./GraduateProfilePhotoForm";
 
 const meta = {
@@ -64,8 +65,16 @@ export const GalleryFormatGuard: Story = {
     await expect(input?.accept).toContain("image/heic");
     await expect(input?.accept).toContain("image/heif");
     await expect(input?.accept).toContain("image/avif");
-    await expect(input?.accept).toContain("image/svg+xml");
+    await expect(input?.accept).not.toContain("image/svg+xml");
+    await expect(input?.accept).not.toContain(".svg");
     await expect(input?.accept).not.toContain("image/*");
+
+    await userEvent.upload(
+      input!,
+      new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], "profile.svg", { type: "image/svg+xml" }),
+      { applyAccept: false },
+    );
+    await expect(canvas.getByText(SVG_SOURCE_NOT_ALLOWED_MESSAGE)).toBeInTheDocument();
 
     await userEvent.upload(
       input!,

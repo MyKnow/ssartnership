@@ -6,7 +6,7 @@ import Image from "next/image";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  getImageSourceAccept,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
 import {
@@ -200,7 +200,7 @@ export default function ReviewImageUploader({
       <input
         ref={inputRef}
         type="file"
-        accept={IMAGE_SOURCE_ACCEPT}
+        accept={getImageSourceAccept(REVIEW_IMAGE_POLICY)}
         multiple
         className="hidden"
         onChange={handleFileChange}

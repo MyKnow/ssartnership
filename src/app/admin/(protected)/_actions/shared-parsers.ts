@@ -15,6 +15,7 @@ import {
 } from "../../../../lib/partner-benefit-action.ts";
 import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
 import {
+  buildLegacyPartnerBenefitItems,
   normalizePartnerBenefitItems,
   partnerBenefitItemsToTitles,
 } from "../../../../lib/partner-benefit-items.ts";
@@ -38,6 +39,7 @@ import type {
   PartnerCompanyInput,
   PartnerCoreInput,
 } from "./shared-types.ts";
+import { isFourDigitPin } from "@/lib/validation";
 
 function parseList(value: string) {
   return Array.from(
@@ -55,9 +57,7 @@ function parsePartnerBenefitItems(formData: FormData, legacyBenefits: string) {
   if (typeof rawItems === "string" && rawItems.trim()) {
     return normalizePartnerBenefitItems(JSON.parse(rawItems));
   }
-  return normalizePartnerBenefitItems(
-    parseList(legacyBenefits).map((title, index) => ({ id: `legacy-benefit-${index + 1}`, title })),
-  );
+  return buildLegacyPartnerBenefitItems(parseList(legacyBenefits));
 }
 
 function parseOptionalUrl(value: string) {
@@ -339,7 +339,7 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     benefitActionType === "external_link" ? parsedBenefitActionLink : null;
   const reservationLink = benefitActionLink;
 
-  if (rawBenefitVerificationPin && !/^\d{4}$/.test(rawBenefitVerificationPin)) {
+  if (rawBenefitVerificationPin && !isFourDigitPin(rawBenefitVerificationPin)) {
     throw new Error("partner_form_invalid_benefit_verification_pin");
   }
   const benefitVerificationPin = rawBenefitVerificationPin || null;

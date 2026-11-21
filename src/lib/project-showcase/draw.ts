@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { buildDrawAuditSummary } from "@/lib/draw-audit";
 import { SHOWCASE_PRIZES } from "./labels";
 import type { ShowcaseCandidateGroup, ShowcasePublicWinner } from "./types";
 
@@ -54,6 +55,42 @@ export function sampleShowcaseWeighted<T extends { weight: number }>(
     selected.push(pool.splice(index, 1)[0]!);
   }
   return selected;
+}
+
+/**
+ * Showcase draws use a per-pick CSPRNG, so they are not reproducible; the audit
+ * summary still records which eligible entries the draw saw (see draw-audit).
+ */
+export const SHOWCASE_DRAW_ALGORITHMS = {
+  submitter: "csprng-project-ticket-v1",
+  experiencer: "csprng-weighted-v1",
+} as const satisfies Record<ShowcaseCandidateGroup, string>;
+
+export function buildShowcaseSubmitterDrawAudit(
+  eligible: readonly { projectId: string; memberId: string | null }[],
+) {
+  return buildDrawAuditSummary({
+    algorithm: SHOWCASE_DRAW_ALGORITHMS.submitter,
+    seedSource: "csprng",
+    candidateCount: new Set(eligible.map((candidate) => candidate.memberId)).size,
+    entries: eligible.map((candidate) => ({
+      id: `${candidate.projectId}@${candidate.memberId ?? ""}`,
+      weight: 1,
+    })),
+  });
+}
+
+export function buildShowcaseExperiencerDrawAudit(
+  eligible: readonly { memberId: string; tickets: number }[],
+) {
+  return buildDrawAuditSummary({
+    algorithm: SHOWCASE_DRAW_ALGORITHMS.experiencer,
+    seedSource: "csprng",
+    entries: eligible.map((candidate) => ({
+      id: candidate.memberId,
+      weight: candidate.tickets,
+    })),
+  });
 }
 
 const GROUP_ORDER: readonly ShowcaseCandidateGroup[] = ["submitter", "experiencer"];

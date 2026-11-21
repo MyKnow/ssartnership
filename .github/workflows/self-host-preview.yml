@@ -71,7 +71,9 @@ jobs:
           name: ssartnership-preview-release
           path: .tmp/published/release.json
           if-no-files-found: error
-          retention-days: 30
+          # The receiver re-verifies this manifest on every poll. Keep it for
+          # the platform maximum so a quiet branch does not fail the receiver.
+          retention-days: 90
       - name: Remove registry session
         if: ${{ always() }}
         run: docker logout ghcr.io

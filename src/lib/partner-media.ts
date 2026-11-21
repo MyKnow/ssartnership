@@ -1,6 +1,7 @@
 import { sanitizeHttpUrl } from "@/lib/validation";
 import { assertExistingImageManifestUrls } from "@/lib/image-upload/policy";
 import { extractPublicStorageObjectPath } from "@/lib/public-storage-url";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const PARTNER_MEDIA_BUCKET = "partner-media";
 export const PARTNER_THUMBNAIL_ASPECT_RATIO = 1;
@@ -93,7 +94,7 @@ function parsePartnerMediaManifestEntry(
   if (entry.kind === "upload") {
     if (
       typeof entry.uploadId !== "string"
-      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.uploadId)
+      || !isUuidFormat(entry.uploadId)
     ) {
       return null;
     }

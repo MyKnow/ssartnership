@@ -1,15 +1,16 @@
+import { formatKoreanDateTime } from "@/lib/datetime";
+
+/** 쇼케이스 일정 표기("10월 5일 (월) 오후 03:05"). 값이 없거나 잘못된 날짜면 null이다. */
 export function formatShowcaseDateTime(value: string | null, options: { withTime?: boolean; withYear?: boolean } = {}) {
   if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
+  return formatKoreanDateTime(value, {
     ...(options.withYear ? { year: "numeric" } : {}),
     month: "long",
     day: "numeric",
     weekday: "short",
     ...(options.withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  }).format(date);
+    hour12: true,
+  }) || null;
 }
 
 export function formatShowcasePeriod(start: string | null, end: string | null) {

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const migrationPath = new URL(
-  "../supabase/migrations/20260831122552_make_member_notification_preferences_atomic.sql",
+  "../supabase/migrations/20261006010931_fence_consent_profile_delivery_and_upload_transitions.sql",
   import.meta.url,
 );
 const schemaPath = new URL("../supabase/schema.sql", import.meta.url);
@@ -21,7 +21,7 @@ test("회원 알림 설정 저장은 푸시 선호도와 마케팅 동의 전이
 
   assert.match(
     migration,
-    /create or replace function public\.update_member_push_preferences_atomic\(/,
+    /create or replace function public\.patch_member_notification_preferences_atomic\(/,
   );
   assert.match(migration, /from public\.members[\s\S]*for update;/);
   assert.match(migration, /from public\.push_preferences[\s\S]*for update;/);
@@ -31,7 +31,7 @@ test("회원 알림 설정 저장은 푸시 선호도와 마케팅 동의 전이
   );
   assert.match(
     migration,
-    /if next_marketing_enabled then[\s\S]*from public\.policy_documents[\s\S]*kind = 'marketing'[\s\S]*is_active = true/,
+    /if input_marketing_enabled is true then[\s\S]*from public\.policy_documents[\s\S]*kind = 'marketing'[\s\S]*is_active = true[\s\S]*for share/,
   );
   assert.match(
     migration,
@@ -43,16 +43,16 @@ test("회원 알림 설정 저장은 푸시 선호도와 마케팅 동의 전이
   );
   assert.doesNotMatch(
     migration,
-    /if next_marketing_enabled and not current_marketing_enabled then/,
+    /if next_marketing_enabled then/,
   );
   assert.match(
     migration,
-    /grant execute on function public\.update_member_push_preferences_atomic\([\s\S]*to service_role;/,
+    /grant execute on function public\.patch_member_notification_preferences_atomic\([\s\S]*to service_role;/,
   );
 
   assert.match(
     helper,
-    /rpc\([\s\S]*"update_member_push_preferences_atomic"/,
+    /rpc\([\s\S]*"patch_member_notification_preferences_atomic"/,
   );
   assert.doesNotMatch(helper, /await recordMarketingPolicyConsent\(/);
   assert.ok(schema.includes(migration.trim()));

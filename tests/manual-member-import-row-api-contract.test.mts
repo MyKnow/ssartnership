@@ -5,15 +5,26 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
+const readImportPanel = () => Promise.all([
+  read("src/components/admin/AdminMemberManualAddPanel.tsx"),
+  read("src/components/admin/useAdminMemberManualImport.ts"),
+  read("src/components/admin/manual-member-import-photos.ts"),
+]).then((sources) => sources.join("\n"));
+
 test("회원 XLSX 업로드는 생성 전에 인증된 행 전개 API로만 파싱한다", async () => {
   const [route, panel] = await Promise.all([
     read("src/app/api/admin/member-imports/rows/route.ts"),
-    read("src/components/admin/AdminMemberManualAddPanel.tsx"),
+    readImportPanel(),
   ]);
 
   assert.match(route, /isTrustedSameOriginRequest/);
-  assert.match(route, /canAdmin\(session\.account\.permissions, "members", "create"\)/);
+  assert.match(route, /ensureAdminApiPermission\(request, "members", "create"\)/);
+  assert.doesNotMatch(route, /getAdminSession\(\)/);
   assert.match(route, /parseManualMemberImportWorkbook/);
+  assert.match(route, /readMultipartFormDataWithinLimit\(/);
+  assert.match(route, /MANUAL_MEMBER_IMPORT_LIMITS\.xlsxBytes \+ MULTIPART_FORM_OVERHEAD_BYTES/);
+  assert.match(route, /\{ status: 413 \}/);
+  assert.doesNotMatch(route, /request\.formData\(\)/);
   assert.match(panel, /\/api\/admin\/member-imports\/rows/);
   assert.match(panel, /appendManualMemberImportWorkbookRows/);
 });

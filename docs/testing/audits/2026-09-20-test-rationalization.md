@@ -380,7 +380,7 @@ authority: evidence
 | `tests/github-actions-operations-skill.test.mts` | 유지 | 배포·데이터·검증 절차 안전 경계 |
 | `tests/graduate-approval-schema-contract.test.mts` | 유지 | 배포·데이터·검증 절차 안전 경계 |
 | `tests/graduate-cohort-schema-contract.test.mts` | 유지 | 배포·데이터·검증 절차 안전 경계 |
-| `tests/graduate-email-delivery-hotfix.test.mts` | 유지 | 데이터·외부 부작용·중복·실패 복구 |
+| `tests/graduate-email-delivery-state.test.mts` | 유지 | 데이터·외부 부작용·중복·실패 복구 |
 | `tests/graduate-existing-member-recovery.test.mts` | 유지 | 도메인·상태·입력·성능/접근성 계약; 낮은 비용 대비 삭제 이익 미확인 |
 | `tests/graduate-upload-error-contract.test.mts` | 유지 | 데이터·외부 부작용·중복·실패 복구 |
 | `tests/graduate-verification-domain.test.mts` | 유지 | 도메인·상태·입력·성능/접근성 계약; 낮은 비용 대비 삭제 이익 미확인 |

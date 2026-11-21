@@ -22,7 +22,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   );
   assert.equal(
     packageJson.scripts?.["verify:release:post-quick"],
-    "node scripts/run-package-scripts.mjs build test:e2e:ci",
+    "node scripts/run-package-scripts.mjs typegen:release build test:e2e:prod",
   );
   assert.equal(
     packageJson.scripts?.["test:e2e:ci"],

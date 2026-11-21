@@ -10,6 +10,11 @@ export const PARTNER_METRIC_EVENT_NAMES = [
   "partner_benefit_use",
 ] as const;
 export const PARTNER_METRIC_EVENT_FALLBACK_LIMIT = 10_000;
+export const PARTNER_METRIC_EXCLUDED_ACTOR_TYPES = ["admin", "partner"] as const;
+
+export function isPartnerMetricActorIncluded(actorType: string) {
+  return !(PARTNER_METRIC_EXCLUDED_ACTOR_TYPES as readonly string[]).includes(actorType);
+}
 
 export type PartnerMetricEventName =
   (typeof PARTNER_METRIC_EVENT_NAMES)[number];
@@ -246,6 +251,7 @@ export function buildPartnerMetricRollupRowsFromEventLogs(
   };
 
   for (const event of eventRows) {
+    if (!isPartnerMetricActorIncluded(event.actor_type)) continue;
     const bucketParts = toKstBucketParts(event.created_at ?? new Date());
     if (!bucketParts) {
       continue;
@@ -369,6 +375,7 @@ export async function fetchPartnerMetricEventLogRows(
     .eq("target_type", "partner")
     .in("target_id", normalizedPartnerIds)
     .in("event_name", [...PARTNER_METRIC_EVENT_NAMES])
+    .not("actor_type", "in", `(${PARTNER_METRIC_EXCLUDED_ACTOR_TYPES.join(",")})`)
     .limit(PARTNER_METRIC_EVENT_FALLBACK_LIMIT + 1);
 
   if (error) {

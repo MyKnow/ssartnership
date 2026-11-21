@@ -36,7 +36,7 @@ test("쿠폰 코드 batch 계약은 개수와 코드 길이를 저장소 경계�
 test("Supabase 코드 등록은 동기 해시와 bounded DB batch upsert를 사용한다", async () => {
   const source = await readFile(
     new URL(
-      "../src/lib/repositories/supabase/ad-package-repository.supabase.ts",
+      "../src/lib/repositories/supabase/ad-package-coupon-issues.supabase.ts",
       import.meta.url,
     ),
     "utf8",

@@ -146,7 +146,13 @@ for (const kind of ["graduate_signup", "existing_member_recovery"] as const) {
         page.getByRole("dialog", { name: "선택한 본인 사진 확대" }),
       ).toBeVisible();
       await expect(page.getByRole("img", { name: "선택한 본인 사진 확대" })).toBeVisible();
-      await page.getByRole("button", { name: "닫기", exact: true }).click();
+      await page.getByRole("button", { name: "모달 닫기", exact: true }).click();
+      await expect(
+        page.getByRole("dialog", { name: "선택한 본인 사진 확대" }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "선택한 본인 사진 크게 보기" }),
+      ).toBeFocused();
 
       await page
         .getByText(

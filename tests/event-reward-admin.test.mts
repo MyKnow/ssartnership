@@ -63,6 +63,64 @@ const campaign = {
   rules: [],
 };
 
+test("event reward draw preserves tied candidate order, exact seeded winners and audit snapshot", async () => {
+  const { buildEventRewardAdminOverview, createEventRewardDrawPlan, buildEventRewardDrawAudit } =
+    await eventRewardsModulePromise;
+  const members = [
+    { id: "tie-b", displayName: "동명", reviewCount: 0 },
+    { id: "heavy", displayName: "가중", reviewCount: 2 },
+    { id: "tie-a", displayName: "동명", reviewCount: 0 },
+    { id: "zero", displayName: "미가입", reviewCount: 0 },
+  ].map((member) => ({
+    ...member,
+    mmUsername: member.id,
+    year: 15,
+    campus: "서울",
+    createdAt: member.id === "zero" ? "2026-05-13T00:00:00+09:00" : campaign.startsAt,
+    preferences: null,
+  }));
+  const originalMembers = structuredClone(members);
+  const overview = buildEventRewardAdminOverview(campaign, members);
+  const originalOverview = structuredClone(overview);
+  assert.deepEqual(overview.members.map((member) => member.id), ["heavy", "tie-b", "tie-a", "zero"]);
+
+  const plan = createEventRewardDrawPlan(overview, { winnerCount: 3, seed: " ordering-fixture " });
+  assert.equal(plan.seed, "ordering-fixture");
+  assert.equal(plan.candidateCount, 3);
+  assert.equal(plan.totalTickets, 5);
+  assert.deepEqual(plan.winners.map((winner) => [winner.rank, winner.memberId, winner.ticketCount]), [
+    [1, "tie-a", 1], [2, "heavy", 3], [3, "tie-b", 1],
+  ]);
+  assert.deepEqual(buildEventRewardDrawAudit(overview, "admin"), {
+    contractVersion: 1,
+    algorithm: "sha256-seeded-weighted-v1",
+    seedSource: "admin",
+    candidateCount: 3,
+    ticketCount: 5,
+    candidateSnapshotSha256: "8947e5865edd05f2a42eab1b4b88edff638ef56a9af8c901f7a72e223b008a0c",
+  });
+  assert.deepEqual(members, originalMembers);
+  assert.deepEqual(overview, originalOverview);
+});
+
+test("event reward comparison treats campaign start as before and campaign end as eligible", async () => {
+  const { buildEventRewardComparisonOverview } = await eventRewardsModulePromise;
+  const overview = buildEventRewardComparisonOverview(campaign, [
+    campaign.startsAt, "2026-04-19T15:00:00.001Z", campaign.endsAt,
+    "2026-05-12T15:00:00.000Z", "invalid-date",
+  ].map((createdAt, index) => ({
+    id: String(index), displayName: String(index), mmUsername: String(index),
+    year: 15, campus: "서울", createdAt, preferences: null, reviewCount: 0,
+  })));
+  const byId = new Map(overview.members.map((member) => [member.id, member]));
+  assert.deepEqual([...byId.values()].map((member) => [
+    member.id, member.existedBeforeEvent, member.joinedDuringEvent, member.beforeKnownTickets, member.afterTickets,
+  ]), [
+    ["0", true, false, 1, 1], ["1", false, true, 0, 1], ["2", false, true, 0, 1],
+    ["3", false, false, 0, 0], ["4", false, false, 0, 0],
+  ]);
+});
+
 test("event reward admin overview aggregates member rows and condition counts", async () => {
   const { buildEventRewardAdminOverview } = await eventRewardsModulePromise;
 
@@ -509,4 +567,83 @@ test("winner form access only allows the winning signed-in member", async () => 
     }),
     true,
   );
+});
+
+test("event reward actions require an explicit supported event slug", async () => {
+  const {
+    EVENT_REWARD_DRAW_EVENT_SLUGS,
+    sendEventRewardWinnerNotifications,
+    sendEventRewardWinnerTestNotification,
+    supportsEventRewardDraw,
+  } = await eventRewardsModulePromise;
+
+  assert.deepEqual([...EVENT_REWARD_DRAW_EVENT_SLUGS], ["signup-reward"]);
+  assert.equal(supportsEventRewardDraw("signup-reward"), true);
+  assert.equal(supportsEventRewardDraw("review-reward"), false);
+  assert.equal(supportsEventRewardDraw(""), false);
+  assert.equal(supportsEventRewardDraw(null), false);
+
+  await assert.rejects(
+    sendEventRewardWinnerTestNotification(null, {
+      memberId: "member-test",
+      eventSlug: "",
+    }),
+    /추첨 대상 이벤트를 확인해 주세요/,
+  );
+  await assert.rejects(
+    sendEventRewardWinnerNotifications("draw-1", {
+      confirmationText: "알림 발송",
+      eventSlug: "review-reward",
+    }),
+    /추첨 대상 이벤트를 확인해 주세요/,
+  );
+});
+
+test("event reward admin surfaces derive the slug instead of defaulting to signup-reward", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const read = (path: string) =>
+    readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  const [actions, rewards, page, section, exportRoute] = await Promise.all([
+    read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
+    read("src/lib/promotions/event-rewards-draw.ts"),
+    read("src/app/admin/(protected)/event/[slug]/page.tsx"),
+    read("src/components/admin/event-rewards/SignupRewardOverviewSection.tsx"),
+    read("src/app/admin/(protected)/event/[slug]/rewards/export/route.ts"),
+  ]);
+
+  assert.doesNotMatch(actions, /"signup-reward"/);
+  assert.match(actions, /requireEventRewardActionSlug\(formData\)/);
+  assert.equal(rewards.match(/"signup-reward"/g)?.length, 1);
+  assert.doesNotMatch(rewards, /\?\? "signup-reward"/);
+  assert.doesNotMatch(page, /"signup-reward"/);
+  assert.match(page, /supportsEventRewardDraw\(slug\)/);
+  assert.doesNotMatch(section, /signup-reward/);
+  assert.match(section, /name="slug" value=\{campaign\.slug\}/);
+  assert.match(section, /href=\{`\/admin\/event\/\$\{campaign\.slug\}\/rewards\/export`\}/);
+  assert.match(exportRoute, /params: Promise<\{ slug: string \}>/);
+  assert.match(exportRoute, /supportsEventRewardDraw\(slug\)/);
+  assert.doesNotMatch(exportRoute, /"signup-reward"/);
+});
+
+test("event reward winner send outcome copy covers partial and total delivery failure", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const read = (path: string) =>
+    readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  const [actions, page] = await Promise.all([
+    read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
+    read("src/app/admin/(protected)/event/[slug]/page.tsx"),
+  ]);
+
+  // Only a fully reached draw reports success; partial_failed and failed share
+  // the retry notice, so the notice must not claim that only some failed.
+  assert.match(
+    actions,
+    /result\.status === "sent" \? "winner-sent" : "winner-partial"/,
+  );
+  const partialNotice = page.match(
+    /status === "winner-partial"\) \{[\s\S]*?return "([^"]+)";/,
+  )?.[1];
+  assert.ok(partialNotice, "winner-partial notice should exist");
+  assert.doesNotMatch(partialNotice, /일부/);
+  assert.match(partialNotice, /미도달 당첨자에게 다시 보내 주세요/);
 });

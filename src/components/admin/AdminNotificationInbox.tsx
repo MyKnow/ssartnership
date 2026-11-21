@@ -12,12 +12,13 @@ import IconActionButton, {
 } from "@/components/ui/IconActionButton";
 import { useToast } from "@/components/ui/Toast";
 import {
+  ADMIN_NOTIFICATION_PAGE_SIZE,
   getAdminNotificationTypeLabel,
   type AdminNotificationInboxItem,
   type AdminNotificationListResult,
 } from "@/lib/admin-notification-inbox";
 import { cn } from "@/lib/cn";
-import { formatKoreanDateTime } from "@/lib/datetime";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 type AdminNotificationInboxProps = {
@@ -26,12 +27,7 @@ type AdminNotificationInboxProps = {
 };
 
 function formatNotificationDate(value: string) {
-  return formatKoreanDateTime(value, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatKoreanMonthDayTime(value, { hour12: false });
 }
 
 async function parseAdminNotificationResponse(response: Response) {
@@ -119,7 +115,7 @@ export default function AdminNotificationInbox({
             : row,
         ),
       }));
-      notify(getSafeAdminMessage(error, "읽음 처리에 실패했습니다."));
+      notify(getSafeAdminMessage(error, "읽음 처리에 실패했습니다."), { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -155,7 +151,7 @@ export default function AdminNotificationInbox({
       }
       router.push(item.targetUrl);
     } catch (error) {
-      notify(getSafeAdminMessage(error, "알림을 열지 못했습니다."));
+      notify(getSafeAdminMessage(error, "알림을 열지 못했습니다."), { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -193,7 +189,7 @@ export default function AdminNotificationInbox({
         unreadCount: wasUnread ? current.unreadCount + 1 : current.unreadCount,
         items: [item, ...current.items],
       }));
-      notify(getSafeAdminMessage(error, "알림을 삭제하지 못했습니다."));
+      notify(getSafeAdminMessage(error, "알림을 삭제하지 못했습니다."), { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -236,7 +232,7 @@ export default function AdminNotificationInbox({
       notify("관리자 알림을 모두 읽음 처리했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(getSafeAdminMessage(error, "전체 읽음 처리에 실패했습니다."));
+      notify(getSafeAdminMessage(error, "전체 읽음 처리에 실패했습니다."), { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -272,7 +268,7 @@ export default function AdminNotificationInbox({
       notify("관리자 알림을 모두 삭제했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(getSafeAdminMessage(error, "전체 삭제에 실패했습니다."));
+      notify(getSafeAdminMessage(error, "전체 삭제에 실패했습니다."), { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -286,7 +282,7 @@ export default function AdminNotificationInbox({
     setLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/admin/notifications?offset=${state.nextOffset}&limit=10&includeSummary=0`,
+        `/api/admin/notifications?offset=${state.nextOffset}&limit=${ADMIN_NOTIFICATION_PAGE_SIZE}&includeSummary=0`,
       );
       const data = await parseAdminNotificationResponse(response);
       setState((current) => ({
@@ -296,7 +292,7 @@ export default function AdminNotificationInbox({
         hasMore: Boolean(data.hasMore),
       }));
     } catch (error) {
-      notify(getSafeAdminMessage(error, "알림을 더 불러오지 못했습니다."));
+      notify(getSafeAdminMessage(error, "알림을 더 불러오지 못했습니다."), { tone: "error" });
     } finally {
       setLoadingMore(false);
     }
@@ -317,11 +313,11 @@ export default function AdminNotificationInbox({
           ) : null}
         </div>
         {state.items.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-3">
             <Button
               variant="secondary"
-              size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full border-success/20 bg-success/10 px-3 text-xs font-semibold text-success shadow-raised hover:border-success/30 hover:bg-success/15"
+              size="compact"
+              className="border-success/20 bg-success/10 text-success shadow-raised hover:border-success/30 hover:bg-success/15"
               onClick={() => {
                 void markAllAsRead();
               }}
@@ -335,8 +331,8 @@ export default function AdminNotificationInbox({
             </Button>
             <Button
               variant="danger"
-              size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-raised"
+              size="compact"
+              className="shadow-raised"
               onClick={() => {
                 setDeleteAllConfirmOpen(true);
               }}
@@ -363,7 +359,7 @@ export default function AdminNotificationInbox({
                   "group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 outline-none transition-colors hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 sm:px-5 sm:py-4",
                   item.isUnread
                     ? "bg-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
-                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)] opacity-[0.74]",
+                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)]",
                   isBusy ? "pointer-events-none opacity-70" : null,
                 )}
               >
@@ -393,10 +389,10 @@ export default function AdminNotificationInbox({
                     <Badge
                       variant={item.isUnread ? "primary" : "neutral"}
                       className={cn(
-                        "px-2 py-0.5 text-[10px]",
+                        "px-2 py-0.5 text-xs",
                         item.isUnread
                           ? "border-primary/20 bg-primary-soft text-primary"
-                          : "border-border/40 bg-surface-muted/55 text-muted-foreground/75",
+                          : "border-border/40 bg-surface-muted/55 text-muted-foreground",
                       )}
                     >
                       {getAdminNotificationTypeLabel(item.type)}
@@ -406,7 +402,7 @@ export default function AdminNotificationInbox({
                         "text-xs text-muted-foreground",
                         item.isUnread
                           ? "text-foreground-soft"
-                          : "text-muted-foreground/65",
+                          : "text-muted-foreground",
                       )}
                     >
                       {formatNotificationDate(item.createdAt)}
@@ -418,7 +414,7 @@ export default function AdminNotificationInbox({
                         "text-sm font-semibold leading-6 text-foreground sm:text-[15px]",
                         item.isUnread
                           ? "text-foreground"
-                          : "text-foreground-soft/75",
+                          : "text-foreground-soft",
                       )}
                     >
                       {item.title}
@@ -428,7 +424,7 @@ export default function AdminNotificationInbox({
                         "line-clamp-2 text-sm leading-5 text-muted-foreground sm:leading-6",
                         item.isUnread
                           ? "text-muted-foreground"
-                          : "text-muted-foreground/60",
+                          : "text-muted-foreground",
                       )}
                     >
                       {item.body}

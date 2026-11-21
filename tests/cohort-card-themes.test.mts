@@ -181,3 +181,25 @@ test("gradient text helper chooses the more readable foreground", () => {
     "#ffffff",
   );
 });
+
+test("cohort card themes are cached by tag and expired immediately on admin writes", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(
+    new URL("../src/lib/cohort-card-themes.server.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /const getCachedCohortCardThemes = unstable_cache\([\s\S]*\.from\("ssafy_cohort_card_themes"\)[\s\S]*tags: \[COHORT_CARD_THEMES_CACHE_TAG\]/,
+  );
+  assert.match(source, /revalidate: SLOW_CHANGING_DATA_CACHE_SECONDS/);
+  assert.equal(
+    source.match(/revalidateTag\(COHORT_CARD_THEMES_CACHE_TAG, \{ expire: 0 \}\)/g)?.length,
+    2,
+  );
+  assert.match(
+    source,
+    /if \(isMockDataSource\(\)\) \{[\s\S]*return getCachedCohortCardThemes\(\);/,
+  );
+});

@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { trackProductEvent } from "@/lib/product-events";
 import {
@@ -90,23 +92,15 @@ export default function CertificationView({
     roleLabel,
   ]);
 
-  useEffect(() => {
-    if (!isAvatarOpen) {
-      return;
-    }
-    const originalOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setAvatarOpen(false);
-      }
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isAvatarOpen]);
+  const avatarDialogRef = useRef<HTMLDivElement>(null);
+  const closeAvatar = useCallback(() => setAvatarOpen(false), []);
+  const avatarDialogOpen = hasProfileImage && isAvatarOpen;
+  useBodyScrollLock(avatarDialogOpen);
+  useDialogFocus({
+    open: avatarDialogOpen,
+    containerRef: avatarDialogRef,
+    onClose: closeAvatar,
+  });
 
   const dateLabel = useMemo(() => {
     return formatKoreanDateTime(now, {
@@ -174,18 +168,26 @@ export default function CertificationView({
         avatarButtonLabel="프로필 이미지 크게 보기"
       />
 
-      {hasProfileImage && isAvatarOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
+      {avatarDialogOpen ? (
+        <div
+          ref={avatarDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="프로필 확대 이미지"
+          tabIndex={-1}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 focus:outline-hidden sm:p-6"
+        >
           <button
             type="button"
             className="absolute inset-0"
-            onClick={() => setAvatarOpen(false)}
+            onClick={closeAvatar}
             aria-label="확대 이미지 닫기"
+            tabIndex={-1}
           />
           <button
             type="button"
-            className="absolute right-6 top-6 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
-            onClick={() => setAvatarOpen(false)}
+            className="absolute right-6 top-6 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
+            onClick={closeAvatar}
             aria-label="닫기"
           >
             ✕

@@ -25,7 +25,7 @@ const {
   resolveImageUploadActorForRouteMock: vi.fn(),
 }));
 
-vi.mock("@/lib/partner-portal-scope", () => ({
+vi.mock("@/lib/partner-auth/portal-scope", () => ({
   isPartnerPortalCompanyAllowed: isPartnerPortalCompanyAllowedMock,
 }));
 

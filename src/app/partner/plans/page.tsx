@@ -3,8 +3,13 @@ import { redirect } from "next/navigation";
 import {
   getCompanyScopedPortalHref,
   getPartnerPasswordChangeHref,
-} from "@/lib/partner-portal-paths";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import {
+  PARTNER_PLAN_FALLBACK_ERROR_MESSAGE,
+  isSafePartnerPlanMessage,
+  resolvePartnerPlanStatusParam,
+} from "@/lib/partner-plan-safe-messages";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { readFirstSearchParam } from "@/lib/search-params";
@@ -44,13 +49,18 @@ export default async function PartnerPlansCompatibilityPage({
   }
 
   const nextParams = new URLSearchParams();
-  const status = readFirstSearchParam(legacyParams.status);
-  const error = readFirstSearchParam(legacyParams.error);
+  const status = resolvePartnerPlanStatusParam(legacyParams.status);
+  const error = readFirstSearchParam(legacyParams.error)?.trim();
   if (status) {
     nextParams.set("status", status);
   }
   if (error) {
-    nextParams.set("error", error);
+    nextParams.set(
+      "error",
+      isSafePartnerPlanMessage(error)
+        ? error
+        : PARTNER_PLAN_FALLBACK_ERROR_MESSAGE,
+    );
   }
   const query = nextParams.toString();
   redirect(

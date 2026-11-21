@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import PartnerCompanySelectionView from "@/components/partner/PartnerCompanySelectionView";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { redirect } from "next/navigation";

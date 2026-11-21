@@ -1,7 +1,7 @@
 ---
 title: Production·Preview PVE 이전 명세
 type: feature-spec
-status: active
+status: current
 authority: normative
 issue: https://github.com/MyKnow/ssartnership/issues/523
 ---

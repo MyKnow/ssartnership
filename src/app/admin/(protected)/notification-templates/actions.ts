@@ -1,7 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { logAdminAction } from "@/app/admin/(protected)/_actions/shared-helpers";
+import {
+  logAdminAction,
+  redirectAdminActionError,
+} from "@/app/admin/(protected)/_actions/shared-helpers";
 import { requireNotificationTemplateAdmin } from "@/lib/admin-access";
 import {
   getNotificationTemplateDefinition,
@@ -45,7 +48,7 @@ export async function updateNotificationTemplateAction(formData: FormData) {
   const bodyTemplate = String(formData.get("bodyTemplate") ?? "");
   const bodyFormat = getBodyFormat(formData.get("bodyFormat"));
   if (!eventKey || !channel || !bodyFormat) {
-    redirect(`${PATH}?error=invalid_request`);
+    redirectAdminActionError(PATH, "invalid_request");
   }
 
   try {
@@ -58,7 +61,7 @@ export async function updateNotificationTemplateAction(formData: FormData) {
       adminId: session.adminId,
     });
   } catch {
-    redirect(`${PATH}?error=save_failed`);
+    redirectAdminActionError(PATH, "save_failed");
   }
 
   await logAdminAction("notification_template_update", {
@@ -78,12 +81,12 @@ export async function resetNotificationTemplateAction(formData: FormData) {
   const eventKey = getEventKey(formData.get("eventKey"));
   const channel = getChannel(formData.get("channel"));
   if (!eventKey || !channel) {
-    redirect(`${PATH}?error=invalid_request`);
+    redirectAdminActionError(PATH, "invalid_request");
   }
   try {
     await resetNotificationTemplate({ eventKey, channel });
   } catch {
-    redirect(`${PATH}?error=reset_failed`);
+    redirectAdminActionError(PATH, "reset_failed");
   }
 
   await logAdminAction("notification_template_reset", {
@@ -108,7 +111,7 @@ export async function sendNotificationTemplateTestAction(formData: FormData) {
   const bodyTemplate = String(formData.get("bodyTemplate") ?? "");
   const bodyFormat = getBodyFormat(formData.get("bodyFormat"));
   if (!eventKey || !channel || !memberId || !bodyFormat) {
-    redirect(`${PATH}?error=invalid_request`);
+    redirectAdminActionError(PATH, "invalid_request");
   }
 
   try {
@@ -121,7 +124,7 @@ export async function sendNotificationTemplateTestAction(formData: FormData) {
       bodyFormat,
     });
   } catch {
-    redirect(`${PATH}?error=test_failed`);
+    redirectAdminActionError(PATH, "test_failed");
   }
 
   await logAdminAction("notification_template_test_send", {

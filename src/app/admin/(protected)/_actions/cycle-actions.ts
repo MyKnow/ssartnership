@@ -25,7 +25,9 @@ import { parseMattermostSenderCredentialInput } from "@/lib/mattermost-senders/v
 import {
   clearSsafyCycleOverride,
   getConfiguredCurrentSsafyYear,
+  getSsafyCycleEarlyStartTargetYear,
   getSsafyCycleSettings,
+  isSsafyCycleEarlyStartApplied,
   setSsafyCycleEarlyStart,
   upsertSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
@@ -44,18 +46,11 @@ import {
   parseCohortCardThemePayloadOrRedirect,
   parseSsafyCycleSettingsPayloadOrRedirect,
 } from "./shared-parser-redirects";
+import { isUuidFormat } from "@/lib/uuid";
+import { readRawString } from "@/lib/form-data";
+import { type AdminActionErrorCode } from "@/lib/admin-action-errors";
 
 const MATTERMOST_SENDER_PATH = "/admin/cycle";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function getFormString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
-}
-
-function isUuid(value: string) {
-  return UUID_PATTERN.test(value);
-}
 
 function createMattermostSenderAuditContext(
   adminId: string,
@@ -83,7 +78,7 @@ function getMattermostSenderErrorCode(error: unknown): MattermostSenderSafeError
 }
 
 function redirectMattermostSenderError(
-  code: string,
+  code: AdminActionErrorCode,
   action:
     | "mattermost_sender_candidate_save"
     | "mattermost_sender_test"
@@ -116,14 +111,19 @@ export async function updateSsafyCycleSettingsAction(formData: FormData) {
 export async function earlyStartSsafyCycleAction() {
   await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
   const settings = await getSsafyCycleSettings();
-  const currentYear = getConfiguredCurrentSsafyYear(settings);
-  const targetYear = currentYear + 1;
+  const now = new Date();
+  const currentYear = getConfiguredCurrentSsafyYear(settings, now);
+  const targetYear = getSsafyCycleEarlyStartTargetYear(settings, now);
+  if (isSsafyCycleEarlyStartApplied(settings, now)) {
+    redirect("/admin/cycle?status=early-start-already");
+  }
   await setSsafyCycleEarlyStart(targetYear);
   await logAdminAction("cycle_settings_early_start", {
     targetType: "cycle_settings",
     targetId: "singleton",
     properties: {
       currentYear,
+      calendarYear: targetYear - 1,
       targetYear,
       anchorYear: settings.anchorYear,
       anchorCalendarYear: settings.anchorCalendarYear,
@@ -196,9 +196,9 @@ export async function saveMattermostSenderCandidateAction(formData: FormData) {
     path: MATTERMOST_SENDER_PATH,
   });
   const parsed = parseMattermostSenderCredentialInput({
-    generation: getFormString(formData, "generation"),
-    loginId: getFormString(formData, "loginId"),
-    password: getFormString(formData, "password"),
+    generation: readRawString(formData, "generation"),
+    loginId: readRawString(formData, "loginId"),
+    password: readRawString(formData, "password"),
   });
   if (!parsed.ok) {
     redirectMattermostSenderError(
@@ -253,8 +253,8 @@ export async function testMattermostSenderCandidateAction(formData: FormData) {
   const session = await requireMattermostSenderAdmin("update", {
     path: MATTERMOST_SENDER_PATH,
   });
-  const candidateId = getFormString(formData, "candidateId");
-  if (!isUuid(candidateId)) {
+  const candidateId = readRawString(formData, "candidateId");
+  if (!isUuidFormat(candidateId)) {
     redirectMattermostSenderError(
       "mattermost_sender_invalid_request",
       "mattermost_sender_test",
@@ -392,8 +392,8 @@ export async function disableMattermostSenderAction(formData: FormData) {
   const session = await requireMattermostSenderAdmin("delete", {
     path: MATTERMOST_SENDER_PATH,
   });
-  const candidateId = getFormString(formData, "candidateId");
-  if (!isUuid(candidateId)) {
+  const candidateId = readRawString(formData, "candidateId");
+  if (!isUuidFormat(candidateId)) {
     redirectMattermostSenderError(
       "mattermost_sender_invalid_request",
       "mattermost_sender_disable",
@@ -419,7 +419,7 @@ export async function disableMattermostSenderAction(formData: FormData) {
   }
 
   const expectedConfirmation = `${sender.generation}기 비활성화`;
-  if (getFormString(formData, "confirmationText").trim() !== expectedConfirmation) {
+  if (readRawString(formData, "confirmationText").trim() !== expectedConfirmation) {
     redirectMattermostSenderError(
       "mattermost_sender_disable_confirmation_invalid",
       "mattermost_sender_disable",

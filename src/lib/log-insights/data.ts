@@ -25,6 +25,7 @@ import {
 import { getBucketSizeMs, resolveLogRange } from './range';
 import { collectPagedRows } from './paging';
 import { encodeAdminLogsCursor, parseAdminLogsCursor } from './cursor';
+import { logServerError } from "@/lib/server-log";
 
 async function queryAllRows<T>(
   supabase: AdminSupabaseClient,
@@ -53,7 +54,7 @@ async function queryAllRows<T>(
         .range(from, to);
 
       if (error) {
-        console.error(`[log-insights] ${table} query failed`, error.message);
+        logServerError(`[log-insights] ${table} query failed`, error);
         return { rows: [] as T[], error: true };
       }
 
@@ -118,7 +119,7 @@ async function fetchMemberLookup(
 
   for (const result of results) {
     if (result.error) {
-      console.error('[log-insights] members query failed', result.error.message);
+      logServerError('[log-insights] members query failed', result.error);
       continue;
     }
 
@@ -155,7 +156,7 @@ async function fetchPartnerLookup(
 
   for (const result of results) {
     if (result.error) {
-      console.error('[log-insights] partners query failed', result.error.message);
+      logServerError('[log-insights] partners query failed', result.error);
       continue;
     }
 
@@ -422,7 +423,7 @@ export async function loadAdminLogSummaryAggregates(
       error.message.includes('Could not find the function') ||
       error.message.includes('get_admin_logs_summary_scoped');
     if (!missingFunction) {
-      console.error('[log-insights] admin logs summary rpc failed', error.message);
+      logServerError('[log-insights] admin logs summary rpc failed', error);
     }
     return {
       range,
@@ -583,7 +584,7 @@ export async function loadAdminLogNormalizedPage(
         input_include_pii: config.access.includePii,
       });
   if (rpcResult.error && useCursor) {
-    console.error('[log-insights] cursor rpc unavailable, falling back to page rpc', rpcResult.error.message);
+    logServerError('[log-insights] cursor rpc unavailable, falling back to page rpc', rpcResult.error);
     rpcResult = await supabase.rpc('get_admin_logs_page_scoped', {
       input_start: range.start,
       input_end: range.end,
@@ -602,7 +603,7 @@ export async function loadAdminLogNormalizedPage(
   const { data: rawData, error } = rpcResult;
 
   if (error) {
-    console.error('[log-insights] scoped admin logs page rpc failed', error.message);
+    logServerError('[log-insights] scoped admin logs page rpc failed', error);
     return {
       range,
       productRows: [] as ProductLogRow[],
@@ -729,7 +730,7 @@ export async function loadAdminLogListPage(
       .range(from, to);
 
     if (error) {
-      console.error('[log-insights] event_logs paged query failed', error.message);
+      logServerError('[log-insights] event_logs paged query failed', error);
       return {
         range,
         productRows: [] as ProductLogRow[],
@@ -786,7 +787,7 @@ export async function loadAdminLogListPage(
       .range(from, to);
 
     if (error) {
-      console.error('[log-insights] admin_audit_logs paged query failed', error.message);
+      logServerError('[log-insights] admin_audit_logs paged query failed', error);
       return {
         range,
         productRows: [] as ProductLogRow[],
@@ -841,7 +842,7 @@ export async function loadAdminLogListPage(
   const { data, error, count } = await query;
 
   if (error) {
-    console.error('[log-insights] auth_security_logs paged query failed', error.message);
+    logServerError('[log-insights] auth_security_logs paged query failed', error);
     return {
       range,
       productRows: [] as ProductLogRow[],

@@ -195,12 +195,17 @@ export const SITE_ALTERNATE_NAMES = uniqueStrings([
   "삼성 부트캠프 제휴",
   "SSAFY(싸피) 제휴",
 ]);
+/** Canonical public origin of the self-hosted Production site. */
+export const DEFAULT_SITE_URL = "https://ssartnership.myknow.xyz";
 export const SITE_URL =
-  (process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app").replace(
-    /\/+$/,
-    "",
-  );
+  (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/+$/, "");
 export const SITE_RSS_URL = "/rss.xml";
+
+// Browser chrome and installed-app colors. They mirror the `--background`
+// tokens in src/app/globals.css (light and dark) and are shared by the root
+// viewport and the web app manifest.
+export const SITE_THEME_COLOR_LIGHT = "#f4f7fb";
+export const SITE_THEME_COLOR_DARK = "#07101d";
 
 export const GITHUB_URL = "https://github.com/MyKnow";
 export const BUG_REPORT_EMAIL = "myknow@ssafy.com";

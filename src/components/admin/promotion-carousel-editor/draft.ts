@@ -4,10 +4,10 @@ import {
   DEFAULT_PROMOTION_AUDIENCES,
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const PROMOTION_CAROUSEL_DRAFT_KEY = "promotion-carousel-editor";
 const DRAFT_VALUE_KEY = "promotionSlides";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALID_AUDIENCES = new Set<PromotionAudience>(DEFAULT_PROMOTION_AUDIENCES);
 const VALID_CAMPUSES = new Set<CampusSlug>(CAMPUS_DIRECTORY.map((campus) => campus.slug));
 
@@ -103,7 +103,7 @@ export function readPromotionCarouselDraft(value: unknown): PromotionCarouselDra
     const id = asString(record.id).trim();
     const uploadId = asNullableString(record.uploadId);
     const source = record.source === "catalog" ? "catalog" : "database";
-    if (!id || ids.has(id) || (uploadId && !UUID_PATTERN.test(uploadId))) return null;
+    if (!id || ids.has(id) || (uploadId && !isUuidFormat(uploadId))) return null;
     ids.add(id);
     slides.push({
       id,

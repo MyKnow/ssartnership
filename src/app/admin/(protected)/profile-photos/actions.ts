@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
+import { ADMIN_REVIEW_NOTE_MAX_LENGTH, appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import {
   logAdminAction,
   redirectAdminActionError,
@@ -15,9 +15,9 @@ import {
   rejectMemberProfileImageReplacement,
 } from "@/lib/graduate-verification-service";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { isUuidFormat } from "@/lib/uuid";
 
 const PROFILE_PHOTOS_PATH = "/admin/profile-photos";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getReturnTo(formData: FormData) {
   return sanitizeReturnTo(String(formData.get("returnTo") ?? ""), PROFILE_PHOTOS_PATH);
@@ -25,7 +25,7 @@ function getReturnTo(formData: FormData) {
 
 function getRequiredId(formData: FormData, name: string, returnTo: string) {
   const value = String(formData.get(name) ?? "").trim();
-  if (!UUID_PATTERN.test(value)) {
+  if (!isUuidFormat(value)) {
     redirectAdminActionError(returnTo, "invalid_fields");
   }
   return value;
@@ -37,7 +37,7 @@ function getRequiredReason(
   reasonFieldId: string,
 ) {
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason || reason.length > 500) {
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
     redirectAdminActionError(
       appendAdminReviewQueueQuery(returnTo, { focus: reasonFieldId }),
       "invalid_reason",
@@ -48,7 +48,7 @@ function getRequiredReason(
 
 function getOptionalMemberId(formData: FormData) {
   const value = String(formData.get("memberId") ?? "").trim();
-  return UUID_PATTERN.test(value) ? value : null;
+  return isUuidFormat(value) ? value : null;
 }
 
 function revalidateProfilePhotoPaths(memberId?: string | null) {

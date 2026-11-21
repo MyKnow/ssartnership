@@ -15,14 +15,11 @@ import {
   parseShowcaseRegistration,
 } from "@/lib/project-showcase/validation";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { logServerError } from "@/lib/server-log";
+import { readString } from "@/lib/form-data";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
-
-function readString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function parseSubmissionForm(formData: FormData, requireImage: boolean) {
   return parseShowcaseProjectSubmission({
@@ -58,7 +55,7 @@ async function attachCoverImage(projectId: string, uploadId: string) {
     return attached.url;
   } catch (error) {
     if (error instanceof ShowcaseDomainError) throw error;
-    console.error("[project-showcase/image]", error instanceof Error ? error.message : "unknown");
+    logServerError("[project-showcase/image]", error);
     throw new ShowcaseDomainError("image_unavailable");
   }
 }
@@ -79,7 +76,7 @@ async function requireOwner() {
 
 function logUnexpected(scope: string, error: unknown) {
   if (error instanceof ShowcaseDomainError) return;
-  console.error(`[project-showcase/${scope}]`, error instanceof Error ? error.message : "unknown");
+  logServerError(`[project-showcase/${scope}]`, error);
 }
 
 export async function submitShowcaseProject(formData: FormData) {

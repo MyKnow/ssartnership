@@ -170,6 +170,12 @@ test("raw metric fallback is bounded and refuses a truncated total", async () =>
     in() {
       return this;
     },
+    not(column: string, operator: string, value: string) {
+      assert.equal(column, "actor_type");
+      assert.equal(operator, "in");
+      assert.equal(value, "(admin,partner)");
+      return this;
+    },
     limit(limit: number) {
       requestedLimit = limit;
       return Promise.resolve({

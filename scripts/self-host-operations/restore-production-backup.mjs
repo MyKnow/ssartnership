@@ -1,7 +1,8 @@
-import { readFile, writeFile, readdir, lstat } from 'node:fs/promises';
+import { readFile, writeFile, readdir, lstat, realpath } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { verifyReferencedStorage } from './production-online-backup.mjs';
 export function assertRestoreDatabaseIdentity(expected, actual) {
   if (typeof expected !== 'string' || !/^[1-9][0-9]{0,19}$/u.test(expected) || expected !== actual) throw Error('PRODUCTION_RESTORE_IDENTITY_MISMATCH');
@@ -14,7 +15,14 @@ export function assertRestoreSnapshotKind(manifest) {
   if (manifest?.version !== 1 || manifest.databaseCleanlyStopped !== true || !(cold || online)) throw Error('PRODUCTION_RESTORE_SNAPSHOT_INVALID');
 }
 
-export async function restoreProductionBackup(backup, expectedDatabaseSystemId) {
+export function buildRestoreTiming(startedAt, finishedAt, identitySource = 'not-recorded') {
+  if (!['active-host', 'offline-escrow', 'not-recorded'].includes(identitySource)) throw Error('RESTORE_IDENTITY_SOURCE_INVALID');
+  const durationSeconds = (Date.parse(finishedAt) - Date.parse(startedAt)) / 1000;
+  if (!Number.isFinite(durationSeconds) || durationSeconds < 0) throw Error('RESTORE_TIMING_INVALID');
+  return { startedAt, finishedAt, durationSeconds, identitySource };
+}
+export async function restoreProductionBackup(backup, expectedDatabaseSystemId, identitySource = 'not-recorded') {
+const startedAt = new Date().toISOString();
 const check=v=>{if(!v)throw Error('ORIGINAL_RESTORE_CHECK_FAILED');};
 const run=(cmd,args)=>execFileSync(cmd,args,{encoding:'utf8',maxBuffer:64*1024**2,timeout:120000,stdio:['ignore','pipe','pipe']});
 const id=v=>'"'+v.replaceAll('"','""')+'"';
@@ -67,12 +75,13 @@ try{
    check(actual.rows===table.rows&&actual.sha256===table.sha256);rows+=actual.rows;
  }
  const actualTables=Number(sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema'"));check(actualTables===manifest.tables.length);
- const proof={version:1,restored:true,verifiedAt:new Date().toISOString(),source:'encrypted-mac-roundtrip',project:'ssartnership-production-data',databaseImage:manifest.databaseImage,databaseSystemId:expectedDatabaseSystemId,receiptManifestDatabaseIdentityMatch:true,tables:manifest.tables.length,rows,storageFiles:manifest.storage.length,storageBytes:manifest.storage.reduce((n,f)=>n+f.bytes,0),allRowsMatch:true,allFileHashesMatch:true,storageMetadataTarCompare:true,noSourceDataMount:true,network:'none',continuousPitr:false,publicCutover:false};
+ const finishedAt = new Date().toISOString();
+ const proof={version:1,restored:true,verifiedAt:finishedAt,...buildRestoreTiming(startedAt, finishedAt, identitySource),source:'encrypted-mac-roundtrip',project:'ssartnership-production-data',databaseImage:manifest.databaseImage,databaseSystemId:expectedDatabaseSystemId,receiptManifestDatabaseIdentityMatch:true,tables:manifest.tables.length,rows,storageFiles:manifest.storage.length,storageBytes:manifest.storage.reduce((n,f)=>n+f.bytes,0),allRowsMatch:true,allFileHashesMatch:true,storageMetadataTarCompare:true,noSourceDataMount:true,network:'none',continuousPitr:false,publicCutover:false};
  await writeFile(`${backup}/restore-proof.json`,JSON.stringify(proof,null,2),{mode:0o600,flag:'wx'});console.log(JSON.stringify(proof));
 }catch{console.error(JSON.stringify({error:'ORIGINAL_RESTORE_FAILED',stage,container:name}));process.exitCode=1;}
 finally{if(started){try{run('docker',['stop','--time','30',name]);run('docker',['rm',name]);}catch{console.error('{"error":"ORIGINAL_RESTORE_CONTAINER_CLEANUP_FAILED"}');process.exitCode=1;}}}
 }
 
-if (process.argv[1] && (process.argv[1] === '-' || import.meta.url === new URL(process.argv[1], 'file:').href)) {
-  await restoreProductionBackup(process.argv[2], process.argv[3]);
+if (process.argv[1] && (process.argv[1] === '-' || import.meta.url === pathToFileURL(await realpath(process.argv[1])).href)) {
+  await restoreProductionBackup(process.argv[2], process.argv[3], process.argv[4]);
 }

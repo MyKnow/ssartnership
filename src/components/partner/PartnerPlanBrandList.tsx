@@ -21,7 +21,7 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
-import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
+import { getPartnerPortalMetricAccessItems } from "@/lib/partner-auth/portal-metric-access";
 import type { PartnerPlanPortalData } from "@/lib/partner-plan-service";
 import {
   PARTNER_PLAN_FILTERS,

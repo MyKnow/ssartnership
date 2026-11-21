@@ -5,18 +5,18 @@ import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
-  deleteReviewMediaUrls,
-} from "@/lib/review-media-storage";
-import {
   ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
   getReviewMediaInputFieldErrors,
-  getReviewMemberSession,
+  getReviewMemberSessionLookup,
   isReviewImageUploadUnavailable,
   parseReviewListParams,
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
+  reviewSessionUnavailableResponse,
 } from "./_shared";
+import { memberApiSessionDeniedResponse } from "@/lib/member-api-session";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -32,13 +32,19 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  // A public listing degrades to anonymous when the member session cannot
+  // be read (the lookup already logged it); moderation needs a real answer.
+  const sessionLookup = await getReviewMemberSessionLookup();
+  const session = sessionLookup.ok ? sessionLookup.session : null;
   const { sort, offset, limit, rating, imagesOnly, includeHidden } = parseReviewListParams(request);
-  const partnerSession = includeHidden
-    ? await ensurePartnerReviewModerationAccess(id)
-    : null;
-  if (includeHidden && !partnerSession) {
-    return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
+  if (includeHidden) {
+    const moderationAccess = await ensurePartnerReviewModerationAccess(id);
+    if (moderationAccess === "unavailable") {
+      return reviewSessionUnavailableResponse();
+    }
+    if (moderationAccess !== "allowed") {
+      return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
+    }
   }
   if (!includeHidden) {
     const partner = await ensureVisibleReviewPartner(id, session?.userId ?? null);
@@ -76,12 +82,19 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  const sessionLookup = await getReviewMemberSessionLookup();
+  if (!sessionLookup.ok) {
+    return reviewSessionUnavailableResponse();
+  }
+  const session = sessionLookup.session;
   if (!session?.userId) {
     return NextResponse.json(
       { ok: false, message: "로그인 후 리뷰를 작성할 수 있습니다." },
       { status: 401 },
     );
+  }
+  if (session.mustChangePassword) {
+    return memberApiSessionDeniedResponse("password_change_required");
   }
 
   const partner = await ensureVisibleReviewPartner(id, session.userId);
@@ -116,7 +129,9 @@ export async function POST(
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
     return NextResponse.json({ ok: true, review: existingReview, summary, idempotent: true });
   }
-  let uploadedUrls: string[] = [];
+  // A failed/duplicate writer must not delete another writer's attachments.
+  // Session expiry and the DB reference guard own final-object cleanup.
+  const uploadedUrls: string[] = [];
 
   try {
     const media = await resolveReviewMediaPayload(
@@ -124,8 +139,9 @@ export async function POST(
       id,
       reviewId,
       session.userId,
+      [],
+      { attachedUrls: uploadedUrls },
     );
-    uploadedUrls = media.uploadedUrls;
     const review = await partnerReviewRepository.createPartnerReview({
       reviewId,
       partnerId: id,
@@ -151,6 +167,25 @@ export async function POST(
     });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
+    // The client-generated reviewId is the idempotency key. A duplicate
+    // submission that lost a race (primary key conflict, or an image the
+    // winning request already attached) answers with the stored review before
+    // any error is mapped, so a double tap never reports a failed save.
+    const storedLookup = await partnerReviewRepository
+      .getPartnerReviewById(reviewId, session.userId)
+      .then(
+        (review) => ({ answered: true, review }) as const,
+        () => ({ answered: false, review: null }) as const,
+      );
+    const storedReview = storedLookup.review;
+    if (
+      storedReview
+      && storedReview.partnerId === id
+      && storedReview.memberId === session.userId
+    ) {
+      const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
+      return NextResponse.json({ ok: true, review: storedReview, summary, idempotent: true });
+    }
     if (isReviewImageUploadUnavailable(error)) {
       return NextResponse.json(
         {
@@ -168,19 +203,7 @@ export async function POST(
         { status: 400 },
       );
     }
-    const retriedReview = await partnerReviewRepository
-      .getPartnerReviewById(reviewId, session.userId)
-      .catch(() => null);
-    if (
-      retriedReview
-      && retriedReview.partnerId === id
-      && retriedReview.memberId === session.userId
-    ) {
-      const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
-      return NextResponse.json({ ok: true, review: retriedReview, summary, idempotent: true });
-    }
-    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
-    console.error("[partner-reviews] create failed", error);
+    logServerError("[partner-reviews] create failed", error);
     const safeError = getSafePublicRouteError(
       error,
       "리뷰 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",

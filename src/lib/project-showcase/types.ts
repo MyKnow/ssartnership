@@ -1,3 +1,5 @@
+import type { DrawAuditSummary } from "@/lib/draw-audit";
+
 export const PROJECT_SHOWCASE_SLUG = "project-showcase";
 
 export const SHOWCASE_PROJECT_TYPES = ["web", "app", "game", "embedded"] as const;
@@ -271,4 +273,5 @@ export type ShowcaseDrawReceipt = {
   candidateCount: number;
   ticketCount: number;
   selectedCount: number;
+  audit: DrawAuditSummary;
 };

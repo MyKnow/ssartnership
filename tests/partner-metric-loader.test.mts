@@ -165,6 +165,38 @@ test("empty rollups rebuild each requested partner in an isolated fallback bucke
   assert.equal(partnerBTotalPv?.metric_count, 1);
 });
 
+test("public callers can disable the raw event-log fallback for empty rollups", async () => {
+  let fallbackCalls = 0;
+  const loaders: PartnerMetricAggregateLoaders = {
+    fetchRollupRows: async () => ({ rows: [], errorMessage: null }),
+    fetchEventLogRows: async () => {
+      fallbackCalls += 1;
+      return { rows: FALLBACK_EVENT_ROWS, errorMessage: null };
+    },
+  };
+
+  const result = await loadPartnerMetricAggregateRows(
+    null as never,
+    { ...LOAD_OPTIONS, allowEventLogFallback: false },
+    loaders,
+  );
+
+  assert.deepEqual(result, { rows: [], source: "rollup", failure: null });
+  assert.equal(fallbackCalls, 0);
+});
+
+test("home popularity requests metrics without the event-log fallback", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(
+    new URL("../src/lib/home-partner-state.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /getAdminPartnerMetrics\(partnerIds, \{ allowEventLogFallback: false \}\)/,
+  );
+});
+
 test("empty metric-kind requests do not query either metric source", async () => {
   let calls = 0;
   const result = await loadPartnerMetricAggregateRows(

@@ -11,6 +11,7 @@ export const SIGNUP_REWARD_EVENT: EventCampaign = {
   endsAt: "2026-05-12T23:59:59+09:00",
   heroImageSrc: "/ads/reward-event.svg",
   heroImageAlt: "싸트너십 회원 참여 추첨권 이벤트",
+  shareImageSrc: "/ads/reward-event-og.png",
   conditions: [
     {
       key: "signup",

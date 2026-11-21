@@ -1,11 +1,15 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
 import { getPolicyHref } from "@/lib/policy-documents";
 import { formatKoreanDateTime } from "@/lib/datetime";
@@ -120,7 +124,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                 aria-hidden="true"
                 className="relative inline-flex items-center opacity-65 saturate-75"
               >
-                <span className="h-7 w-12 rounded-full border border-emerald-500/70 bg-emerald-500/80 dark:border-emerald-400/70 dark:bg-emerald-400/80" />
+                <span className="h-7 w-12 rounded-full border border-success/70 bg-success/80 border-success/70 bg-success/80" />
                 <span className="pointer-events-none absolute left-1 h-5 w-5 translate-x-5 rounded-full bg-white shadow dark:bg-slate-950" />
               </span>
             </div>
@@ -145,8 +149,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                     {controller.pushEnabled ? "켜짐" : "꺼짐"}
                   </span>
                   <span className="relative inline-flex items-center">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="peer sr-only"
                       checked={controller.pushEnabled}
                       disabled={controller.hasPendingAction}
@@ -157,7 +160,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                         );
                       }}
                     />
-                    <span className="h-7 w-12 rounded-full border border-border bg-slate-300 transition peer-checked:border-emerald-500 peer-checked:bg-emerald-500 peer-disabled:opacity-50 dark:bg-slate-700 dark:peer-checked:border-emerald-400 dark:peer-checked:bg-emerald-400" />
+                    <span className="h-7 w-12 rounded-full border border-border bg-slate-300 transition peer-checked:border-success/20 peer-checked:bg-success peer-disabled:opacity-50 dark:bg-slate-700 dark:peer-checked:border-success/20 dark:peer-checked:bg-success" />
                     <span className="pointer-events-none absolute left-1 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5 peer-disabled:opacity-70 dark:bg-slate-950" />
                   </span>
                 </span>
@@ -238,11 +241,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-border bg-surface-inset/75 px-3 py-3">
-                      <p className="text-sm text-muted-foreground">
-                        아직 푸시를 받을 기기가 없습니다.
-                      </p>
-                    </div>
+                    <EmptyState size="sm" title="아직 푸시를 받을 기기가 없습니다." />
                   )}
                 </div>
               ) : controller.canControlPush ? (

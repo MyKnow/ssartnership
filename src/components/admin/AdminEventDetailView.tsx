@@ -2,15 +2,16 @@ import { Suspense } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminConfirmSubmitButton from "@/components/admin/AdminConfirmSubmitButton";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import EventRegistrationForm from "@/components/admin/event-management/EventRegistrationForm";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import Surface from "@/components/ui/Surface";
 import type { EventCampaign } from "@/lib/promotions/catalog";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 
 type FormAction = (formData: FormData) => Promise<void>;
 
@@ -63,17 +64,7 @@ async function DeferredRewardContent({
 }
 
 function formatEventDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatKoreanMonthDayTime(value) || value;
 }
 
 export default function AdminEventDetailView({
@@ -252,9 +243,14 @@ export default function AdminEventDetailView({
             <form action={deleteAction} className="flex justify-end">
               <input type="hidden" name="id" value={registration.id ?? ""} />
               <input type="hidden" name="slug" value={registration.slug} />
-              <Button type="submit" variant="danger">
+              <AdminConfirmSubmitButton
+                confirmTitle="이벤트 운영 등록을 삭제할까요?"
+                confirmDescription="공개 기간·노출 대상 같은 운영 등록 정보가 삭제되며 되돌릴 수 없습니다. 코드에 정의된 본문과 보상 로직은 그대로 남습니다."
+                confirmLabel="이벤트 삭제"
+                pendingText="삭제 중"
+              >
                 이벤트 삭제
-              </Button>
+              </AdminConfirmSubmitButton>
             </form>
           ) : null}
         </Card>

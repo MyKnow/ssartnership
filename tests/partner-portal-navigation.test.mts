@@ -7,7 +7,7 @@ import {
   getPartnerGlobalPortalHref,
   getPartnerPortalMobileNavigation,
   getPartnerScopedHrefFromLegacyTarget,
-} from "../src/lib/partner-portal-paths.ts";
+} from "../src/lib/partner-auth/portal-paths.ts";
 
 describe("partner portal navigation contract", () => {
   it("keeps dashboard, services, and plans in company scope", () => {

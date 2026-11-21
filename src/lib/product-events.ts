@@ -1,13 +1,13 @@
 'use client';
 
-import type { ProductEventName } from '@/lib/event-catalog';
+import type { ClientProductEventName } from '@/lib/product-event-contract';
 import { shouldBypassProductEventTransport } from '@/lib/activity-log-runtime';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
 import { PRODUCT_EVENT_SCHEMA_VERSION } from '@/lib/product-event-schema';
 import { createClientUuid } from '@/lib/client-uuid';
 
 type ProductEventClientPayload = {
-  eventName: ProductEventName;
+  eventName: ClientProductEventName;
   path?: string | null;
   referrer?: string | null;
   targetType?: string | null;

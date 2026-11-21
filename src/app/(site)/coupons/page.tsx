@@ -10,6 +10,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import { getCertificationMemberView } from "@/lib/certification-member-view.server";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,10 @@ export const metadata: Metadata = {
 export default async function CouponsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ issueId?: string | string[] }>;
+  searchParams?: Promise<{
+    issueId?: string | string[];
+    returnTo?: string | string[];
+  }>;
 }) {
   const session = await getSignedUserSession();
   if (!session?.userId) {
@@ -37,7 +41,11 @@ export default async function CouponsPage({
     adPackageRepository.listIssuedCouponsForMember({
       memberId: session.userId,
     }),
-    searchParams ?? Promise.resolve<{ issueId?: string | string[] }>({}),
+    searchParams ??
+      Promise.resolve<{
+        issueId?: string | string[];
+        returnTo?: string | string[];
+      }>({}),
   ]);
   if (!memberView) {
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
@@ -48,6 +56,13 @@ export default async function CouponsPage({
     ? coupons.find((item) => item.issueId === rawIssueId && item.coupon.redemptionType === "onsite")
     : null;
   const cohortCardThemes = selectedItem ? await listCohortCardThemes() : [];
+  const rawReturnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+  const partnerReturnHref = selectedItem
+    ? sanitizeReturnTo(
+        rawReturnTo,
+        `/partners/${encodeURIComponent(selectedItem.coupon.partnerId)}`,
+      )
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,6 +75,7 @@ export default async function CouponsPage({
                 item={selectedItem}
                 member={memberView.member}
                 cohortCardThemes={cohortCardThemes}
+                partnerReturnHref={partnerReturnHref ?? "/"}
               />
             </div>
           ) : (

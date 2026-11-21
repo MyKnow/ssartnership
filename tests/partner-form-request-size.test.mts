@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const modulePromise = import("../src/lib/partner-form-request-size.ts");
@@ -58,5 +59,21 @@ test("partner form image size no longer drives the Server Action request guard",
       createFormData(PARTNER_FORM_SAFE_REQUEST_BODY_BYTES),
     ),
     true,
+  );
+});
+
+test("partner form 한도는 Next Server Action 한도와 같고 엣지 프록시 한도보다 작다", async () => {
+  const { PARTNER_FORM_SERVER_ACTION_BODY_LIMIT_BYTES } = await modulePromise;
+  const nextConfig = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
+  const edge = readFileSync(new URL("../deploy/pve/edge.Caddyfile", import.meta.url), "utf8");
+  const serverActionLimit = /bodySizeLimit:\s*"(\d+)mb"/u.exec(nextConfig)?.[1];
+  const edgeLimits = [...edge.matchAll(/max_size (\d+)MB/gu)].map((match) => Number(match[1]));
+
+  assert.equal(Number(serverActionLimit) * 1024 * 1024, PARTNER_FORM_SERVER_ACTION_BODY_LIMIT_BYTES);
+  assert.ok(edgeLimits.length > 0);
+  assert.ok(Math.max(...edgeLimits) * 1024 * 1024 > PARTNER_FORM_SERVER_ACTION_BODY_LIMIT_BYTES);
+  assert.doesNotMatch(
+    readFileSync(new URL("../src/lib/partner-form-request-size.ts", import.meta.url), "utf8"),
+    /Vercel/u,
   );
 });

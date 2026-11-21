@@ -281,6 +281,15 @@ export const mockScenarios = [
     requiredStates: ["운영 요약", "최근 작업", "권한 제한"],
   },
   {
+    id: "admin.mcp.connections",
+    label: "AI 연결과 운영 승인",
+    surface: "admin",
+    description: "등록·동의·철회와 리뷰 변경 검토의 합성 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["repository", "service", "api-route"],
+    requiredStates: ["빈 연결", "등록 검증", "연결 동의", "권한 제한", "만료", "변경 승인"],
+  },
+  {
     id: "admin.search",
     label: "관리자 통합 대상 검색",
     surface: "admin",

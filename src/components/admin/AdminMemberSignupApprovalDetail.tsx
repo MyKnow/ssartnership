@@ -12,7 +12,12 @@ import Textarea from "@/components/ui/Textarea";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS } from "@/lib/member-manual-import/options";
 import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
-import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import {
+  ADMIN_REVIEW_NOTE_MAX_LENGTH,
+  type AdminReviewQueueFeedback,
+} from "@/lib/admin-review-queue";
+import { formatKoreanMediumDateTime } from "@/lib/datetime";
+import { MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH } from "@/lib/mm-signup-approval";
 
 const PARSE_REASON_LABELS: Record<string, string> = {
   campus_ambiguous: "캠퍼스가 여러 개로 감지됨",
@@ -23,13 +28,7 @@ const PARSE_REASON_LABELS: Record<string, string> = {
 };
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "시간 미상"
-    : new Intl.DateTimeFormat("ko-KR", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(date);
+  return formatKoreanMediumDateTime(value) || "시간 미상";
 }
 
 export default function AdminMemberSignupApprovalDetail({
@@ -147,7 +146,7 @@ export default function AdminMemberSignupApprovalDetail({
               <input type="hidden" name="returnTo" value={returnTo} />
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 이름
-                <Input name="displayName" required maxLength={128} defaultValue={request.mattermostDisplayName} placeholder="홍길동" />
+                <Input name="displayName" required maxLength={MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH} defaultValue={request.mattermostDisplayName} placeholder="홍길동" />
               </label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -202,7 +201,7 @@ export default function AdminMemberSignupApprovalDetail({
                   id={rejectionReasonId}
                   name="reason"
                   required
-                  maxLength={500}
+                  maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH}
                   autoFocus={focusRejectReason}
                   aria-invalid={focusRejectReason || undefined}
                   aria-describedby={rejectionReasonDescribedBy}
@@ -212,7 +211,7 @@ export default function AdminMemberSignupApprovalDetail({
                   id={rejectionReasonHelpId}
                   className="text-xs leading-5 text-muted-foreground"
                 >
-                  반려 사유를 1~500자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지 마세요.
+                  반려 사유를 1~{ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지 마세요.
                 </p>
                 {focusRejectReason ? (
                   <p
@@ -220,7 +219,7 @@ export default function AdminMemberSignupApprovalDetail({
                     className="text-sm font-medium text-danger"
                     role="alert"
                   >
-                    반려 사유를 1~500자로 입력해 주세요.
+                    반려 사유를 1~{ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.
                   </p>
                 ) : null}
                 <div>

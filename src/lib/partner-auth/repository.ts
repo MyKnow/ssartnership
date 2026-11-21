@@ -4,7 +4,7 @@ import {
   partnerPortalDataAccess,
   type PartnerPortalRepository,
   type PartnerPortalDemoSetupSummary,
-} from "../partner-portal.ts";
+} from "./portal.ts";
 import { mockPartnerPortalRepository } from "../mock/partner-portal.ts";
 import { authenticateSupabasePartnerPortalLogin } from "./login.ts";
 import { changeSupabasePartnerPortalPassword } from "./password.ts";

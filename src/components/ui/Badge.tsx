@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef } from "react";
 
 const variants = {
   neutral: "border-border bg-surface-muted/85 text-foreground",
+  info: "border-info/20 bg-info-soft text-info",
   primary: "border-primary/15 bg-primary-soft text-primary",
   success: "border-success/15 bg-success/10 text-success",
   warning: "border-warning/20 bg-warning/10 text-warning",
@@ -21,7 +22,7 @@ export default function Badge({
     <span
       {...props}
       className={cn(
-        "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none tracking-[0.08em] whitespace-nowrap",
+        "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold leading-none tracking-[0.08em] whitespace-nowrap",
         variants[variant],
         className,
       )}

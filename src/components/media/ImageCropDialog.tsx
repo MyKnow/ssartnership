@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Area } from "react-easy-crop";
 import {
@@ -12,6 +12,9 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { encodeCanvasAsIntermediateWebp } from "@/lib/image-upload/client-webp";
 import { type ImageTransformPolicy } from "@/lib/image-upload/policy";
 
 const Cropper = dynamic(() => import("react-easy-crop"), { ssr: false });
@@ -40,13 +43,16 @@ async function exportCroppedImage({
   outputWidth,
   outputHeight,
   quality,
+  maxBytes,
 }: {
   sourceUrl: string;
   crop: Area;
   outputName: string;
   outputWidth: number;
   outputHeight: number;
+  /** 서버가 적용할 최종 품질(0~1). 중간 파일은 이보다 높은 품질로 만든다. */
   quality: number;
+  maxBytes?: number;
 }) {
   const image = await createImage(sourceUrl);
   const canvas = document.createElement("canvas");
@@ -71,18 +77,10 @@ async function exportCroppedImage({
     outputHeight,
   );
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (nextBlob) => {
-        if (!nextBlob) {
-          reject(new Error("이미지 변환에 실패했습니다."));
-          return;
-        }
-        resolve(nextBlob);
-      },
-      "image/webp",
-      quality,
-    );
+  const blob = await encodeCanvasAsIntermediateWebp(canvas, {
+    finalQuality: quality,
+    maxBytes,
+    failureMessage: "이미지 변환에 실패했습니다.",
   });
   return createWebpFile(blob, outputName);
 }
@@ -113,6 +111,7 @@ export default function ImageCropDialog({
   zoomControl?: boolean;
   /** Match the image viewport to the crop ratio for a consistent preview. */
   frameAspectRatio?: number;
+  /** 정책이 없을 때만 쓰는 최종 품질(0~1). 정책이 있으면 정책 품질을 쓴다. */
   quality?: number;
   policy?: ImageTransformPolicy;
   onCancel: () => void;
@@ -131,21 +130,23 @@ export default function ImageCropDialog({
   const effectiveAspectRatio = policy?.aspectRatio ?? aspectRatio;
   const effectiveQuality = policy ? policy.quality / 100 : quality;
   const canApply = requiresServerFallback ? Boolean(sourceFile) : croppedAreaPixels !== null;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const dialogOpen = open && Boolean(portalRoot);
+
+  useBodyScrollLock(dialogOpen);
+  // 취소 버튼과 같은 계약: Escape는 onCancel, 닫히면 편집을 연 요소로 포커스를 돌린다.
+  useDialogFocus({ open: dialogOpen, containerRef: panelRef, onClose: onCancel });
 
   useEffect(() => {
     if (!open || !portalRoot) {
       return;
     }
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
     setError(null);
     setRequiresServerFallback(false);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
   }, [open, portalRoot, sourceFile, sourceUrl]);
 
   const exportFile = async () => {
@@ -161,7 +162,7 @@ export default function ImageCropDialog({
     if (!croppedAreaPixels) {
       const message = "이미지를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.";
       setError(message);
-      notify(message);
+      notify(message, { tone: "error" });
       return;
     }
     setIsExporting(true);
@@ -173,6 +174,7 @@ export default function ImageCropDialog({
         outputWidth: effectiveOutputWidth,
         outputHeight: effectiveOutputHeight,
         quality: effectiveQuality,
+        maxBytes: policy?.maxSourceBytes,
       });
       onApply(file);
     } catch (nextError) {
@@ -181,7 +183,7 @@ export default function ImageCropDialog({
           ? nextError.message
           : "이미지 변환에 실패했습니다.";
       setError(message);
-      notify(message);
+      notify(message, { tone: "error" });
     } finally {
       setIsExporting(false);
     }
@@ -195,9 +197,17 @@ export default function ImageCropDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-black/70 px-2 py-2 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
-      <div className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface-overlay shadow-overlay sm:max-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface-overlay shadow-overlay focus:outline-hidden sm:max-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]"
+      >
         <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-5 sm:py-4">
           <h2
+            id={titleId}
             data-testid="image-crop-dialog-title"
             className="min-w-0 text-ko-title text-base font-semibold text-foreground"
           >
@@ -210,7 +220,7 @@ export default function ImageCropDialog({
 
         <div
           data-testid="image-crop-dialog-content"
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-5 sm:py-4"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4"
         >
           <div className="grid min-h-0 gap-3 sm:gap-4">
             <div

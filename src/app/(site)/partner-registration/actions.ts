@@ -33,10 +33,11 @@ import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import { notifyAdminsOfPartnerRegistrationRequest } from "@/lib/operational-notifications";
-import { getClientIp } from "@/lib/client-ip";
+import { getClientRateLimitIdentifier } from "@/lib/client-ip";
+import { logServerError } from "@/lib/server-log";
 
 function getClientIdentifier(headerStore: Awaited<ReturnType<typeof headers>>) {
-  return getClientIp(headerStore) ?? "unknown";
+  return getClientRateLimitIdentifier(headerStore);
 }
 
 export async function createPartnerRegistrationRequestAction(
@@ -120,7 +121,7 @@ export async function createPartnerRegistrationRequestAction(
     });
   } catch (error) {
     await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
-    console.error("[partner-registration] insert failed", error);
+    logServerError("[partner-registration] insert failed", error);
     const safeError = getSafePartnerRegistrationError(
       error,
       "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -165,10 +166,7 @@ export async function createPartnerRegistrationRequestAction(
         location: values.location,
       });
     } catch (error) {
-      console.error(
-        "[partner-registration] admin notification failed",
-        error instanceof Error ? error.message : "notification_failed",
-      );
+      logServerError("[partner-registration] admin notification failed", error);
     }
   }
 
@@ -295,7 +293,7 @@ export async function createPartnerRegistrationExcelRequestAction(
     });
   } catch (error) {
     await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
-    console.error("[partner-registration:xlsx] insert failed", error);
+    logServerError("[partner-registration:xlsx] insert failed", error);
     const safeError = getSafePartnerRegistrationError(
       error,
       "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -340,10 +338,7 @@ export async function createPartnerRegistrationExcelRequestAction(
         location: validation.values.location,
       });
     } catch (error) {
-      console.error(
-        "[partner-registration:xlsx] admin notification failed",
-        error instanceof Error ? error.message : "notification_failed",
-      );
+      logServerError("[partner-registration:xlsx] admin notification failed", error);
     }
   }
 

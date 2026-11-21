@@ -1,11 +1,16 @@
 ---
 title: 자체 호스팅 데이터와 운영 복구 작업 목록
 type: task-list
-status: active
-authority: normative
+status: completed
+authority: evidence
 ---
 
 # 데이터와 운영 복구 작업 목록
+
+> 종료 정리(2026-10-05): Issue #435·#453은 2026-09-30(KST)에 종료됐고 Production·Preview는 2026-10-02 PVE로 이전됐다([PVE 이전 작업 기록](../pve-service-migration/tasks.md)). 아래 시간별 기록은 각 시점의 증거이며, 미체크 항목은 다음과 같이 정리한다.
+>
+> - 완료로 판정: 공개 HTTPS·DNS 전환과 원본 쓰기 정지, GitHub 이미지 게시와 두 환경 수신기 연결·timer 활성, 원래 Cloud Preview 이전과 데이터 대조, 운영 데이터 반입 범위 조사, 회원·관리자·파트너 공개 인증 확인, scheduler 설치와 백업·장애 알림의 외부 수신. 근거는 공개 Preview 전환(2026-09-08)과 PVE 공개 전환·재부팅 복구·공용 감시 증거다.
+> - [기술 부채 원장](../../plans/tech-debt.md#종료-issue에서-이관한-잔여-항목)으로 이관: 서버 밖 복구 키 보관과 새 장치 복구 실습, 독립 장애 영역 백업 사본과 연속 WAL/PITR, RPO/RTO와 자원 측정, DB 이미지 최소화, 자체 RUM·오류·가용성 수집의 완결, 테스트 수신처를 허용하는 Preview 외부 연동 경로.
 
 상위 작업은 [Issue #435](https://github.com/MyKnow/ssartnership/issues/435)와 [마이그레이션 작업 목록](../self-hosting/tasks.md)이다. 코드 준비와 실제 실행 완료를 구분한다.
 

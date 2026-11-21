@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { PolicyKind } from "../../src/lib/policy-documents";
 
 const getSupabaseAdminClient = vi.fn();
-const upsertMemberPushPreferences = vi.fn();
+const updateMemberNotificationPreferences = vi.fn();
 
 vi.mock("../../src/lib/supabase/server", () => ({
   getSupabaseAdminClient,
 }));
 
-vi.mock("@/lib/push/preferences", () => ({
-  upsertMemberPushPreferences,
+vi.mock("@/lib/notification-preferences", () => ({
+  updateMemberNotificationPreferences,
 }));
 
 type PolicyRow = {
@@ -314,6 +314,69 @@ describe("policy documents", () => {
     ]);
   });
 
+  test("loads only active required policy versions for the member gate", async () => {
+    const supabase = createSupabaseMock({
+      policyDocuments: [
+        createPolicyRow({ id: "service-v1", kind: "service", version: 1, is_active: false }),
+        createPolicyRow({ id: "service-v2", kind: "service", version: 2 }),
+        createPolicyRow({ id: "privacy-v4", kind: "privacy", version: 4 }),
+        createPolicyRow({ id: "marketing-v3", kind: "marketing", version: 3 }),
+      ],
+    });
+    const selections: string[] = [];
+    const originalFrom = supabase.from.bind(supabase);
+    supabase.from = ((table: string) => {
+      const builder = originalFrom(table) as { select: (...args: unknown[]) => unknown };
+      const originalSelect = builder.select.bind(builder);
+      builder.select = (...args: unknown[]) => {
+        selections.push(`${table}:${String(args[0])}`);
+        return originalSelect();
+      };
+      return builder;
+    }) as typeof supabase.from;
+    getSupabaseAdminClient.mockReturnValue(supabase);
+
+    const policies = await loadPolicyDocumentsModule({ useMockData: false });
+
+    await expect(policies.getActiveRequiredPolicyVersions()).resolves.toEqual({
+      service: 2,
+      privacy: 4,
+    });
+    expect(selections).toEqual(["policy_documents:kind,version"]);
+    expect(
+      policies.isPolicyConsentSnapshotFresh(
+        { serviceVersion: 2, privacyVersion: 4 },
+        { service: 2, privacy: 4 },
+      ),
+    ).toBe(true);
+    expect(
+      policies.isPolicyConsentSnapshotFresh(
+        { serviceVersion: 2, privacyVersion: 3 },
+        { service: 2, privacy: 4 },
+      ),
+    ).toBe(false);
+    expect(policies.isPolicyConsentSnapshotFresh(null, { service: 2, privacy: 4 })).toBe(false);
+    expect(
+      policies.evaluateRequiredPolicyVersionStatus(
+        { service: 2, privacy: 3, marketing: null },
+        { service: 2, privacy: 4 },
+      ),
+    ).toMatchObject({ requiresConsent: true, outdatedKinds: ["privacy"] });
+  });
+
+  test("rejects the gate version lookup when a required policy has no active version", async () => {
+    getSupabaseAdminClient.mockReturnValue(
+      createSupabaseMock({
+        policyDocuments: [createPolicyRow({ id: "service-v2", kind: "service", version: 2 })],
+      }),
+    );
+
+    const policies = await loadPolicyDocumentsModule({ useMockData: false });
+    await expect(policies.getActiveRequiredPolicyVersions()).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+
   test("surfaces db and not-found errors while loading policies", async () => {
     getSupabaseAdminClient.mockReturnValue(
       createSupabaseMock({
@@ -556,7 +619,7 @@ describe("policy documents", () => {
   });
 
   test("records marketing policy consent for opt-out and opt-in", async () => {
-    upsertMemberPushPreferences.mockResolvedValue({ marketingEnabled: false });
+    updateMemberNotificationPreferences.mockResolvedValue({ marketingEnabled: false });
     getSupabaseAdminClient.mockReturnValue(createSupabaseMock({}));
 
     let policies = await loadPolicyDocumentsModule({ useMockData: false });
@@ -567,11 +630,11 @@ describe("policy documents", () => {
         agreed: false,
       }),
     ).resolves.toBeNull();
-    expect(upsertMemberPushPreferences).toHaveBeenCalledWith("member-1", {
+    expect(updateMemberNotificationPreferences).toHaveBeenCalledWith("member-1", {
       marketingEnabled: false,
-    });
+    }, { ipAddress: undefined, userAgent: undefined });
 
-    upsertMemberPushPreferences.mockResolvedValue({ marketingEnabled: true });
+    updateMemberNotificationPreferences.mockResolvedValue({ marketingEnabled: true });
     getSupabaseAdminClient.mockReturnValue(createSupabaseMock({}));
     policies = await loadPolicyDocumentsModule({ useMockData: false });
     await expect(
@@ -587,13 +650,13 @@ describe("policy documents", () => {
         userAgent: "Vitest",
       }),
     ).resolves.toBe("2026-04-26T07:00:00.000Z");
-    expect(upsertMemberPushPreferences).toHaveBeenCalledWith("member-1", {
-      marketingEnabled: true,
-    });
+    expect(updateMemberNotificationPreferences).toHaveBeenCalledWith("member-1", {
+      marketingEnabled: true, marketingPolicyId: "marketing-v2", marketingPolicyVersion: 2,
+    }, { ipAddress: "127.0.0.1", userAgent: "Vitest" });
   });
 
   test("surfaces marketing policy consent failures", async () => {
-    upsertMemberPushPreferences.mockResolvedValue(false);
+    updateMemberNotificationPreferences.mockRejectedValue(new Error("private database failure"));
     getSupabaseAdminClient.mockReturnValue(createSupabaseMock({}));
 
     let policies = await loadPolicyDocumentsModule({ useMockData: false });
@@ -621,12 +684,7 @@ describe("policy documents", () => {
       code: "db_error",
     });
 
-    upsertMemberPushPreferences.mockResolvedValue({ marketingEnabled: true });
-    getSupabaseAdminClient.mockReturnValue(
-      createSupabaseMock({
-        policyConsentError: { message: "동의 저장 실패" },
-      }),
-    );
+    updateMemberNotificationPreferences.mockRejectedValue(new Error("private consent failure"));
     policies = await loadPolicyDocumentsModule({ useMockData: false });
     await expect(
       policies.recordMarketingPolicyConsent({
@@ -640,7 +698,7 @@ describe("policy documents", () => {
       }),
     ).rejects.toMatchObject({
       code: "db_error",
-      message: "동의 저장 실패",
+      message: "회원 마케팅 동의 내역을 저장하지 못했습니다.",
     });
 
   });

@@ -147,7 +147,7 @@ export function MobileNavSurface({
                     setGuestDestination(guestOnlyDestination);
                   }}
                   className={cn(
-                    "site-mobile-nav-interactive flex min-h-[3.75rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.75rem] px-1 text-[11px] font-semibold leading-none text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                    "site-mobile-nav-interactive flex min-h-[3.75rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.75rem] px-1 text-xs font-semibold leading-none text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                     active && "site-mobile-nav-active text-primary-emphasis",
                   )}
                 >
@@ -166,7 +166,7 @@ export function MobileNavSurface({
             className="site-mobile-nav-glass site-mobile-nav-interactive pointer-events-auto flex h-[4.25rem] w-[4.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-full text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <MagnifyingGlassIcon className="h-6 w-6" aria-hidden="true" />
-            <span className="text-[10px] font-semibold leading-none">검색</span>
+            <span className="text-xs font-semibold leading-none">검색</span>
           </Link>
         </div>
       </nav>

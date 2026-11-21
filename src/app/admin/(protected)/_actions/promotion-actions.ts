@@ -1,11 +1,22 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath, revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
+import {
+  deletePromotionEventRegistration,
+  findPromotionEventRegistrationTarget,
+  insertPromotionEventRegistration,
+  listRegisteredPromotionEventSlugs,
+  savePromotionEventRegistration,
+  type PromotionEventRegistrationRow,
+  type PromotionEventRegistrationTarget,
+} from "@/lib/promotions/events-store.server";
+import {
+  getSafeAdminActionErrorCode,
+  type AdminRedirectErrorCode,
+} from "@/lib/admin-action-errors";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
@@ -18,33 +29,35 @@ import {
   validatePromotionSlide,
 } from "@/lib/promotions/slide-validation";
 import { getEventPageDefinition } from "@/lib/event-pages";
+import { toDrawAuditLogProperties } from "@/lib/draw-audit";
 import {
   createStoredEventRewardDraw,
+  EventRewardSafeError,
   parseEventRewardDrawPreviewRequest,
   parseEventRewardDrawRequest,
   sendEventRewardWinnerTestNotification,
   sendEventRewardWinnerNotifications,
+  supportsEventRewardDraw,
 } from "@/lib/promotions/event-rewards";
+import { getManagedEventCampaign } from "@/lib/promotions/events";
 import {
-  getManagedEventCampaign,
-  PROMOTION_EVENTS_CACHE_TAG,
-  PROMOTION_SLIDES_CACHE_TAG,
-} from "@/lib/promotions/events";
+  revalidatePromotionEventSurfaces,
+  revalidatePromotionSurfaces,
+} from "@/lib/promotions/cache-invalidation";
 import {
   deletePromotionSlideImageUrls,
 } from "@/lib/promotion-slide-storage-server";
 import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
+import { isUuidFormat } from "@/lib/uuid";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
-import { logAdminAction } from "./shared-helpers";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
+import { logAdminAction, redirectAdminActionError } from "./shared-helpers";
+import { logServerError } from "@/lib/server-log";
+import { readString } from "@/lib/form-data";
 
 function getRequiredString(formData: FormData, key: string) {
-  const value = getString(formData, key);
+  const value = readString(formData, key);
   if (!value) {
     throw new Error("필수 입력값을 확인해 주세요.");
   }
@@ -60,12 +73,22 @@ function normalizeSlug(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-function eventRewardActionSlug(formData: FormData) {
-  return normalizeSlug(getString(formData, "slug")) || "signup-reward";
+/**
+ * Reward forms always post their event slug. A missing or unsupported slug is a
+ * stale or tampered request, so it is rejected instead of falling back to a
+ * default event.
+ */
+function requireEventRewardActionSlug(formData: FormData) {
+  const slug = normalizeSlug(readString(formData, "slug"));
+  if (!slug || !supportsEventRewardDraw(slug)) {
+    redirectEventRegistrationError(slug, "admin_event_reward_unsupported");
+  }
+  return slug;
 }
 
-function eventRewardActionErrorMessage(_error: unknown, fallback: string) {
-  return fallback;
+/** Shows authored reward messages; anything else may carry database text. */
+function eventRewardActionErrorMessage(error: unknown, fallback: string) {
+  return error instanceof EventRewardSafeError ? error.message : fallback;
 }
 
 function adminEventUrl(
@@ -83,13 +106,17 @@ function adminEventUrl(
   return `/admin/event/${slug}${query ? `?${query}` : ""}`;
 }
 
-function redirectEventRegistrationError(slug: string, fallback: string, error?: unknown): never {
+function redirectEventRegistrationError(
+  slug: string,
+  fallback: AdminRedirectErrorCode,
+  error?: unknown,
+): never {
   const safeSlug = normalizeSlug(slug);
   const path = safeSlug ? `/admin/event/${encodeURIComponent(safeSlug)}` : "/admin/event";
   const code = error
     ? getSafeAdminActionErrorCode(error, fallback)
     : fallback;
-  redirect(`${path}?error=${encodeURIComponent(code)}`);
+  redirectAdminActionError(path, code);
 }
 
 function redirectAdvertisementError(fallback: string, error?: unknown): never {
@@ -147,19 +174,6 @@ function parseDateTimeLocal(value: string) {
   return date.toISOString();
 }
 
-function revalidatePromotionPaths(slug: string) {
-  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
-  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/advertisement");
-  revalidatePath("/admin/event");
-  revalidatePath("/admin/event/[slug]", "page");
-  revalidatePath("/admin/promotions");
-  revalidatePath("/events/[slug]", "page");
-  revalidatePath(`/events/${slug}`);
-}
-
 function parseTargetAudiences(formData: FormData) {
   const values = formData.getAll("targetAudiences");
   const audiences = normalizeAudienceArray(values);
@@ -169,7 +183,10 @@ function parseTargetAudiences(formData: FormData) {
   return audiences;
 }
 
-function parsePromotionEventRegistration(formData: FormData, slug: string) {
+function parsePromotionEventRegistration(
+  formData: FormData,
+  slug: string,
+): PromotionEventRegistrationRow {
   const normalizedSlug = normalizeSlug(slug);
   if (!normalizedSlug || normalizedSlug !== slug) {
     throw new Error("이벤트 슬러그를 확인해 주세요.");
@@ -250,7 +267,7 @@ function extractEventSlugFromHref(href: string) {
 }
 
 function parsePromotionSlideDrafts(formData: FormData) {
-  const raw = getString(formData, "slidesJson");
+  const raw = readString(formData, "slidesJson");
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -292,7 +309,7 @@ function parsePromotionSlideDrafts(formData: FormData) {
     const uploadId = typeof record.uploadId === "string" ? record.uploadId.trim() : "";
     if (
       uploadId
-      && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploadId)
+      && !isUuidFormat(uploadId)
     ) {
       throw new PromotionSlideSaveError("promotion_slide_upload_invalid", slideNumber);
     }
@@ -322,56 +339,13 @@ function parsePromotionSlideDrafts(formData: FormData) {
   return slides;
 }
 
-async function listRegisteredPromotionEventSlugs(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  slugs: string[],
-) {
-  const unique = [...new Set(slugs)];
-  if (unique.length === 0) {
-    return new Set<string>();
-  }
-  const { data, error } = await supabase
-    .from("promotion_events")
-    .select("slug")
-    .in("slug", unique);
-  if (error) {
-    console.error("[admin-advertisement] event lookup failed", error);
-    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(error.code, "promotion_slide_event_lookup_failed"));
-  }
-  return new Set(((data ?? []) as Array<{ slug: string }>).map((row) => row.slug));
-}
-
-function revalidateAdvertisementPaths() {
-  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
-  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/advertisement");
-  revalidatePath("/admin/promotions");
-}
-
 export async function createPromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
-  const slug = normalizeSlug(getString(formData, "slug"));
-  let payload: ReturnType<typeof parsePromotionEventRegistration>;
+  const slug = normalizeSlug(readString(formData, "slug"));
+  let payload: PromotionEventRegistrationRow;
   try {
     payload = parsePromotionEventRegistration(formData, slug);
-    const supabase = getSupabaseAdminClient();
-    const { data: existing, error: existingError } = await supabase
-      .from("promotion_events")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (existingError) {
-      throw new Error(existingError.message);
-    }
-    if (existing) {
-      throw new Error("이미 등록된 이벤트입니다.");
-    }
-    const { error } = await supabase.from("promotion_events").insert(payload);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await insertPromotionEventRegistration(payload);
   } catch (error) {
     redirectEventRegistrationError(slug, "admin_event_create_failed", error);
   }
@@ -384,46 +358,20 @@ export async function createPromotionEventAction(formData: FormData) {
       targetAudiences: payload.target_audiences,
     },
   });
-  revalidatePromotionPaths(payload.slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${payload.slug}?status=created`);
 }
 
 export async function updatePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const id = getString(formData, "id");
-  const slug = normalizeSlug(getString(formData, "slug"));
-  let payload: ReturnType<typeof parsePromotionEventRegistration>;
-  let target: { id?: string | null; slug?: string | null } | null;
+  const id = readString(formData, "id");
+  const slug = normalizeSlug(readString(formData, "slug"));
+  let payload: PromotionEventRegistrationRow;
+  let target: PromotionEventRegistrationTarget | null;
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: existing, error: existingError } = await supabase
-      .from("promotion_events")
-      .select("id,slug")
-      .eq("id", id)
-      .maybeSingle();
-    if (existingError) {
-      throw new Error(existingError.message);
-    }
-
-    const { data: existingBySlug, error: existingBySlugError } = existing?.slug
-      ? { data: null, error: null }
-      : await supabase
-          .from("promotion_events")
-          .select("id,slug")
-          .eq("slug", slug)
-          .maybeSingle();
-    if (existingBySlugError) {
-      throw new Error(existingBySlugError.message);
-    }
-
-    target = existing ?? existingBySlug;
+    target = await findPromotionEventRegistrationTarget({ id, slug });
     payload = parsePromotionEventRegistration(formData, target?.slug ?? slug);
-    const { error } = target?.id
-      ? await supabase.from("promotion_events").update(payload).eq("id", target.id)
-      : await supabase.from("promotion_events").insert(payload);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await savePromotionEventRegistration(target, payload);
   } catch (error) {
     redirectEventRegistrationError(slug, "admin_event_update_failed", error);
   }
@@ -437,23 +385,19 @@ export async function updatePromotionEventAction(formData: FormData) {
       recoveredFromMissingId: !id,
     },
   });
-  revalidatePromotionPaths(payload.slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${payload.slug}?status=updated`);
 }
 
 export async function deletePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "delete", { path: "/admin/event" });
-  const id = getString(formData, "id");
-  const slug = getString(formData, "slug") || id;
+  const id = readString(formData, "id");
+  const slug = readString(formData, "slug") || id;
   try {
     if (!id) {
       throw new Error("이벤트 식별자를 확인해 주세요.");
     }
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase.from("promotion_events").delete().eq("id", id);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await deletePromotionEventRegistration(id);
   } catch (error) {
     redirectEventRegistrationError(slug, "admin_event_delete_failed", error);
   }
@@ -462,7 +406,7 @@ export async function deletePromotionEventAction(formData: FormData) {
     targetId: id,
     properties: { slug },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect("/admin/event?status=deleted");
 }
 
@@ -471,7 +415,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
   try {
     await savePromotionSlidesMutation(formData);
   } catch (error) {
-    console.error("[admin-advertisement] promotion slide save failed", error);
+    logServerError("[admin-advertisement] promotion slide save failed", error);
     redirectAdvertisementError("promotion_slide_save_failed", error);
   }
   redirect("/admin/advertisement?status=updated");
@@ -487,7 +431,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (existingError) {
-    console.error("[admin-advertisement] slide lookup failed", existingError);
+    logServerError("[admin-advertisement] slide lookup failed", existingError);
     throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(existingError.code, "promotion_slide_database_read_failed"));
   }
 
@@ -561,10 +505,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
         },
         resource: { type: "promotion_slide", id: slide.id },
       }).catch((error: unknown) => {
-        console.error("[admin-advertisement] promotion slide image attach failed", {
-          slideNumber,
-          error: error instanceof Error ? error.message : "unknown",
-        });
+        logServerError("[admin-advertisement] promotion slide image attach failed", error, { slideNumber });
         throw new PromotionSlideSaveError("promotion_slide_image_attach_failed", slideNumber);
       });
       imageSrc = attached.url ?? "";
@@ -610,7 +551,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .from("promotion_slides")
     .upsert(nextRows, { onConflict: "id" });
   if (upsertError) {
-    console.error("[admin-advertisement] slide upsert failed", upsertError);
+    logServerError("[admin-advertisement] slide upsert failed", upsertError);
     throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(upsertError.code, "promotion_slide_database_write_failed"));
   }
 
@@ -623,7 +564,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
         removedRows.map((row) => row.id),
       );
     if (deleteError) {
-      console.error("[admin-advertisement] slide deletion failed", deleteError);
+      logServerError("[admin-advertisement] slide deletion failed", deleteError);
       throw new PromotionSlideSaveError("promotion_slide_delete_failed");
     }
   }
@@ -641,15 +582,15 @@ async function savePromotionSlidesMutation(formData: FormData) {
     },
   });
 
-  revalidateAdvertisementPaths();
+  revalidatePromotionSurfaces();
 }
 
 export async function createEventRewardDrawAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
-  const slug = eventRewardActionSlug(formData);
-  const winnerCount = getString(formData, "winnerCount");
-  const seed = getString(formData, "seed");
-  const googleFormUrl = getString(formData, "googleFormUrl");
+  const slug = requireEventRewardActionSlug(formData);
+  const winnerCount = readString(formData, "winnerCount");
+  const seed = readString(formData, "seed");
+  const googleFormUrl = readString(formData, "googleFormUrl");
   const definition = getEventPageDefinition(slug);
   if (!definition) {
     redirectEventRewardDrawError({
@@ -679,10 +620,11 @@ export async function createEventRewardDrawAction(formData: FormData) {
     draw = await createStoredEventRewardDraw({
       campaign,
       request: request.value,
+      seedSource: seed ? "admin" : "generated",
       createdByAdminId: adminSession?.adminId ?? null,
     });
   } catch (error) {
-    console.error("[admin-event] reward draw create failed", error);
+    logServerError("[admin-event] reward draw create failed", error);
     redirectEventRewardDrawError({
       slug,
       message: eventRewardActionErrorMessage(
@@ -702,17 +644,18 @@ export async function createEventRewardDrawAction(formData: FormData) {
       winnerCount: draw.winnerCount,
       candidateCount: draw.candidateCount,
       totalTickets: draw.totalTickets,
+      ...toDrawAuditLogProperties(draw.audit),
     },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${slug}?status=draw-created`);
 }
 
 export async function previewEventRewardDrawAction(formData: FormData) {
   await requireAdminPermission("events", "read", { path: "/admin/event" });
-  const slug = eventRewardActionSlug(formData);
-  const winnerCount = getString(formData, "winnerCount");
-  const seed = getString(formData, "seed");
+  const slug = requireEventRewardActionSlug(formData);
+  const winnerCount = readString(formData, "winnerCount");
+  const seed = readString(formData, "seed");
   const request = parseEventRewardDrawPreviewRequest({
     winnerCount,
     seed,
@@ -745,20 +688,20 @@ export async function previewEventRewardDrawAction(formData: FormData) {
 
 export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const slug = normalizeSlug(getString(formData, "slug"));
-  const drawId = getString(formData, "drawId");
+  const slug = requireEventRewardActionSlug(formData);
+  const drawId = readString(formData, "drawId");
   let result: Awaited<ReturnType<typeof sendEventRewardWinnerNotifications>>;
   try {
-    if (!slug || !drawId) {
+    if (!drawId) {
       throw new Error("당첨 안내 대상 정보를 확인해 주세요.");
     }
     result = await sendEventRewardWinnerNotifications(drawId, {
       eventSlug: slug,
-      confirmationText: getString(formData, "confirmationText"),
+      confirmationText: readString(formData, "confirmationText"),
     });
   } catch (error) {
     redirectEventRewardDrawError({
-      slug: slug || "signup-reward",
+      slug,
       message: eventRewardActionErrorMessage(
         error,
         "당첨 안내를 발송하지 못했습니다. 발송 조건과 설정을 확인해 주세요.",
@@ -776,18 +719,20 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
       warnings: result.warnings.length,
     },
   });
-  revalidatePromotionPaths(slug);
-  redirect(`/admin/event/${slug}?status=winner-sent`);
+  revalidatePromotionEventSurfaces();
+  redirect(
+    `/admin/event/${slug}?status=${result.status === "sent" ? "winner-sent" : "winner-partial"}`,
+  );
 }
 
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const slug = normalizeSlug(getString(formData, "slug"));
-  const drawId = getString(formData, "drawId") || null;
-  const memberId = getString(formData, "memberId");
+  const slug = requireEventRewardActionSlug(formData);
+  const drawId = readString(formData, "drawId") || null;
+  const memberId = readString(formData, "memberId");
   let result: Awaited<ReturnType<typeof sendEventRewardWinnerTestNotification>>;
   try {
-    if (!slug || !memberId) {
+    if (!memberId) {
       throw new Error("테스트 안내 대상 정보를 확인해 주세요.");
     }
     result = await sendEventRewardWinnerTestNotification(drawId, {
@@ -796,7 +741,7 @@ export async function sendEventRewardWinnerTestNotificationAction(formData: Form
     });
   } catch (error) {
     redirectEventRewardDrawError({
-      slug: slug || "signup-reward",
+      slug,
       message: eventRewardActionErrorMessage(
         error,
         "당첨 안내 테스트를 발송하지 못했습니다. 대상 회원과 설정을 확인해 주세요.",
@@ -816,6 +761,6 @@ export async function sendEventRewardWinnerTestNotificationAction(formData: Form
       warnings: result.warnings.length,
     },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${slug}?status=winner-test-sent`);
 }

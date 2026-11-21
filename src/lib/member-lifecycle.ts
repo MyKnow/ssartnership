@@ -196,3 +196,23 @@ export async function anonymizeDeletedMember(memberId: string) {
 }
 
 export { hashMemberIdentifierForAudit };
+
+export type MemberRecordDeletionResult =
+  | { ok: true }
+  | { ok: false; errorCode: string | null };
+
+/**
+ * 관리자 회원 삭제: `members` 행을 즉시 삭제한다(연결 테이블은 FK cascade).
+ * 회원 탈퇴(softDeleteMember)와 달리 식별자 예약·30일 익명화 절차를 거치지
+ * 않고 되돌릴 수 없으므로, 관리자 삭제 권한을 확인한 서버 액션에서만 호출한다.
+ */
+export async function deleteMemberRecord(
+  memberId: string,
+): Promise<MemberRecordDeletionResult> {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("members").delete().eq("id", memberId);
+  if (error) {
+    return { ok: false, errorCode: error.code ?? null };
+  }
+  return { ok: true };
+}

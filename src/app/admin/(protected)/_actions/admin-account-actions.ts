@@ -13,6 +13,7 @@ import { getCampusBySlug } from "@/lib/campuses";
 import { getAdminAccountActionErrorCode } from "@/lib/admin-account-feedback";
 import type { NotificationTemplateContext } from "@/lib/notification-templates/context";
 import { logAdminAction } from "./shared-helpers";
+import { logServerError } from "@/lib/server-log";
 
 function adminManagementPathWithStatus(status: string, extra?: Record<string, string>) {
   const params = new URLSearchParams({ status, ...extra });
@@ -42,7 +43,7 @@ async function notifyAdminSecurityAlert(input: {
     templateVariant: input.templateVariant,
     templateContext: input.templateContext,
   }).catch((error) => {
-    console.error("[admin-account-actions] security alert notification failed", error);
+    logServerError("[admin-account-actions] security alert notification failed", error);
   });
 }
 

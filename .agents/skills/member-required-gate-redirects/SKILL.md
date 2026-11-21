@@ -21,7 +21,9 @@ Treat a forced password change as a security control. Never render consent, emai
 
 ## Route implementation
 
-- Use `getMemberRequiredGateRedirect` in server layouts/pages, login-completion clients, and `proxy.ts` when the available session state can require a gate.
+- Use `getMemberRequiredGateRedirect` in server layouts/pages and `proxy.ts` when the available session state can require a gate.
+- Every flow that ends with a new member session (password login, email recovery, emailed setup links) navigates with `getMemberLoginCompletionHref`; pass the flow's explicit `fallback` instead of hard-coding a destination, and `completedGate` when the flow itself completes a gate.
+- `resolveMemberAuthDestination` never returns a sign-in entry page. `/auth/login` uses it to send an already signed-in member (DB-validated session) to `returnTo`.
 - Pass the actual current request path as `currentPath` and the original destination as `returnTo`.
 - Preserve the original destination when redirecting from an edge/proxy layer; do not replace a route with a gate URL and discard its path or query.
 - Let a route that already owns the highest-priority gate render instead of redirecting to itself.

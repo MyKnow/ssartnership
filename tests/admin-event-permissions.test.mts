@@ -44,9 +44,16 @@ test("이벤트 목록·상세는 조회·생성·수정·삭제 권한에 맞�
   assert.match(detailView, /canUpdate = true/);
   assert.match(detailView, /canDelete = true/);
   assert.match(detailView, /조회 전용 권한/);
-  assert.match(detailPage, /admin_event_create_failed/);
-  assert.match(detailPage, /admin_event_update_failed/);
-  assert.match(detailPage, /admin_event_delete_failed/);
+  assert.match(detailPage, /pickAllowedEntry\(adminEventErrorMessages, error\)/);
+  const { adminEventErrorMessages } = await import("@/lib/admin-action-errors");
+  for (const code of [
+    "admin_event_create_failed",
+    "admin_event_update_failed",
+    "admin_event_delete_failed",
+    "admin_event_reward_unsupported",
+  ]) {
+    assert.ok(Object.hasOwn(adminEventErrorMessages, code), code);
+  }
   assert.match(detailView, /errorMessage/);
   const promotionActions = await read(
     "src/app/admin/(protected)/_actions/promotion-actions.ts",

@@ -1,27 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
-import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import {
   PARTNER_NOTIFICATION_CENTER_SCOPE_LABEL,
+  PARTNER_NOTIFICATION_PARTIAL_FILTER_NOTICE,
   type PartnerNotificationCategory,
   type PartnerNotificationCenterData,
-  type PartnerNotificationEntry,
   type PartnerNotificationStatus,
 } from "@/lib/partner-notification-contract";
 import {
-  derivePartnerNotificationUiModel,
-  filterPartnerNotificationUiModels,
   PARTNER_NOTIFICATION_PRIORITY_LABELS,
   PARTNER_NOTIFICATION_PURPOSE_LABELS,
   type PartnerNotificationPriority,
@@ -31,19 +29,10 @@ import {
   type PartnerNotificationUiFilters,
   type PartnerNotificationUiModel,
   type PartnerNotificationUiType,
-  summarizePartnerNotificationUiModels,
 } from "@/lib/partner-notification-ui";
-import {
-  getNotificationClientError,
-  requestNotificationJson,
-} from "@/lib/notifications/client-request";
+import { usePartnerNotificationCenterController } from "./usePartnerNotificationCenterController";
 
 type NotificationFilter = PartnerNotificationCategory | "all";
-type PartnerNotificationMutationResponse = {
-  ok?: boolean;
-  message?: string;
-  summary?: { unreadCount?: number };
-};
 
 const categoryOptions: Array<{
   value: NotificationFilter;
@@ -133,33 +122,6 @@ function SelectField({
       </Select>
     </label>
   );
-}
-
-function updateNotificationReadState(
-  items: PartnerNotificationEntry[],
-  notificationIds: string[],
-  readAt: string,
-) {
-  const targets = new Set(notificationIds);
-  return items.map((item) =>
-    item.notificationId && targets.has(item.notificationId)
-      ? {
-          ...item,
-          readAt,
-          isUnread: false,
-          tone: item.tone === "primary" ? "neutral" : item.tone,
-          badgeLabel: item.badgeLabel.includes("새") ? "확인됨" : item.badgeLabel,
-        }
-      : item,
-  );
-}
-
-function removeNotifications(
-  items: PartnerNotificationEntry[],
-  notificationIds: string[],
-) {
-  const targets = new Set(notificationIds);
-  return items.filter((item) => !item.notificationId || !targets.has(item.notificationId));
 }
 
 function NotificationProgress({
@@ -350,229 +312,17 @@ export default function PartnerNotificationCenter({
 }: {
   data: PartnerNotificationCenterData;
 }) {
-  const { notify } = useToast();
-  const [items, setItems] = useState(data.items);
-  const [pendingNotificationId, setPendingNotificationId] = useState<string | null>(null);
-  const [pendingBulkAction, setPendingBulkAction] = useState<
-    "read-visible" | "delete-action" | null
-  >(null);
-  const [filters, setFilters] = useState<PartnerNotificationUiFilters>({
-    category: "all",
-    type: "all",
-    purpose: "all",
-    priority: "all",
-    status: "all",
-    readState: "all",
-    companyId: "all",
-    period: "all",
-    searchQuery: "",
-  });
-
-  const uiItems = useMemo(
-    () => items.map((item) => derivePartnerNotificationUiModel(item)),
-    [items],
-  );
-
-  const summary = useMemo(() => summarizePartnerNotificationUiModels(uiItems), [uiItems]);
-
-  const visibleItems = useMemo(
-    () => filterPartnerNotificationUiModels(uiItems, filters),
-    [filters, uiItems],
-  );
-
-  const attentionItems = useMemo(
-    () =>
-      uiItems
-        .filter((model) => model.purpose === "action")
-        .sort((left, right) => {
-          const priorityRank: Record<PartnerNotificationPriority, number> = {
-            critical: 0,
-            high: 1,
-            medium: 2,
-            low: 3,
-          };
-          return (
-            priorityRank[left.priority] - priorityRank[right.priority] ||
-            new Date(right.item.createdAt).getTime() - new Date(left.item.createdAt).getTime()
-          );
-        })
-        .slice(0, 3),
-    [uiItems],
-  );
-
-  const typeOptions = useMemo(() => {
-    const map = new Map<PartnerNotificationUiType, string>();
-    uiItems.forEach((model) => map.set(model.type, model.typeLabel));
-    return Array.from(map, ([value, label]) => ({ value, label }));
-  }, [uiItems]);
-
-  const statusOptions = useMemo(() => {
-    const map = new Map<PartnerNotificationStatus, string>();
-    uiItems.forEach((model) => map.set(model.item.status, model.statusLabel));
-    return Array.from(map, ([value, label]) => ({ value, label }));
-  }, [uiItems]);
-
-  const companyOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    uiItems.forEach((model) => {
-      map.set(model.item.companyId ?? "global", model.item.companyName || "계정 전역");
-    });
-    return Array.from(map, ([value, label]) => ({ value, label }));
-  }, [uiItems]);
-
-  const activeFilterCount = [
-    filters.category !== "all",
-    filters.type !== "all",
-    filters.purpose !== "all",
-    filters.priority !== "all",
-    filters.status !== "all",
-    filters.readState !== "all",
-    filters.companyId !== "all",
-    filters.period !== "all",
-    Boolean(filters.searchQuery.trim()),
-  ].filter(Boolean).length;
-  const isMutationPending = Boolean(pendingNotificationId || pendingBulkAction);
-  const visibleUnreadNotificationIds = visibleItems
-    .filter((model) => model.readState === "unread")
-    .map((model) => model.item.notificationId)
-    .filter((value): value is string => Boolean(value));
-  const visibleActionNotificationIds = visibleItems
-    .filter((model) => model.purpose === "action")
-    .map((model) => model.item.notificationId)
-    .filter((value): value is string => Boolean(value));
-
-  function updateFilter<K extends keyof PartnerNotificationUiFilters>(
-    key: K,
-    value: PartnerNotificationUiFilters[K],
-  ) {
-    setFilters((current) => ({ ...current, [key]: value }));
-  }
-
-  async function markNotificationAsRead(model: PartnerNotificationUiModel) {
-    const notificationId = model.item.notificationId;
-    if (!notificationId || pendingNotificationId || pendingBulkAction || model.readState !== "unread") {
-      return;
-    }
-
-    const snapshot = items;
-    const now = new Date().toISOString();
-    setPendingNotificationId(notificationId);
-    setItems((current) => updateNotificationReadState(current, [notificationId], now));
-
-    try {
-      await requestNotificationJson<PartnerNotificationMutationResponse>(
-        `/api/partner/notifications/${notificationId}`,
-        {
-          method: "PATCH",
-        },
-        { requestFailureMessage: "읽음 처리에 실패했습니다." },
-      );
-      notify("알림을 읽음 처리했습니다.");
-    } catch (error) {
-      setItems(snapshot);
-      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message);
-    } finally {
-      setPendingNotificationId(null);
-    }
-  }
-
-  async function deleteNotification(model: PartnerNotificationUiModel) {
-    const notificationId = model.item.notificationId;
-    if (!notificationId || pendingNotificationId || pendingBulkAction) {
-      return;
-    }
-
-    const snapshot = items;
-    setPendingNotificationId(notificationId);
-    setItems((current) => removeNotifications(current, [notificationId]));
-
-    try {
-      await requestNotificationJson<PartnerNotificationMutationResponse>(
-        `/api/partner/notifications/${notificationId}`,
-        {
-          method: "DELETE",
-        },
-        { requestFailureMessage: "알림 삭제에 실패했습니다." },
-      );
-      notify("처리 필요 알림을 삭제했습니다.");
-    } catch (error) {
-      setItems(snapshot);
-      notify(getNotificationClientError(error, "알림 삭제에 실패했습니다.").message);
-    } finally {
-      setPendingNotificationId(null);
-    }
-  }
-
-  async function markVisibleNotificationsAsRead() {
-    if (
-      pendingNotificationId ||
-      pendingBulkAction ||
-      visibleUnreadNotificationIds.length === 0
-    ) {
-      return;
-    }
-
-    const snapshot = items;
-    const now = new Date().toISOString();
-    setPendingBulkAction("read-visible");
-    setItems((current) => updateNotificationReadState(current, visibleUnreadNotificationIds, now));
-
-    try {
-      await requestNotificationJson<PartnerNotificationMutationResponse>(
-        "/api/partner/notifications",
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notificationIds: visibleUnreadNotificationIds }),
-        },
-        { requestFailureMessage: "전체 읽음 처리에 실패했습니다." },
-      );
-      notify("표시된 미확인 알림을 읽음 처리했습니다.");
-    } catch (error) {
-      setItems(snapshot);
-      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message);
-    } finally {
-      setPendingBulkAction(null);
-    }
-  }
-
-  async function deleteVisibleActionNotifications() {
-    if (
-      pendingNotificationId ||
-      pendingBulkAction ||
-      visibleActionNotificationIds.length === 0
-    ) {
-      return;
-    }
-
-    if (!window.confirm("표시된 처리 필요 알림을 삭제할까요?")) {
-      return;
-    }
-
-    const snapshot = items;
-    setPendingBulkAction("delete-action");
-    setItems((current) => removeNotifications(current, visibleActionNotificationIds));
-
-    try {
-      await requestNotificationJson<PartnerNotificationMutationResponse>(
-        "/api/partner/notifications",
-        {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notificationIds: visibleActionNotificationIds }),
-        },
-        { requestFailureMessage: "처리 필요 알림 삭제에 실패했습니다." },
-      );
-      notify("표시된 처리 필요 알림을 삭제했습니다.");
-    } catch (error) {
-      setItems(snapshot);
-      notify(
-        getNotificationClientError(error, "처리 필요 알림 삭제에 실패했습니다.").message,
-      );
-    } finally {
-      setPendingBulkAction(null);
-    }
-  }
+  const {
+    pendingNotificationId, pendingBulkAction, storedPage, loadingMore,
+    filters, setFilters, updateFilter,
+    deleteActionConfirmOpen, setDeleteActionConfirmOpen,
+    summary, visibleItems, attentionItems, typeOptions, statusOptions, companyOptions,
+    activeFilterCount, isMutationPending, showPartialFilterNotice,
+    canReadUnloadedStoredNotifications, visibleUnreadNotificationIds, visibleActionNotificationIds,
+    loadMoreStoredNotifications, markAllStoredNotificationsAsRead,
+    markNotificationAsRead, deleteNotification,
+    markVisibleNotificationsAsRead, deleteVisibleActionNotifications,
+  } = usePartnerNotificationCenterController(data);
 
   return (
     <div className="grid min-w-0 gap-6">
@@ -610,8 +360,11 @@ export default function PartnerNotificationCenter({
         items={[
           {
             label: "미확인 알림",
-            value: `${summary.unreadCount.toLocaleString("ko-KR")}건`,
-            hint: "아직 확인하지 않았거나 강조된 알림",
+            value: `${(storedPage.unreadCount ?? summary.unreadCount).toLocaleString("ko-KR")}건`,
+            hint:
+              storedPage.unreadCount === null
+                ? "아직 확인하지 않은 알림"
+                : "아직 불러오지 않은 이전 알림까지 포함한 미확인 수",
           },
           {
             label: "처리 필요",
@@ -653,7 +406,7 @@ export default function PartnerNotificationCenter({
           <label className="grid min-w-0 gap-1.5">
             <span className="text-xs font-semibold text-muted-foreground">검색</span>
             <Input
-              type="search"
+              {...SEARCH_INPUT_ATTRIBUTES}
               value={filters.searchQuery}
               onChange={(event) => updateFilter("searchQuery", event.target.value)}
               placeholder="제휴처, 상태, 알림 내용 검색"
@@ -806,14 +559,30 @@ export default function PartnerNotificationCenter({
               loading={pendingBulkAction === "delete-action"}
               loadingText="삭제 중"
               disabled={
-                visibleActionNotificationIds.length === 0 || isMutationPending
+                visibleActionNotificationIds.length === 0 ||
+                isMutationPending ||
+                loadingMore
               }
-              onClick={() => {
-                void deleteVisibleActionNotifications();
-              }}
+              onClick={() => setDeleteActionConfirmOpen(true)}
             >
               처리 필요 알림 삭제
             </Button>
+            {canReadUnloadedStoredNotifications ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                loading={pendingBulkAction === "read-all-stored"}
+                loadingText="읽음 처리 중"
+                disabled={isMutationPending || loadingMore}
+                onClick={() => {
+                  void markAllStoredNotificationsAsRead();
+                }}
+              >
+                이전 알림까지 모두 읽음
+              </Button>
+            ) : null}
             <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
               Information 알림은 읽음 처리만 제공하고, 삭제 같은 일괄 작업은
               Action 알림에만 적용합니다.
@@ -845,30 +614,88 @@ export default function PartnerNotificationCenter({
           ) : null}
         </Card>
 
-        {visibleItems.length === 0 ? (
-          <EmptyState
-            title="표시할 알림이 없습니다."
-            description="검색어와 필터 조건을 조정해 다시 확인해 주세요."
-            action={
-              <PartnerPendingButtonLink href="/partner" variant="secondary">
-                대시보드로 이동
-              </PartnerPendingButtonLink>
-            }
-          />
-        ) : (
-          <div className="grid min-w-0 gap-3">
-            {visibleItems.map((model) => (
-              <NotificationCard
-                key={model.item.id}
-                model={model}
-                pending={pendingNotificationId === model.item.notificationId}
-                onMarkRead={markNotificationAsRead}
-                onDelete={deleteNotification}
+        <div className="grid min-w-0 gap-3">
+          {showPartialFilterNotice ? (
+            <FormMessage variant="info">
+              {PARTNER_NOTIFICATION_PARTIAL_FILTER_NOTICE}
+            </FormMessage>
+          ) : null}
+
+          {visibleItems.length === 0 ? (
+            storedPage.hasMore ? (
+              <EmptyState
+                title="불러온 알림 중 조건에 맞는 알림이 없습니다."
+                description="이전 알림을 더 불러온 뒤 다시 확인해 주세요."
+                action={
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={loadingMore}
+                    loadingText="불러오는 중"
+                    disabled={loadingMore || isMutationPending}
+                    onClick={() => {
+                      void loadMoreStoredNotifications();
+                    }}
+                  >
+                    이전 알림 더 보기
+                  </Button>
+                }
               />
-            ))}
-          </div>
-        )}
+            ) : (
+              <EmptyState
+                title="표시할 알림이 없습니다."
+                description="검색어와 필터 조건을 조정해 다시 확인해 주세요."
+                action={
+                  <PartnerPendingButtonLink href="/partner" variant="secondary">
+                    대시보드로 이동
+                  </PartnerPendingButtonLink>
+                }
+              />
+            )
+          ) : (
+            <>
+              {visibleItems.map((model) => (
+                <NotificationCard
+                  key={model.item.id}
+                  model={model}
+                  pending={pendingNotificationId === model.item.notificationId}
+                  onMarkRead={markNotificationAsRead}
+                  onDelete={deleteNotification}
+                />
+              ))}
+              {storedPage.hasMore ? (
+                <div className="flex justify-center pt-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full max-w-sm"
+                    loading={loadingMore}
+                    loadingText="불러오는 중"
+                    disabled={loadingMore || isMutationPending}
+                    onClick={() => {
+                      void loadMoreStoredNotifications();
+                    }}
+                  >
+                    이전 알림 더 보기
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
+      <ConfirmDialog
+        open={deleteActionConfirmOpen}
+        title="표시된 처리 필요 알림을 삭제할까요?"
+        description={`현재 필터에 표시된 처리 필요 알림 ${visibleActionNotificationIds.length.toLocaleString("ko-KR")}건을 삭제합니다. 삭제 후에는 알림 센터에서 다시 확인할 수 없습니다.`}
+        confirmLabel="알림 삭제"
+        danger
+        onClose={() => setDeleteActionConfirmOpen(false)}
+        onConfirm={() => {
+          setDeleteActionConfirmOpen(false);
+          void deleteVisibleActionNotifications();
+        }}
+      />
     </div>
   );
 }

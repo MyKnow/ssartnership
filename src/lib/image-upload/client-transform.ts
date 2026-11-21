@@ -4,6 +4,7 @@ import {
   getHeifSpatialExtentError,
   getImagePixelError,
 } from "@/lib/image-upload/heif";
+import { encodeCanvasAsIntermediateWebp } from "@/lib/image-upload/client-webp";
 import {
   validateImageUploadSource,
   type ImageTransformPolicy,
@@ -88,18 +89,10 @@ async function decodeHeifToWebp(file: File, policy: ImageTransformPolicy) {
   }
   context.putImageData(imageData, 0, 0);
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (nextBlob) => {
-        if (!nextBlob) {
-          reject(new Error("HEIC/HEIF 사진 변환에 실패했습니다."));
-          return;
-        }
-        resolve(nextBlob);
-      },
-      "image/webp",
-      policy.quality / 100,
-    );
+  const blob = await encodeCanvasAsIntermediateWebp(canvas, {
+    finalQuality: policy.quality / 100,
+    maxBytes: policy.maxSourceBytes,
+    failureMessage: "HEIC/HEIF 사진 변환에 실패했습니다.",
   });
   return createWebpFile(blob, file);
 }

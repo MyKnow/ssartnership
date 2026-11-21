@@ -18,6 +18,7 @@ import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getAdminCompanyWorkspaceReadModel } from "@/lib/admin-company-workspace.server";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,7 @@ async function AdminCompaniesContent({
   const managedCampusFilter = getManagedCampusFilterValues(
     adminSession.account,
   );
-  const companyError = params.error
-    ? adminCompaniesErrorMessages[params.error]
-    : null;
+  const companyError = pickAllowedEntry(adminCompaniesErrorMessages, params.error);
   const generatedSetupUrl =
     typeof params.generatedSetupUrl === "string"
       ? params.generatedSetupUrl

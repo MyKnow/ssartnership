@@ -17,6 +17,12 @@ export type PartnerMetricAggregateLoadOptions = {
   metricNames: readonly PartnerMetricEventName[];
   metricKinds: readonly PartnerMetricKind[];
   granularity?: PartnerMetricGranularity;
+  /**
+   * When the rollup has no rows, rebuild the metrics from raw `event_logs`.
+   * Defaults to `true` for admin and partner dashboards. Public request paths
+   * (home popularity) pass `false` so a page view never scans the event log.
+   */
+  allowEventLogFallback?: boolean;
 };
 
 export type PartnerMetricAggregateLoadFailure = {
@@ -105,7 +111,7 @@ export async function loadPartnerMetricAggregateRows(
     };
   }
 
-  if (rollupResult.rows.length > 0) {
+  if (rollupResult.rows.length > 0 || options.allowEventLogFallback === false) {
     return {
       rows: rollupResult.rows,
       source: "rollup",

@@ -122,6 +122,36 @@ function isIpv4CompatibleIpv6Address(bytes: Uint8Array) {
   return bytes.length === 16 && bytes.slice(0, 12).every((value) => value === 0);
 }
 
+/**
+ * IPv4를 내장하는 IPv6 전환 대역. 게이트웨이를 거쳐 임의의 IPv4(사설 대역 포함)로
+ * 도달할 수 있어 내장 주소를 신뢰할 수 없으므로 대역 전체를 차단한다.
+ * - 64:ff9b::/96  NAT64 well-known prefix (RFC 6052)
+ * - 64:ff9b:1::/48 NAT64 local-use prefix (RFC 8215)
+ * - 2002::/16     6to4 (RFC 3056, RFC 7526으로 폐기)
+ * - 2001::/32     Teredo (RFC 4380)
+ * - ::ffff:0:0:0/96 SIIT IPv4-translated (RFC 2765). 내장 IPv4로 평가하는
+ *   IPv4-mapped(`::ffff:0:0/96`)와 달리 대역째 차단한다.
+ *
+ * 이 판정은 이미지 프록시·프로필 사진 원격 fetch와 웹 푸시 endpoint 신뢰 검사가 함께
+ * 쓴다. DNS64 resolver 뒤에서는 공개 호스트도 64:ff9b::로 해석돼 위 경로가 모두
+ * 거부되므로, 서버 egress는 네이티브 IPv4/IPv6 resolver를 전제로 한다.
+ */
+function isIpv4TransitionIpv6Address(bytes: Uint8Array) {
+  const isNat64Prefix = bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b;
+  if (isNat64Prefix && bytes.slice(4, 12).every((value) => value === 0)) return true;
+  if (isNat64Prefix && bytes[4] === 0x00 && bytes[5] === 0x01) return true;
+  if (bytes[0] === 0x20 && bytes[1] === 0x02) return true;
+  if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0x00 && bytes[3] === 0x00) return true;
+  const isSiitPrefix =
+    bytes.slice(0, 8).every((value) => value === 0) &&
+    bytes[8] === 0xff &&
+    bytes[9] === 0xff &&
+    bytes[10] === 0x00 &&
+    bytes[11] === 0x00;
+  if (isSiitPrefix) return true;
+  return false;
+}
+
 function isBlockedIpv6Address(value: string) {
   const bytes = parseIpv6Address(value);
   if (!bytes) {
@@ -135,6 +165,8 @@ function isBlockedIpv6Address(value: string) {
     const embeddedIpv4 = `${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`;
     return isBlockedIpv4Address(embeddedIpv4);
   }
+
+  if (isIpv4TransitionIpv6Address(bytes)) return true;
 
   const [firstByte, secondByte] = bytes;
   if (firstByte === 0xfc || firstByte === 0xfd) return true;

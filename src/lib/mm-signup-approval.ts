@@ -1,5 +1,9 @@
 import { parseSsafyProfileFromUser, type ParsedProfile } from "@/lib/mm-profile";
 import { normalizeManualMemberImportCampus } from "@/lib/member-manual-import/options";
+import { hasFieldErrors } from "@/lib/field-errors";
+
+/** MM 가입 승인 시 관리자가 확정하는 이름 길이 상한. 승인 화면 입력과 서버 검증이 공유한다. */
+export const MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH = 128;
 
 export const MATTERMOST_SIGNUP_MODES = ["direct", "approval"] as const;
 export type MattermostSignupMode = (typeof MATTERMOST_SIGNUP_MODES)[number];
@@ -101,8 +105,8 @@ export function parseMattermostSignupApprovalDecision(
 
   if (!displayName) {
     fieldErrors.displayName = "이름을 입력해 주세요.";
-  } else if (displayName.length > 128) {
-    fieldErrors.displayName = "이름은 128자 이하로 입력해 주세요.";
+  } else if (displayName.length > MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH) {
+    fieldErrors.displayName = `이름은 ${MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH}자 이하로 입력해 주세요.`;
   }
 
   const generation = /^\d{1,2}$/u.test(generationRaw)
@@ -117,7 +121,7 @@ export function parseMattermostSignupApprovalDecision(
     fieldErrors.campus = "캠퍼스를 선택해 주세요.";
   }
 
-  if (Object.keys(fieldErrors).length > 0 || generation === null) {
+  if (hasFieldErrors(fieldErrors) || generation === null) {
     return { ok: false, fieldErrors };
   }
 

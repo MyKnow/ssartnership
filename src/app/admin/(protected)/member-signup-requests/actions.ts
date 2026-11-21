@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
+import { ADMIN_REVIEW_NOTE_MAX_LENGTH, appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import {
   requireMemberSignupRequestAdmin,
 } from "@/lib/admin-access";
@@ -90,7 +90,7 @@ export async function rejectMemberSignupRequestAction(formData: FormData) {
   const path = detailPath(requestId, returnTo);
   const session = await requireMemberSignupRequestAdmin("update", { path });
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason || reason.length > 500) {
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
     redirect(appendAdminReviewQueueQuery(path, { error: "invalid_reason" }));
   }
 

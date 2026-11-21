@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { composeEnvironment, createDatabaseEnvironment, createMigrationPlan, databasePsqlArguments, deriveProjectName, loadDatabaseEnvironment, renderMigrationRunnerSql, renderMigrationVerificationSql, resolveSignedStorageUrl, validateProjectName, writeNewEnvironmentFile } from "./lib.mjs";
+import { composeEnvironment, createDatabaseEnvironment, createMigrationPlan, databasePsqlArguments, deriveProjectName, loadDatabaseEnvironment, parsePublicExposure, renderMigrationRunnerSql, renderMigrationVerificationSql, renderPublicExposureCheckSql, resolveSignedStorageUrl, validateProjectName, writeNewEnvironmentFile } from "./lib.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const compose = resolve(root, "compose.supabase.yaml");
@@ -178,6 +178,21 @@ async function smoke(env, file, project, persisted) {
         key: `${category.key}-anon`
       })
     })).ok) fail("anon_write_not_denied");
+    // Read-only exposure probes: the browser key must not read tables or call RPCs.
+    if ((await fetch(`${rest}/members?select=id&limit=1`, {
+      headers: headers(env.SUPABASE_ANON_KEY)
+    })).ok) fail("anon_read_not_denied");
+    if ((await fetch(`${rest}/rpc/get_admin_dashboard_counts`, {
+      method: "POST",
+      headers: headers(env.SUPABASE_ANON_KEY, {
+        "content-type": "application/json"
+      }),
+      body: "{}"
+    })).ok) fail("anon_rpc_not_denied");
+    const exposure = parsePublicExposure(await psql(file, project, renderPublicExposureCheckSql(), true));
+    if (!exposure) fail("public_exposure_unreadable");
+    if (exposure.routines > 0) fail("anon_routine_exposed");
+    if (exposure.tables > 0) fail("anon_table_exposed");
     const publicBucket = "self-host-smoke-public",
       privateBucket = "self-host-smoke-private",
       persistence = "persistence-marker.txt",

@@ -147,13 +147,13 @@ test("quota window 정리는 service-role 전용 bounded RPC로 수행한다", a
     },
     async rpc(name: string, parameters: Record<string, unknown>) {
       rpcCalls.push({ name, parameters });
-      return { data: 0, error: null };
+      return { data: name === "claim_image_upload_cleanup" ? [] : 0, error: null };
     },
   } as never);
   const now = new Date("2026-08-31T09:00:00.000Z");
 
   assert.equal(await imageRepository.expireStale(now), 0);
-  assert.deepEqual(rpcCalls, [{
+  assert.deepEqual(rpcCalls, [{ name: "claim_image_upload_cleanup", parameters: { p_limit: 100 } }, {
     name: "cleanup_image_upload_quota_windows",
     parameters: {
       p_before: "2026-08-30T09:00:00.000Z",

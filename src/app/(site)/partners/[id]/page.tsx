@@ -6,8 +6,10 @@ import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
-import { createCanonicalAlternates, serializeJsonLd } from "@/lib/seo";
+import { readRouteParam } from "@/lib/route-params";
+import { createCanonicalAlternates, createPageOpenGraph, serializeJsonLd } from "@/lib/seo";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
+import { getSignedUserSession } from "@/lib/user-auth";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
@@ -25,11 +27,8 @@ import {
   getPartnerDetailBenefitMode,
   resolvePartnerDetailBenefitUseAction,
 } from "@/lib/partner-detail-benefit-action";
-import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import { buildLegacyPartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 300;
 
 export async function generateMetadata({
   params,
@@ -53,9 +52,7 @@ export async function generateMetadata({
   }
 
   const resolvedParams = await params;
-  const rawId = resolvedParams?.id
-    ? decodeURIComponent(resolvedParams.id).trim()
-    : "";
+  const rawId = readRouteParam(resolvedParams?.id);
 
   if (!rawId) {
     return {
@@ -89,28 +86,14 @@ export async function generateMetadata({
     alternates: {
       ...createCanonicalAlternates(canonicalPath),
     },
-    openGraph: {
+    // Uploaded thumbnails have no stored dimensions, so none are declared.
+    openGraph: createPageOpenGraph({
+      path: canonicalPath,
       title,
       description,
-      url: canonicalPath,
-      siteName: SITE_NAME,
-      locale: "ko_KR",
       type: "article",
-      images: [
-        {
-          url: partner.thumbnail ?? "/icon-512.png",
-          width: 512,
-          height: 512,
-          alt: title,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [partner.thumbnail ?? "/icon-512.png"],
-    },
+      images: partner.thumbnail ? [{ url: partner.thumbnail, alt: title }] : undefined,
+    }),
     robots: {
       index: true,
       follow: true,
@@ -128,9 +111,9 @@ export default async function PartnerDetailPage({
     preview?: string | string[];
   }>;
 }) {
-  const [headerSession, resolvedParams, resolvedSearchParams] =
+  const [session, resolvedParams, resolvedSearchParams] =
     await Promise.all([
-      getHeaderSession(),
+      getSignedUserSession(),
       params,
       searchParams ??
         Promise.resolve<{
@@ -138,23 +121,30 @@ export default async function PartnerDetailPage({
           preview?: string | string[];
         }>({}),
     ]);
-  const rawId = resolvedParams?.id
-    ? decodeURIComponent(resolvedParams.id).trim()
-    : "";
+  const rawId = readRouteParam(resolvedParams?.id);
   if (!rawId) {
     notFound();
   }
   const previewToken = Array.isArray(resolvedSearchParams.preview)
     ? resolvedSearchParams.preview[0]
     : resolvedSearchParams.preview;
-  const viewerContext = await getPartnerViewerContext(headerSession?.userId);
-  const pageData = await getPartnerDetailPageData(
-    rawId,
-    viewerContext.authenticated,
-    headerSession?.userId ?? null,
-    viewerContext.viewerAudience,
-    previewToken ?? null,
-  );
+  // One signed-session read feeds both the header and the viewer audience;
+  // the unread count overlaps the audience snapshot and the page data.
+  const userId = session?.userId ?? null;
+  const headerSessionPromise = userId
+    ? getHeaderSession(userId)
+    : Promise.resolve(null);
+  const viewerContext = await getPartnerViewerContext(userId);
+  const [headerSession, pageData] = await Promise.all([
+    headerSessionPromise,
+    getPartnerDetailPageData(
+      rawId,
+      viewerContext.authenticated,
+      userId,
+      viewerContext.viewerAudience,
+      previewToken ?? null,
+    ),
+  ]);
   if (!pageData) {
     notFound();
   }
@@ -190,6 +180,7 @@ export default async function PartnerDetailPage({
     currentUserId,
     adCoupons,
     issuedAdCoupons,
+    couponsUnavailable,
     isPreview,
   } = pageData;
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
@@ -229,12 +220,7 @@ export default async function PartnerDetailPage({
           partnerName: partner.name,
           benefitItems: partner.benefitItems?.length
             ? partner.benefitItems
-            : normalizePartnerBenefitItems(
-                partner.benefits.map((title, index) => ({
-                  id: `legacy-benefit-${partner.id}-${index + 1}`,
-                  title,
-                })),
-              ),
+            : buildLegacyPartnerBenefitItems(partner.benefits, partner.id),
           returnTo: partnerReturnTo,
           requiresLogin: !viewerContext.authenticated,
         }
@@ -325,6 +311,7 @@ export default async function PartnerDetailPage({
             <PartnerDetailCoupons
               coupons={adCoupons}
               initialIssuedCoupons={issuedAdCoupons}
+              unavailable={couponsUnavailable}
               partnerId={partner.id}
               currentUserId={currentUserId}
               returnTo={partnerReturnTo}

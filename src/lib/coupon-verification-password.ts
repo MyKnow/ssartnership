@@ -1,3 +1,4 @@
+import { isFourDigitPin } from "@/lib/validation";
 const PBKDF2_ITERATIONS = 120_000;
 const SALT_LENGTH = 16;
 const HASH_LENGTH = 32;
@@ -11,7 +12,7 @@ export function normalizeCouponVerificationPassword(value: unknown) {
   if (value === undefined || value === null || value === "") {
     return null;
   }
-  if (typeof value !== "string" || !/^\d{4}$/.test(value)) {
+  if (!isFourDigitPin(value)) {
     throw new Error("현장 확인 PIN은 숫자 4자리로 입력해 주세요.");
   }
   return value;

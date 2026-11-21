@@ -16,7 +16,10 @@ test("전체와 제휴처 광고 조회는 bounded DB rollup을 공유한다", a
   const [repositoryContract, supabaseRepository, readModel, deferredSections] =
     await Promise.all([
       read("src/lib/repositories/ad-package-repository.ts"),
-      read("src/lib/repositories/supabase/ad-package-repository.supabase.ts"),
+      Promise.all([
+        "ad-package-campaigns.supabase.ts",
+        "ad-package-mapping.supabase.ts",
+      ].map((name) => read(`src/lib/repositories/supabase/${name}`))).then((sources) => sources.join("\n")),
       read("src/lib/admin-partner-detail.server.ts"),
       read("src/components/admin/AdminPartnerDetailDeferredSections.tsx"),
     ]);
@@ -45,7 +48,7 @@ test("전체와 제휴처 광고 조회는 bounded DB rollup을 공유한다", a
   const scopedMethod = methodSource(
     supabaseRepository,
     "async listAdminCampaignsForPartner(",
-    "async listAdminCouponsForPartner(",
+    "async createCampaign(",
   );
 
   assert.match(

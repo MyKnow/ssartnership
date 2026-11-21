@@ -46,8 +46,9 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# vercel
-.vercel
+# retired Vercel CLI link state: kept ignored only so a leftover local
+# .vercel/ directory is never committed (Vercel deployment was retired in RF-04)
+/.vercel/
 
 # local Codex configuration
 .codex/config.toml
@@ -55,3 +56,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local assistant state and diagnostic output
+.claude/
+*.log

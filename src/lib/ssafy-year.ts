@@ -1,3 +1,5 @@
+import { getKstDateParts } from "@/lib/datetime";
+
 export type SsafyYearRule = {
   anchorYear: number;
   anchorCalendarYear: number;
@@ -13,19 +15,8 @@ export const DEFAULT_SSAFY_YEAR_RULE: SsafyYearRule = {
 export const SSAFY_STAFF_YEAR = 0;
 
 export function getSeoulDateParts(now: Date = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "numeric",
-  });
-
-  const parts = formatter.formatToParts(now);
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-
-  return {
-    year: Number.parseInt(values.get("year") ?? "0", 10),
-    month: Number.parseInt(values.get("month") ?? "0", 10),
-  };
+  const { year, month } = getKstDateParts(now);
+  return { year, month };
 }
 
 function getHalfYearIndex(calendarYear: number, month: number) {

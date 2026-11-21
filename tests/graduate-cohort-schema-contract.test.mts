@@ -83,10 +83,24 @@ test("graduate correction targets and approval snapshot survive the cohort cutov
   );
   assert.ok(
     finalApprovalIndex > parityIndex,
-    "final graduate approval snapshot must remain last",
+    "final graduate approval snapshot must follow Preview parity",
+  );
+  const afterFinalApproval = schemaSql.indexOf(
+    "\n-- Snapshot of ",
+    finalApprovalIndex + finalApprovalHeader.length,
   );
   assert.equal(
-    schemaSql.slice(finalApprovalIndex + finalApprovalHeader.length).trim(),
+    schemaSql
+      .slice(finalApprovalIndex + finalApprovalHeader.length, afterFinalApproval === -1 ? undefined : afterFinalApproval)
+      .trim(),
     approvalSql.trim(),
+  );
+  const lastApprovalDefinition = schemaSql.lastIndexOf(
+    "create or replace function public.approve_graduate_verification(",
+  );
+  assert.ok(
+    lastApprovalDefinition > finalApprovalIndex
+      && (afterFinalApproval === -1 || lastApprovalDefinition < afterFinalApproval),
+    "the final approval snapshot keeps the last approval RPC definition",
   );
 });

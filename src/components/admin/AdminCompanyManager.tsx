@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -8,7 +9,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
 type AdminCompany = {
@@ -48,11 +49,7 @@ function FieldGroup({
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) {
-    return "없음";
-  }
-
-  return formatKoreanDateTimeToMinute(value);
+  return formatOptionalKoreanDateTimeToMinute(value, "없음");
 }
 
 export default function AdminCompanyManager({
@@ -104,8 +101,7 @@ export default function AdminCompanyManager({
                   </p>
                 </div>
                 <label className="flex items-center gap-3 text-sm font-medium text-foreground">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="companyIsActive"
                     value="true"
                     defaultChecked
@@ -242,8 +238,7 @@ export default function AdminCompanyManager({
                           </FieldGroup>
                           <div className="grid gap-3 rounded-2xl border border-border/70 bg-surface-muted/70 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
                             <label className="flex items-center gap-3 text-sm font-medium text-foreground">
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 name="companyIsActive"
                                 value="true"
                                 defaultChecked={isActive}

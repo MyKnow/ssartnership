@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import {
   normalizePartnerReviewRatingFilter,
   normalizePartnerReviewSort,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/review-media";
 import {
   buildReviewMediaStoragePath,
-  deleteReviewMediaUrls,
 } from "@/lib/review-media-storage";
 import {
   resolveImageTransformPolicy,
@@ -31,7 +31,9 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { getUserSession } from "@/lib/user-auth";
+import { getUserSession, isUserSessionLookupUnavailable } from "@/lib/user-auth";
+import { lookupMemberSession } from "@/lib/member-session-lookup";
+import { logServerError } from "@/lib/server-log";
 
 const INVALID_REVIEW_BODY_MESSAGE = "리뷰 요청 형식을 확인해 주세요.";
 const OVERSIZED_REVIEW_BODY_MESSAGE = "리뷰 요청이 너무 큽니다.";
@@ -46,6 +48,11 @@ class ReviewMediaInputError extends Error {
 export function getReviewMediaInputFieldErrors(
   error: unknown,
 ): ReviewFieldErrors | null {
+  if ((error instanceof ImageUploadError && error.code === "review_image_reupload_required")
+    // The session can expire between attach and the actual review INSERT/PATCH.
+    || (error instanceof Error && error.message === "review_image_reference_invalid")) {
+    return { images: "리뷰 사진을 다시 업로드해 주세요." };
+  }
   return error instanceof ReviewMediaInputError
     ? { images: error.message }
     : null;
@@ -58,6 +65,34 @@ export function isReviewImageUploadUnavailable(error: unknown) {
 
 export async function getReviewMemberSession() {
   return getUserSession();
+}
+
+export const REVIEW_SESSION_UNAVAILABLE_MESSAGE =
+  "로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
+type ReviewMemberSession = Awaited<ReturnType<typeof getReviewMemberSession>>;
+
+/**
+ * Distinguishes "not signed in" from "session lookup failed". A failed member
+ * lookup (which the session helper reports as an empty session) or a failed
+ * policy read must not look like a logged-out member (401); callers answer
+ * 503 for writes or degrade a public read to anonymous.
+ */
+export async function getReviewMemberSessionLookup(): Promise<
+  { ok: true; session: ReviewMemberSession } | { ok: false }
+> {
+  return lookupMemberSession(
+    "[partner-review] member session lookup failed",
+    getReviewMemberSession,
+    isUserSessionLookupUnavailable,
+  );
+}
+
+export function reviewSessionUnavailableResponse() {
+  return NextResponse.json(
+    { ok: false, message: REVIEW_SESSION_UNAVAILABLE_MESSAGE },
+    { status: 503, headers: { "Retry-After": "30", "Cache-Control": "no-store" } },
+  );
 }
 
 export async function ensureVisibleReviewPartner(
@@ -81,15 +116,26 @@ export function parseReviewListParams(request: Request) {
   return { sort, offset, limit, rating, imagesOnly, includeHidden };
 }
 
-export async function ensurePartnerReviewModerationAccess(partnerId: string) {
-  const session = await getPartnerSession().catch(() => null);
-  if (!session || session.mustChangePassword) {
-    return null;
+export async function ensurePartnerReviewModerationAccess(
+  partnerId: string,
+): Promise<"allowed" | "denied" | "unavailable"> {
+  let session: Awaited<ReturnType<typeof getPartnerSession>>;
+  try {
+    session = await getPartnerSession();
+  } catch (error) {
+    logServerError("[partner-review] partner session lookup failed", error);
+    return "unavailable";
   }
-  const context = await getPartnerChangeRequestContext(session.companyIds, partnerId).catch(
-    () => null,
-  );
-  return context ? session : null;
+  if (!session || session.mustChangePassword) {
+    return "denied";
+  }
+  try {
+    const context = await getPartnerChangeRequestContext(session.companyIds, partnerId);
+    return context ? "allowed" : "denied";
+  } catch (error) {
+    logServerError("[partner-review] partner moderation scope lookup failed", error);
+    return "unavailable";
+  }
 }
 
 function parseBooleanParam(value: string | null) {
@@ -146,12 +192,18 @@ export async function readPartnerReviewSubmission(request: Request): Promise<
   };
 }
 
+export type ResolveReviewMediaOptions = {
+  /** Collects attached URLs for callers; only the expiry collector may delete them. */
+  attachedUrls?: string[];
+};
+
 export async function resolveReviewMediaPayload(
   manifest: ReviewMediaManifest,
   partnerId: string,
   reviewId: string,
   memberId: string,
   allowedExistingUrls: readonly string[] = [],
+  options: ResolveReviewMediaOptions = {},
 ) {
   const entries = manifest.images;
   try {
@@ -166,7 +218,7 @@ export async function resolveReviewMediaPayload(
   }
 
   const images: string[] = [];
-  const uploadedUrls: string[] = [];
+  const uploadedUrls: string[] = options.attachedUrls ?? [];
   const attachUpload = async (uploadId: string, imageIndex: number) => {
     const attached = await getImageUploadRepository().attach({
       actor: { kind: "member", id: memberId },
@@ -187,24 +239,20 @@ export async function resolveReviewMediaPayload(
     return attached.url;
   };
 
-  try {
-    for (const entry of entries) {
-      if (entry.kind === "existing") {
-        images.push(entry.url);
-        continue;
-      }
-      if (!entry.uploadId) {
-        throw new ReviewMediaInputError(
-          "완료된 공통 이미지 업로드를 확인해 주세요.",
-        );
-      }
-      const uploadedUrl = await attachUpload(entry.uploadId, images.length);
-      images.push(uploadedUrl);
-      uploadedUrls.push(uploadedUrl);
+  // Keep partial attachments for retry until the original session expires.
+  for (const entry of entries) {
+    if (entry.kind === "existing") {
+      images.push(entry.url);
+      continue;
     }
-  } catch (error) {
-    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
-    throw error;
+    if (!entry.uploadId) {
+      throw new ReviewMediaInputError(
+        "완료된 공통 이미지 업로드를 확인해 주세요.",
+      );
+    }
+    const uploadedUrl = await attachUpload(entry.uploadId, images.length);
+    images.push(uploadedUrl);
+    uploadedUrls.push(uploadedUrl);
   }
 
   return {

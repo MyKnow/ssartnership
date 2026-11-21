@@ -27,16 +27,16 @@ export class JsonRequestBodyError extends Error {
   }
 }
 
-export async function readRequestBodyWithinLimit(
+export async function readRequestBodyBytesWithinLimit(
   body: ReadableStream<Uint8Array> | null,
   maximumBytes: number,
-): Promise<string> {
+): Promise<Uint8Array> {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) {
     throw new TypeError('maximumBytes must be a non-negative safe integer.');
   }
 
   if (!body) {
-    return '';
+    return new Uint8Array(0);
   }
 
   const reader = body.getReader();
@@ -69,19 +69,82 @@ export async function readRequestBodyWithinLimit(
     offset += chunk.byteLength;
   }
 
+  return bytes;
+}
+
+export async function readRequestBodyWithinLimit(
+  body: ReadableStream<Uint8Array> | null,
+  maximumBytes: number,
+): Promise<string> {
+  const bytes = await readRequestBodyBytesWithinLimit(body, maximumBytes);
   return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+}
+
+function declaresBodyLargerThan(request: Request, maximumBytes: number) {
+  const declaredContentLength = request.headers.get('content-length');
+  if (declaredContentLength === null) {
+    return false;
+  }
+  const contentLength = Number(declaredContentLength);
+  return Number.isFinite(contentLength) && contentLength > maximumBytes;
+}
+
+/** multipart 경계·필드 헤더 등 파일 본문 외 여유분 */
+export const MULTIPART_FORM_OVERHEAD_BYTES = 64 * 1024;
+
+export type MultipartRequestBodyErrorCode = 'invalid_form' | 'body_too_large';
+
+export class MultipartRequestBodyError extends Error {
+  readonly code: MultipartRequestBodyErrorCode;
+
+  constructor(code: MultipartRequestBodyErrorCode) {
+    super(
+      code === 'body_too_large'
+        ? '업로드 요청이 너무 큽니다.'
+        : '업로드 요청 형식을 확인해 주세요.',
+    );
+    this.name = 'MultipartRequestBodyError';
+    this.code = code;
+  }
+}
+
+/**
+ * `request.formData()` 대신 사용한다. 선언된 Content-Length가 한도를 넘으면 본문을 읽기 전에
+ * 거부하고, 길이를 선언하지 않은 스트림도 한도까지만 읽은 뒤 multipart를 해석한다.
+ */
+export async function readMultipartFormDataWithinLimit(
+  request: Request,
+  maximumBytes: number,
+): Promise<FormData> {
+  if (declaresBodyLargerThan(request, maximumBytes)) {
+    throw new MultipartRequestBodyError('body_too_large');
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = await readRequestBodyBytesWithinLimit(request.body, maximumBytes);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      throw new MultipartRequestBodyError('body_too_large');
+    }
+    throw new MultipartRequestBodyError('invalid_form');
+  }
+
+  try {
+    return await new Response(bytes, {
+      headers: { 'content-type': request.headers.get('content-type') ?? '' },
+    }).formData();
+  } catch {
+    throw new MultipartRequestBodyError('invalid_form');
+  }
 }
 
 export async function readJsonRequestBodyWithinLimit<T>(
   request: Request,
   maximumBytes: number,
 ): Promise<T> {
-  const declaredContentLength = request.headers.get('content-length');
-  if (declaredContentLength !== null) {
-    const contentLength = Number(declaredContentLength);
-    if (Number.isFinite(contentLength) && contentLength > maximumBytes) {
-      throw new JsonRequestBodyError('body_too_large');
-    }
+  if (declaresBodyLargerThan(request, maximumBytes)) {
+    throw new JsonRequestBodyError('body_too_large');
   }
 
   try {

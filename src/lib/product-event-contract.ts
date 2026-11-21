@@ -2,6 +2,7 @@ import { z } from "zod";
 import { type ProductEventName } from "@/lib/event-catalog";
 import { normalizeProductEventLocation } from "@/lib/product-event-path";
 import { PRODUCT_EVENT_SCHEMA_VERSION } from "@/lib/product-event-schema";
+import { isUuidFormat } from "@/lib/uuid";
 
 export { PRODUCT_EVENT_SCHEMA_VERSION } from "@/lib/product-event-schema";
 export const MAX_PRODUCT_EVENT_BODY_BYTES = 12 * 1024;
@@ -269,8 +270,6 @@ type ProductEventTarget = {
   targetId: string | null;
 };
 
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const mockPartnerIdPattern =
   /^(?:mock-partner-[a-z0-9-]{1,96}|(?:health|restaurant|cafe|space)-\d{3})$/;
 const categoryKeyPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
@@ -309,12 +308,12 @@ function parseFixedTarget(
       }
       break;
     case "uuid":
-      if (!targetId || !uuidPattern.test(targetId)) {
+      if (!targetId || !isUuidFormat(targetId)) {
         return rejectTarget(eventName);
       }
       break;
     case "partner":
-      if (!targetId || (!uuidPattern.test(targetId) && !mockPartnerIdPattern.test(targetId))) {
+      if (!targetId || (!isUuidFormat(targetId) && !mockPartnerIdPattern.test(targetId))) {
         return rejectTarget(eventName);
       }
       break;

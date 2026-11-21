@@ -47,73 +47,20 @@ npm run test-storybook:watch
 
 ## 검증 게이트
 
-Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
+Storybook은 필수 릴리스 게이트가 아니라 UI 변경을 검토할 때 실행하는 수동 검사다.
 
-- `npm run release`는 커밋/푸시 전에 `npm run build-storybook`을 반드시 실행합니다.
-- `npm run release`는 커밋/푸시 전에 `npm run test-storybook`을 반드시 실행합니다.
-- 두 명령 중 하나라도 실패하면 버전 업데이트, 커밋, 푸시를 진행하지 않습니다.
-- GitHub Actions의 `Storybook and Visual Baselines`는 Chromatic 없이 정적 빌드, browser-mode test, Playwright 이미지 비교를 실행합니다.
-- GitHub에서 수동 비활성화한 워크플로의 재활성화·검증·롤백 절차는 [Storybook·Visual Baselines 워크플로 운영](../operations/runbooks/storybook-visual-workflow.md)을 따릅니다.
-- 긴급 상황에서 `git push --no-verify`로 로컬 hook을 우회하더라도 release 스크립트와 Public Readiness CI 게이트는 우회하지 않는 것을 원칙으로 합니다.
+- `npm run release`와 `verify:change`는 Storybook 빌드·테스트를 실행하지 않는다. UI 변경 PR에서는 `npm run build-storybook`, `npm run test-storybook`, 필요 시 `npm run test:visual`을 직접 실행하고 결과를 PR에 남긴다.
+- GitHub Actions의 `Storybook and Visual Baselines`는 수동 실행 전용이다. 실행·판정 절차는 [Storybook·Visual Baselines 워크플로 운영](../operations/runbooks/storybook-visual-workflow.md)을 따른다.
 
-## 현재 포함된 스토리
+## 스토리 위치
 
-### Foundations
+스토리는 대상 컴포넌트 옆의 `*.stories.tsx`에 둔다. 2026-10-05 `dev` 기준 156개이며 관리자 컴포넌트가 가장 많다. 개별 목록은 문서에 복제하지 않고 아래 명령으로 확인한다.
 
-- [.storybook/overview.stories.tsx](../../.storybook/overview.stories.tsx)
+```bash
+find src .storybook -name "*.stories.tsx" | sort
+```
 
-### UI
-
-- [src/components/ui/Button.stories.tsx](../../src/components/ui/Button.stories.tsx)
-- [src/components/ui/Badge.stories.tsx](../../src/components/ui/Badge.stories.tsx)
-- [src/components/ui/Card.stories.tsx](../../src/components/ui/Card.stories.tsx)
-- [src/components/ui/Modal.stories.tsx](../../src/components/ui/Modal.stories.tsx)
-- [src/components/ui/Input.stories.tsx](../../src/components/ui/Input.stories.tsx)
-- [src/components/ui/Textarea.stories.tsx](../../src/components/ui/Textarea.stories.tsx)
-- [src/components/ui/PasswordInput.stories.tsx](../../src/components/ui/PasswordInput.stories.tsx)
-- [src/components/ui/Select.stories.tsx](../../src/components/ui/Select.stories.tsx)
-- [src/components/ui/Tabs.stories.tsx](../../src/components/ui/Tabs.stories.tsx)
-- [src/components/ui/EmptyState.stories.tsx](../../src/components/ui/EmptyState.stories.tsx)
-- [src/components/ui/SubmitButton.stories.tsx](../../src/components/ui/SubmitButton.stories.tsx)
-
-### Public / Domain
-
-- [src/components/HeroSection.stories.tsx](../../src/components/HeroSection.stories.tsx)
-- [src/components/SiteHeader.stories.tsx](../../src/components/SiteHeader.stories.tsx)
-- [src/components/PartnerCardView.stories.tsx](../../src/components/PartnerCardView.stories.tsx)
-- [src/components/PartnerImageCarousel.stories.tsx](../../src/components/PartnerImageCarousel.stories.tsx)
-- [src/components/partner-reviews/PartnerReviewCard.stories.tsx](../../src/components/partner-reviews/PartnerReviewCard.stories.tsx)
-- [src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx](../../src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx)
-- [src/components/partner-reviews/PartnerReviewForm.stories.tsx](../../src/components/partner-reviews/PartnerReviewForm.stories.tsx)
-- [src/components/partner-favorites/PartnerFavoriteButton.stories.tsx](../../src/components/partner-favorites/PartnerFavoriteButton.stories.tsx)
-
-### Auth
-
-- [src/components/auth/LoginForm.stories.tsx](../../src/components/auth/LoginForm.stories.tsx)
-- 당시 `src/components/auth/ResetPasswordForm.stories.tsx` (현재 제거됨)
-
-### Admin
-
-- [src/components/admin/AdminLogoutButton.stories.tsx](../../src/components/admin/AdminLogoutButton.stories.tsx)
-- [src/components/admin/AdminMobileNav.stories.tsx](../../src/components/admin/AdminMobileNav.stories.tsx)
-- [src/components/admin/AdminShell.stories.tsx](../../src/components/admin/AdminShell.stories.tsx)
-- [src/components/admin/AdminPageStates.stories.tsx](../../src/components/admin/AdminPageStates.stories.tsx)
-- [src/components/admin/AdminPartnerManager.stories.tsx](../../src/components/admin/AdminPartnerManager.stories.tsx)
-- 당시 `src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx` (현재 제거됨)
-- [src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx](../../src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx)
-- [src/components/admin/AdminReviewManager.stories.tsx](../../src/components/admin/AdminReviewManager.stories.tsx)
-- [src/components/admin/review-manager/AdminReviewFilters.stories.tsx](../../src/components/admin/review-manager/AdminReviewFilters.stories.tsx)
-- [src/components/admin/review-manager/AdminReviewCardView.stories.tsx](../../src/components/admin/review-manager/AdminReviewCardView.stories.tsx)
-- [src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx](../../src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx)
-- [src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx](../../src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx)
-- [src/components/admin/logs/AdminLogsExplorer.stories.tsx](../../src/components/admin/logs/AdminLogsExplorer.stories.tsx)
-- [src/components/admin/AdminPushManager.stories.tsx](../../src/components/admin/AdminPushManager.stories.tsx)
-- [src/components/admin/AdminLogsManager.stories.tsx](../../src/components/admin/AdminLogsManager.stories.tsx)
-
-### Partner Page States
-
-- [src/components/partner/PartnerCompanySelectionView.stories.tsx](../../src/components/partner/PartnerCompanySelectionView.stories.tsx)
-- [src/components/partner/PartnerDashboardView.stories.tsx](../../src/components/partner/PartnerDashboardView.stories.tsx)
+전역 개요 스토리는 [.storybook/overview.stories.tsx](../../.storybook/overview.stories.tsx)다. 디자인 시스템 문서에서 말하는 시각 기준 확인은 이 개요와 해당 컴포넌트·화면 상태 스토리를 기준으로 한다.
 
 ## Mock Scenario Registry
 
@@ -131,17 +78,25 @@ Mock 전략은 Repository/service mock을 폐기하지 않고, 그 위에 시나
 
 ### 현재 Coverage Matrix
 
-현재 상태는 전체 완료가 아니라 foundation coverage입니다.
+`summarizeMockCoverageMatrix(buildMockCoverageMatrix())`로 계산한 2026-10-05 `dev` 기준 값이다. 전체 완료가 아니라 foundation coverage다.
 
-- App Router `page.tsx` route: 61개
-- 등록된 mock scenario: 45개
-- Storybook scenario story: 14개
-- Storybook complete route: 11개
-- Storybook partial route: 0개
-- Storybook missing route: 17개
-- Route inventory only route: 33개
+- App Router `page.tsx` route: 97개
+- 등록된 mock scenario: 61개
+- Storybook scenario story: 136개
+- Storybook complete route: 10개
+- Storybook partial route: 42개
+- Storybook reference-only route: 2개
+- Storybook missing route: 0개
+- Route inventory only route: 43개
 
-이 숫자는 [tests/mock-scenarios.test.mts](../../tests/mock-scenarios.test.mts)에서 고정합니다. 새 route나 story가 추가되면 coverage matrix 수치를 함께 갱신해야 합니다.
+[tests/mock-scenarios.test.mts](../../tests/mock-scenarios.test.mts)는 이 수치를 정확히 고정하지 않는다. 고정하는 계약은 다음뿐이다.
+
+- route inventory가 실제 `page.tsx` 전체와 일치한다(`totalRoutes` 일치).
+- `storybookMissingRoutes`는 0이다.
+- 다섯 coverage 분류의 합이 전체 route 수와 같다.
+- scenario·story·complete·partial·reference-only 수는 하한(각각 50, 102, 6, 30, 2 이상)만 검사한다.
+
+따라서 위 수치는 문서 작성 시점의 측정값이다. 새 route를 추가하면 inventory 갱신이 테스트로 강제되지만, story 수 변화는 이 문서를 자동으로 바꾸지 않는다.
 
 운영 규칙:
 
@@ -205,17 +160,7 @@ MSW는 다음 조건을 모두 만족할 때만 추가합니다.
 
 ## 검증 현황
 
-### 완료
-
-- `npm run build-storybook` 통과
-- `npm run test-storybook` 통과
-- Storybook Vitest browser-mode smoke test 구성 완료
-
-### 현재 자동 테스트 결과
-
-- `74` files passed
-- `188` tests passed
-- skipped 없음
+Storybook 빌드·테스트 결과는 실행한 PR이나 수동 workflow 실행 기록이 정본이다. 이 문서에 통과 건수를 고정하지 않는다.
 
 ## 현재 상태
 
@@ -252,12 +197,8 @@ MSW는 다음 조건을 모두 만족할 때만 추가합니다.
 - 기본 자동 검증 대상: 전체 스토리
 - 예외 태그는 현재 없음
 
-## 현재 미포함 컴포넌트 방향
-
-현재 `storybook.md`에 우선순위로 적어두었던 1차~5차 대상은 모두 스토리 추가가 끝났습니다.
-
 ## 다음 권장 작업
 
 1. 인증/관리자 화면을 `form section`, `row`, `dialog`, `empty/loading/error` 단위로 계속 확장
 2. 추가된 하위 스토리에 `play` 기반 interaction test를 더 넓게 적용
-3. 필요 시 visual regression 기준을 별도 도입
+3. 정기 자동 실행 여부는 CI 비용 측정 뒤 결정([기술 부채 원장](../plans/tech-debt.md#성능ux운영))

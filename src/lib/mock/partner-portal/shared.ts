@@ -1,7 +1,7 @@
 import type {
   PartnerPortalCompanySummary,
   PartnerPortalDemoSetupSummary,
-} from "../../partner-portal.ts";
+} from "../../partner-auth/portal.ts";
 import type {
   PartnerPortalServiceDashboard,
 } from "../../partner-dashboard.ts";

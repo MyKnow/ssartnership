@@ -4,8 +4,8 @@ import type {
   PartnerPortalSetupContext,
   PartnerPortalSetupInput,
   PartnerPortalSetupResult,
-} from "../../partner-portal.ts";
-import { PartnerPortalSetupError } from "../../partner-portal-errors.ts";
+} from "../../partner-auth/portal.ts";
+import { PartnerPortalSetupError } from "../../partner-auth/portal-errors.ts";
 import { getPartnerSetupLinkState } from "../../partner-auth/setup-link.ts";
 import type { MockPortalSetupRecord } from "./shared.ts";
 import { cloneSetupSummary } from "./shared.ts";

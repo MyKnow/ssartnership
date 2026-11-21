@@ -1,5 +1,6 @@
 import SiteHeader from "@/components/SiteHeader";
 import Button from "@/components/ui/Button";
+import { FOCUS_RING_CLASS_NAME } from "@/components/ui/focus-ring";
 import { getHeaderSession } from "@/lib/header-session";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { SHOWCASE_CLAIM_DEADLINE_AT, SHOWCASE_CLAIM_DEADLINE_LABEL } from "@/lib/project-showcase/results";
@@ -23,7 +24,7 @@ export default async function ShowcaseResultsPage({ userId, now = new Date() }: 
   const claimClosed = now.getTime() >= Date.parse(SHOWCASE_CLAIM_DEADLINE_AT);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
         <p className="text-sm font-semibold text-primary">내 프로젝트를 소개합니다! · 이벤트 종료</p>
@@ -47,7 +48,7 @@ export default async function ShowcaseResultsPage({ userId, now = new Date() }: 
                 <article key={project.id} className="min-w-0 rounded-2xl border border-border bg-surface p-5 sm:p-6">
                   <h3 className="break-words text-lg font-bold text-foreground">{project.title}</h3>
                   <details className="mt-4" open>
-                    <summary className="cursor-pointer text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">받은 리뷰 {feedback.length}개</summary>
+                    <summary className={`min-h-11 cursor-pointer py-3 text-sm font-semibold text-primary ${FOCUS_RING_CLASS_NAME}`}>받은 리뷰 {feedback.length}개</summary>
                     {feedback.length > 0 ? (
                       <ul className="mt-3 grid gap-3">
                         {feedback.map((item) => <li key={item.id} className="whitespace-pre-wrap break-words rounded-xl bg-surface-inset px-4 py-3 text-sm leading-6 text-foreground">{item.body}</li>)}

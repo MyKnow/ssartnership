@@ -8,7 +8,7 @@ type OperationalNotificationsModule =
   typeof import("../src/lib/operational-notifications");
 type PartnerPlanServiceModule =
   typeof import("../src/lib/partner-plan-service");
-type PartnerPortalModule = typeof import("../src/lib/partner-portal");
+type PartnerPortalModule = typeof import("../src/lib/partner-auth/portal");
 type PartnerAuthModule = typeof import("../src/lib/partner-auth");
 type PartnerAuthRepositoryModule =
   typeof import("../src/lib/partner-auth/repository");
@@ -24,7 +24,7 @@ const mockPartnerPortalModulePromise = import(
   new URL("../src/lib/mock/partner-portal.ts", import.meta.url).href
 ) as Promise<MockPartnerPortalModule>;
 const partnerPortalModulePromise = import(
-  new URL("../src/lib/partner-portal.ts", import.meta.url).href
+  new URL("../src/lib/partner-auth/portal.ts", import.meta.url).href
 ) as Promise<PartnerPortalModule>;
 const mockPartnerChangeRequestModulePromise = import(
   new URL("../src/lib/mock/partner-change-requests.ts", import.meta.url).href

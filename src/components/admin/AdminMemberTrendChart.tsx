@@ -295,7 +295,7 @@ export default function AdminMemberTrendChart({
             items: [
               {
                 label: "변화량",
-                value: `+${(point.values.members ?? 0).toLocaleString()}명`,
+                value: `+${(point.values.members ?? 0).toLocaleString("ko-KR")}명`,
                 valueClassName: "text-primary",
               },
               {

@@ -60,6 +60,20 @@ export const IconOnly: Story = {
   },
 };
 
+export const Compact: Story = {
+  args: {
+    size: "compact",
+    variant: "secondary",
+    children: "전체 읽음",
+  },
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: "전체 읽음" });
+    const hitArea = getComputedStyle(button, "::before");
+    await expect(button.getBoundingClientRect().height).toBe(32);
+    await expect(Number.parseFloat(hitArea.minHeight)).toBeGreaterThanOrEqual(44);
+  },
+};
+
 export const InternalLink: Story = {
   args: {
     href: "/partners/partner-1",

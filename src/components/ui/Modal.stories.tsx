@@ -74,6 +74,22 @@ export const Default: Story = {
   },
 };
 
+export const KeyboardContract: Story = {
+  play: async () => {
+    const body = within(document.body);
+    const closeButton = await body.findByRole("button", { name: "모달 닫기" });
+    const confirmButton = body.getByRole("button", { name: "확인" });
+
+    await waitFor(() => expect(closeButton).toHaveFocus());
+    await userEvent.tab({ shift: true });
+    await expect(confirmButton).toHaveFocus();
+    await userEvent.tab();
+    await expect(closeButton).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
+  },
+};
+
 export const DenseBody: Story = {
   args: {
     title: "리뷰 삭제 확인",

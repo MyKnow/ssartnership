@@ -30,6 +30,8 @@ export default function PartnerCardView({
   isFavorited = false,
   metrics,
   onFavoriteChange,
+  favoritePending = false,
+  onFavoritePendingChange,
   returnTo,
 }: {
   partner: Partner;
@@ -42,7 +44,9 @@ export default function PartnerCardView({
   currentUserId?: string | null;
   isFavorited?: boolean;
   metrics?: PartnerPopularityMetrics;
-  onFavoriteChange?: (partnerId: string, nextFavorited: boolean) => void;
+  onFavoriteChange?: (partnerId: string, nextFavorited: boolean, count?: number) => void;
+  favoritePending?: boolean;
+  onFavoritePendingChange?: (partnerId: string, pending: boolean, outcome?: "success" | "failure") => void;
   returnTo?: string | null;
 }) {
   const router = useRouter();
@@ -162,9 +166,13 @@ export default function PartnerCardView({
               favoriteCount={metrics?.favoriteCount ?? undefined}
               onToggle={
                 onFavoriteChange
-                  ? (nextFavorited) => onFavoriteChange(partner.id, nextFavorited)
+                  ? (nextFavorited, count) => onFavoriteChange(partner.id, nextFavorited, count)
                   : undefined
               }
+              pending={favoritePending}
+              onPendingChange={onFavoritePendingChange
+                ? (pending, outcome) => onFavoritePendingChange(partner.id, pending, outcome)
+                : undefined}
               compact
               reducedVerticalPadding
               className={variant === "list" ? "!h-11 !px-3" : undefined}

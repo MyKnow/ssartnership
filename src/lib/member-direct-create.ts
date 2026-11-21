@@ -1,15 +1,16 @@
 import {
+  hasControlCharacters,
   parseMemberYearValue,
   validateAdminIdentifier,
   validateMemberYear,
   validatePasswordPolicy,
 } from "@/lib/validation";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 export const DIRECT_MEMBER_LOGIN_ID_PREFIX = "manual-";
 
 const DISPLAY_NAME_MAX_LENGTH = 80;
 const CAMPUS_MAX_LENGTH = 80;
-const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u007F]/;
 
 export type DirectMemberCreateField =
   | "loginId"
@@ -90,7 +91,7 @@ function validateTextInput(
   if (value.length > maxLength) {
     return `${label}${getKoreanParticle(label, "은", "는")} ${maxLength}자 이내로 입력해 주세요.`;
   }
-  if (CONTROL_CHARACTER_REGEX.test(value)) {
+  if (hasControlCharacters(value)) {
     return `${label} 형식이 올바르지 않습니다.`;
   }
   return null;
@@ -179,7 +180,7 @@ export function validateDirectMemberCreateInput(
     fieldErrors.temporaryPasswordConfirmation = "비밀번호가 일치하지 않습니다.";
   }
 
-  if (Object.keys(fieldErrors).length > 0 || !manualLoginId.value || generation === null) {
+  if (hasFieldErrors(fieldErrors) || !manualLoginId.value || generation === null) {
     return { ok: false, fieldErrors };
   }
 

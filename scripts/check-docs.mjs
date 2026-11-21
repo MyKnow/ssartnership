@@ -46,6 +46,16 @@ export const DOCUMENT_AUTHORITIES = new Set([
   "evidence",
 ]);
 
+// Repository Knowledge root exceptions (see the docs-governance skill). They have
+// no frontmatter contract, but their local links and paths are still validated.
+export const ROOT_KNOWLEDGE_FILES = ["README.md", "AGENTS.md"];
+
+const FORBIDDEN_PATH_PATTERNS = [
+  [/\/Users\/(?!\.\.\.)[^/\s]+\//, "macOS 개인 절대 경로"],
+  [/[A-Za-z]:\\Users\\(?!\.\.\\)[^\\\s]+\\/, "Windows 개인 절대 경로"],
+  [/file:\/\//i, "file URL"],
+];
+
 function toRepositoryPath(rootDir, pathname) {
   return relative(rootDir, pathname).replaceAll("\\", "/");
 }
@@ -115,6 +125,54 @@ function localTarget(rawTarget) {
   return decodeURIComponent(withoutFragment);
 }
 
+function collectRootKnowledgeFiles(rootDir) {
+  const files = ROOT_KNOWLEDGE_FILES
+    .map((name) => resolve(rootDir, name))
+    .filter((pathname) => existsSync(pathname));
+  const skillsRoot = resolve(rootDir, ".agents", "skills");
+  if (existsSync(skillsRoot)) {
+    for (const name of readdirSync(skillsRoot).sort()) {
+      const skillFile = resolve(skillsRoot, name, "SKILL.md");
+      if (existsSync(skillFile)) files.push(skillFile);
+    }
+  }
+  return files;
+}
+
+function validateForbiddenPaths(repositoryPath, source, errors) {
+  for (const [pattern, label] of FORBIDDEN_PATH_PATTERNS) {
+    if (pattern.test(source)) errors.push(`${repositoryPath}: ${label}를 저장소 상대 경로로 바꿔야 합니다.`);
+  }
+}
+
+function validateLocalLinks({ pathname, repositoryPath, source, resolvedRoot, errors, onTarget }) {
+  for (const link of extractMarkdownLinks(source)) {
+    let target;
+    try {
+      target = localTarget(link.target);
+    } catch {
+      errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: link URL encoding이 유효하지 않습니다: ${link.target}`);
+      continue;
+    }
+    if (target === null || target === "") continue;
+    if (target.startsWith("/") || /^[A-Za-z]:[\\/]/.test(target)) {
+      errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: 절대 로컬 링크를 사용할 수 없습니다: ${link.target}`);
+      continue;
+    }
+    const resolvedTarget = resolve(dirname(pathname), target);
+    const relativeTarget = relative(resolvedRoot, resolvedTarget);
+    if (relativeTarget.startsWith("..") || resolve(resolvedRoot, relativeTarget) !== resolvedTarget) {
+      errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: 저장소 밖 링크입니다: ${link.target}`);
+      continue;
+    }
+    if (!existsSync(resolvedTarget)) {
+      errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: 링크 대상이 없습니다: ${link.target}`);
+      continue;
+    }
+    onTarget?.(resolvedTarget);
+  }
+}
+
 function validatePathContract(repositoryPath, metadata, errors) {
   const fail = (message) => errors.push(`${repositoryPath}: ${message}`);
   if (repositoryPath.startsWith("docs/plans/active/") &&
@@ -148,7 +206,7 @@ export function validateDocumentation({ rootDir = process.cwd() } = {}) {
   const resolvedRoot = resolve(rootDir);
   const docsRoot = resolve(resolvedRoot, "docs");
   const errors = [];
-  if (!existsSync(docsRoot)) return { errors: ["docs/: 문서 디렉터리가 없습니다."], documents: [] };
+  if (!existsSync(docsRoot)) return { errors: ["docs/: 문서 디렉터리가 없습니다."], documents: [], rootKnowledgeFiles: [] };
 
   const documents = collectMarkdownFiles(docsRoot).map((pathname) => {
     const source = readFileSync(pathname, "utf8");
@@ -182,40 +240,25 @@ export function validateDocumentation({ rootDir = process.cwd() } = {}) {
       }
     }
 
-    const forbidden = [
-      [/\/Users\/(?!\.\.\.)[^/\s]+\//, "macOS 개인 절대 경로"],
-      [/[A-Za-z]:\\Users\\(?!\.\.\\)[^\\\s]+\\/, "Windows 개인 절대 경로"],
-      [/file:\/\//i, "file URL"],
-    ];
-    for (const [pattern, label] of forbidden) {
-      if (pattern.test(source)) errors.push(`${repositoryPath}: ${label}를 저장소 상대 경로로 바꿔야 합니다.`);
-    }
+    validateForbiddenPaths(repositoryPath, source, errors);
+    validateLocalLinks({
+      pathname,
+      repositoryPath,
+      source,
+      resolvedRoot,
+      errors,
+      onTarget: (resolvedTarget) => {
+        if (byPath.has(resolvedTarget)) graph.get(pathname).add(resolvedTarget);
+      },
+    });
+  }
 
-    for (const link of extractMarkdownLinks(source)) {
-      let target;
-      try {
-        target = localTarget(link.target);
-      } catch {
-        errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: link URL encoding이 유효하지 않습니다: ${link.target}`);
-        continue;
-      }
-      if (target === null || target === "") continue;
-      if (target.startsWith("/") || /^[A-Za-z]:[\\/]/.test(target)) {
-        errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: 절대 로컬 링크를 사용할 수 없습니다: ${link.target}`);
-        continue;
-      }
-      const resolvedTarget = resolve(dirname(pathname), target);
-      const relativeTarget = relative(resolvedRoot, resolvedTarget);
-      if (relativeTarget.startsWith("..") || resolve(resolvedRoot, relativeTarget) !== resolvedTarget) {
-        errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: 저장소 밖 링크입니다: ${link.target}`);
-        continue;
-      }
-      if (!existsSync(resolvedTarget)) {
-        errors.push(`${repositoryPath}:${lineNumberAt(source, link.offset)}: 링크 대상이 없습니다: ${link.target}`);
-        continue;
-      }
-      if (byPath.has(resolvedTarget)) graph.get(pathname).add(resolvedTarget);
-    }
+  const rootKnowledgeFiles = collectRootKnowledgeFiles(resolvedRoot);
+  for (const pathname of rootKnowledgeFiles) {
+    const source = readFileSync(pathname, "utf8");
+    const repositoryPath = toRepositoryPath(resolvedRoot, pathname);
+    validateForbiddenPaths(repositoryPath, source, errors);
+    validateLocalLinks({ pathname, repositoryPath, source, resolvedRoot, errors });
   }
 
   const entrypoint = resolve(docsRoot, "index.md");
@@ -239,7 +282,7 @@ export function validateDocumentation({ rootDir = process.cwd() } = {}) {
     }
   }
 
-  return { errors, documents };
+  return { errors, documents, rootKnowledgeFiles };
 }
 
 function main() {
@@ -249,7 +292,7 @@ function main() {
     process.exitCode = 1;
     return;
   }
-  process.stdout.write(`문서 검증 통과: ${result.documents.length}개 Markdown 문서\n`);
+  process.stdout.write(`문서 검증 통과: ${result.documents.length}개 Markdown 문서, 루트 지식 파일 ${result.rootKnowledgeFiles.length}개\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

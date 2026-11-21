@@ -26,7 +26,7 @@ function PushManagerConstantsPreview() {
       <div>channels-empty:{formatNotificationChannels([])}</div>
       <div>channels-filled:{formatNotificationChannels(["in_app", "push", "mm"])}</div>
       <div>partner-relative:{extractPartnerIdFromUrl("/partners/partner-1")}</div>
-      <div>partner-absolute:{extractPartnerIdFromUrl("https://ssartnership.vercel.app/partners/partner-2")}</div>
+      <div>partner-absolute:{extractPartnerIdFromUrl("https://ssartnership.myknow.xyz/partners/partner-2")}</div>
       <div>partner-invalid:{extractPartnerIdFromUrl("not-a-partner-url")}</div>
       <div>
         member-label:

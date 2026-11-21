@@ -6,15 +6,13 @@ import {
   createPartnerPlanUpgradeRequest,
 } from "@/lib/partner-plan-service";
 import { getSafePartnerPlanActionMessage } from "@/lib/partner-plan-safe-messages";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
-import { getPartnerSession } from "@/lib/partner-session";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
+import { requirePartnerActionSession } from "@/lib/partner-action-session";
+import type { PartnerSession } from "@/lib/partner-session";
+import { readString } from "@/lib/form-data";
 
 const PARTNER_PLANS_PATH = "/partner/plans";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
 
 function getPartnerPlansPath(companyId: string) {
   return companyId
@@ -38,9 +36,9 @@ function redirectPartnerPlanError(companyId: string, error: unknown): never {
 
 function readAuthorizedCompanyId(
   formData: FormData,
-  session: NonNullable<Awaited<ReturnType<typeof getPartnerSession>>>,
+  session: PartnerSession,
 ) {
-  const companyId = getString(formData, "companyId");
+  const companyId = readString(formData, "companyId");
   if (!companyId || !isPartnerPortalCompanyAllowed(session, companyId)) {
     redirectPartnerPlanError("", new Error("파트너사 접근 권한이 없습니다."));
   }
@@ -48,23 +46,17 @@ function readAuthorizedCompanyId(
 }
 
 export async function requestPartnerPlanUpgradeAction(formData: FormData) {
-  const session = await getPartnerSession();
-  if (!session) {
-    redirect("/partner/login");
-  }
-  if (session.mustChangePassword) {
-    redirect("/partner/change-password");
-  }
+  const session = await requirePartnerActionSession();
 
   const companyId = readAuthorizedCompanyId(formData, session);
-  const partnerId = getString(formData, "partnerId");
+  const partnerId = readString(formData, "partnerId");
   if (!partnerId) {
     redirectPartnerPlanError(
       companyId,
       new Error("제휴처 접근 권한이 없습니다."),
     );
   }
-  const billingProfileId = getString(formData, "billingProfileId");
+  const billingProfileId = readString(formData, "billingProfileId");
   if (!billingProfileId) {
     redirectPartnerPlanError(
       companyId,
@@ -77,8 +69,8 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
       partnerId,
       companyId,
       accountId: session.accountId,
-      requestedPlanTier: getString(formData, "requestedPlanTier"),
-      memo: getString(formData, "memo"),
+      requestedPlanTier: readString(formData, "requestedPlanTier"),
+      memo: readString(formData, "memo"),
       billingProfileId,
     });
   } catch (error) {
@@ -91,16 +83,10 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
 export async function cancelPartnerPlanUpgradeRequestAction(
   formData: FormData,
 ) {
-  const session = await getPartnerSession();
-  if (!session) {
-    redirect("/partner/login");
-  }
-  if (session.mustChangePassword) {
-    redirect("/partner/change-password");
-  }
+  const session = await requirePartnerActionSession();
 
   const companyId = readAuthorizedCompanyId(formData, session);
-  const requestId = getString(formData, "requestId");
+  const requestId = readString(formData, "requestId");
   if (!requestId) {
     redirectPartnerPlanError(
       companyId,

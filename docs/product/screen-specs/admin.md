@@ -171,7 +171,7 @@ authority: normative
 - 액션·흐름: 관리자는 공개/대외비/비공개를 선택하고 처리 상태를 등록 완료로 저장한다. 단일 제휴처가 생성되면 `/admin/partners/{id}`로 이동하고, 여러 혜택 그룹으로 여러 제휴처가 생성되면 안전한 목록 결과로 돌아간다.
 - 경계·상태: registrations permission과 campus scope를 적용한다. 검색어·상태·접수 경로·공개 상태·정렬은 URL과 서버 페이지 조회의 단일 기준이다. 대기, 빈 상태, 승인 중, 반려 사유 오류, 파일 오류, 변환 실패, 완료를 제공한다.
 - 반응형·분석: 모바일은 한 건씩 펼치는 queue/detail 아코디언, 데스크톱은 요약과 상세가 이어지는 dense queue를 쓴다. 열람·공개 상태 변경·처리 상태 저장·상세 이동을 audit한다.
-- 수용 기준: 승인 전 필수 회사·제휴처·지점 데이터를 검증하고 중복 처리와 권한 밖 신청 접근을 막는다. 공개 상태 선택값은 등록 요청에 보존하고 제휴처 변환에 전달한다.
+- 수용 기준: 승인 전 필수 회사·제휴처·지점 데이터를 검증하고 중복 처리와 권한 밖 신청 접근을 막는다. 공개 상태 선택값은 등록 요청에 보존하고 제휴처 변환에 전달한다. 등록 완료는 종료 상태라 다른 처리 상태로 되돌릴 수 없고, 화면은 허용된 상태만 선택지로 보이며 서버는 허용되지 않은 전이를 거부한다. 처리 상태 저장은 이전·다음 상태와 함께 감사 기록한다. 제휴처 생성 후속 처리가 실패하면 이번 시도에서 만든 행을 정리하고 신청 상태를 되돌린다. 상태 복원까지 실패해 등록 완료로 남으면 되돌렸다고 안내하지 않고 운영 담당자의 복구가 필요하다고 알리며, 복원 여부를 감사 기록에 남긴다.
 
 <!-- screen-contract: admin.partners -->
 ## `/admin/partners` — 제휴처 목록
@@ -181,7 +181,7 @@ authority: normative
 - 응답성 경계: 목록 첫 응답은 찾기·상태 확인·상세 이동에 필요한 데이터만 기다리며, 즐겨찾기·조회·CTA·리뷰 집계 같은 보조 운영 지표는 상세 화면에서 필요할 때 확인한다.
 - 경계·상태: brands permission과 campus scope를 적용한다. `q`(제휴처명), `category`, `visibility`, `sort`, `page`, `pageSize`가 목록 URL의 단일 기준이며, page size는 12·24·48 중 하나다. filter가 바뀌면 page를 1로 되돌린다. 기본, 빈 결과, 다건, filter, pagination, loading, 오류를 제공한다.
 - 반응형·분석: 모바일 compact entity row, 데스크톱 dense list를 쓴다. 조회·상세 이동·생성을 기록한다.
-- 수용 기준: 서버가 현재 page만 조회하고, 범위를 벗어난 page는 현재 filter를 보존한 canonical URL로 정규화한다. 오류는 내부 DB 오류를 노출하지 않고 같은 filter에서 재시도할 수 있어야 한다. `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다.
+- 수용 기준: 서버가 현재 page만 조회하고, 범위를 벗어난 page는 현재 filter를 보존한 canonical URL로 정규화한다. 오류는 내부 DB 오류를 노출하지 않고 같은 filter에서 재시도할 수 있어야 한다. `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다. 이 화면에서 Partner/Boost 플랜은 만료돼도 자동으로 Basic으로 낮추지 않고(수동 유예) 만료·만료 임박(30일 이내, 파트너 포털과 같은 기준)·만료일 미설정 상태와 만료 후 유지 중인 플랜 수를 표시해 관리자가 직접 변경하게 한다. 이 수동 유예는 플랜 만료일에만 적용되며, 결제 기한과 유예 기간이 지난 미납 청구를 Basic으로 조정하는 청구 배치는 별도 규칙으로 유지한다.
 
 <!-- screen-contract: admin.partner-editor -->
 ## `/admin/partners/[partnerId]` — 제휴처 편집
@@ -236,3 +236,30 @@ authority: normative
 - 경계·상태: global category 관리 권한을 요구한다. 기본, 빈 상태, validation error, 중복, 사용 중 삭제 제한, 저장 중을 제공한다.
 - 반응형·분석: 모바일 compact row와 edit drawer, 데스크톱 list/detail을 쓴다. 생성·변경·삭제를 audit한다.
 - 수용 기준: 지역 관리자에게 전역 변경 UI를 숨기고 연결 제휴처 수를 표시한다. 현재 UI와 server action 모두 삭제를 거부하며, 후속 migration에서 FK 보호와 대체 카테고리 절차를 갖추기 전에는 빈 카테고리도 삭제하지 않는다. `/admin/partners?tab=categories`는 이곳으로 보낸다.
+
+<!-- screen-contract: admin.mcp.connections -->
+## `/admin/mcp` — AI 연결 관리
+
+- 목표·위계: 서버 주소 → 내 연결·권한·철회 → 최고 관리자 클라이언트 등록 → 등록 ID·정확 콜백 순이다.
+- 액션·흐름: primary는 클라이언트 등록이며 연결은 AI 앱에서 시작한다. 연결 철회는 본인 연결만 가능하고 즉시 이후 요청을 차단한다.
+- 경계·상태: 활성 관리자·비밀번호 gate·현재 권한 버전을 재검사한다. 등록은 최고 관리자와 admin_management.create 모두 필요하다. 빈 목록, 긴 URL, 검증 오류·첫 필드 focus, 제출 중, 조회 실패를 제공한다. FE·BE는 같은 등록 schema를 쓴다.
+- 반응형·분석: 360/820/1366px에서 한 열과 줄바꿈을 유지하고 44px 조작 영역을 제공한다. 토큰 원문은 화면·URL·로그에 표시하지 않는다.
+- 수용 기준: 본인 연결만 표시·철회하며 잘못된 콜백은 등록되지 않는다. 운영은 durable Repository, 개발 합성 fixture만 mock을 사용한다.
+
+<!-- screen-contract: admin.mcp.authorize -->
+## `/admin/mcp/authorize` — AI 연결 동의
+
+- 목표·위계: 등록된 클라이언트 이름 → 정확한 사이트 환경 → 요청 권한 → 허용·거절 순이다.
+- 액션·흐름: 로그인과 별도로 사람이 허용해야 code를 발급한다. 거절은 검증된 exact callback으로 access_denied를 돌려준다.
+- 경계·상태: 등록·resource·S256·scope·현재 관리자 권한을 검증한다. 서명된 CSRF는 actor·요청·만료에 묶인다. 미등록/잘못된/만료 요청은 로컬 복구 링크만 제공한다.
+- 반응형·분석: 360/820/1366px에서 긴 이름·origin은 줄바꿈하고 CTA는 감싸며 의미 있는 제목·목록을 제공한다. 쿼리·code·리뷰 본문을 분석 이벤트로 보내지 않는다.
+- 수용 기준: GET은 연결을 허용하지 않으며 code 교환은 exact callback/client/resource/PKCE와 일회성 트랜잭션을 검사한다.
+
+<!-- screen-contract: admin.mcp.review -->
+## `/admin/mcp/reviews/[reviewId]` — 리뷰 변경 검토
+
+- 목표·위계: 출품명 → 익명 본문 → 변경 전후·만료 → 이 변경 승인 순이다.
+- 액션·흐름: primary는 이 변경 승인이다. 승인 후 AI 앱으로 돌아가 명시 실행하고, 만료/상태 변경은 새 검토를 요청한다.
+- 경계·상태: 본인 연결·전역 리뷰 운영 권한·scope·현재 grant와 관리자 상태를 재검증한다. 검토는 5분이며 actor/client/grant/대상/본문 hash/상태/제안 값에 묶인다. 승인 전·승인 후·실행 완료·만료·상태 충돌을 구분한다.
+- 반응형·분석: 360/820/1366px에서 긴 본문을 줄바꿈하고 44px 승인 target을 제공한다. 작성자·작성 시각·인증 값은 표시하지 않는다.
+- 수용 기준: 승인만으로 변경하지 않으며 실행 시 기존 업무 RPC·감사·receipt를 원자 처리한다. 동시 재시도는 한 번만 변경한다.

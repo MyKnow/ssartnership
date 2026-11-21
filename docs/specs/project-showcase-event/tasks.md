@@ -1,11 +1,13 @@
 ---
 title: SSAFY 프로젝트 쇼케이스 작업 기록
 type: task-list
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # SSAFY 프로젝트 쇼케이스 작업 기록
+
+> 종료 정리(2026-10-05): Issue #480·#491·#510·#511·#512는 모두 종료됐고 관련 커밋은 `main`에 있다. 미체크로 남은 Preview·Production 적용 항목은 2026-10-02 PVE 이전에서 두 환경의 적용 마이그레이션 원장이 저장소 마이그레이션 208개와 일치함을 확인해 완료로 본다([PVE 이전 작업 기록](../pve-service-migration/tasks.md)). 이 문서는 시점 증거이며 현재 계약은 [명세](./spec.md)다.
 
 ## Issue #576 종료 결과·경품 수령 안내
 
@@ -13,9 +15,10 @@ authority: descriptive
 - [x] 홈 활성 결과 배너 첫 번째 정렬 및 비로그인·타인·숨김 리뷰 제외 집중 검증
 - [x] 화면 폭별 렌더: 320/360/390/820/1366px, 집중 browser 4건 통과
 - [x] 전체 release 검증: Node 1,988 통과·기존 skip 9, unit 141, build, browser 90 통과·retry 0
-- [ ] 정확한 SHA의 첫 CI 실행 확인
-- [ ] Production 배포, 배너 활성화 감사·당첨 기록 보존 확인
-- [ ] dev 통합·Preview 검증 후 Issue 종료
+- [x] 정확한 SHA의 첫 CI 실행 확인: PR #580 및 main `73922102d2be5e5ab587c3252479b326e30ed8da`, 첫 attempt 성공
+- [x] Production 배포, 첫 배너 활성화 감사 1건·당첨 31명 원장 fingerprint 보존 및 Live 360/820/1366px 확인
+- [x] dev 통합 후보 로컬 검증: Node 2,797·unit 277·build·production-fixture browser 119 통과, retry 0
+- [ ] dev 첫 CI·병합 및 Preview 런타임 검증: 기존 미적용 `20261006010931_fence_consent_profile_delivery_and_upload_transitions.sql` 1개는 이 변경의 범위와 분리해 유지한다. Source 통합과 실제 Preview 배포를 구분하고 Issue 종료는 검증 후 수행한다.
 
 ## 결정 기록
 

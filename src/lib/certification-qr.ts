@@ -1,11 +1,8 @@
 import crypto from "crypto";
 import { SITE_URL } from "@/lib/site";
 import { CERTIFICATION_QR_TTL_SECONDS } from "@/lib/certification-constants";
-import {
-  createHmacDigest,
-  splitSignedToken,
-  verifyHmacDigest,
-} from "./hmac.js";
+import { createHmacDigest, openSignedPayload } from "./hmac.js";
+import { readSessionSecret } from "./session-secrets.ts";
 
 export type CertificationQrPayload = {
   version: 1;
@@ -20,17 +17,7 @@ export type CertificationQrVerificationResult =
   | { ok: false; reason: "invalid" | "expired" };
 
 function getSecret() {
-  const secret =
-    process.env.CERTIFICATION_QR_SECRET ?? process.env.USER_SESSION_SECRET ?? "";
-  if (!secret) {
-    throw new Error(
-      "CERTIFICATION_QR_SECRET 또는 USER_SESSION_SECRET 환경 변수가 필요합니다.",
-    );
-  }
-  if (secret.length < 32) {
-    throw new Error("QR 검증 시크릿은 최소 32자 이상이어야 합니다.");
-  }
-  return secret;
+  return readSessionSecret("certification-qr");
 }
 
 function encodeBase64Url(value: string) {
@@ -67,16 +54,8 @@ export function issueCertificationQrToken(input: {
 export function verifyCertificationQrToken(
   token: string,
 ): CertificationQrVerificationResult {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return { ok: false, reason: "invalid" };
-  }
-  const [encodedPayload, signature] = signedToken;
-  if (!encodedPayload || !signature) {
-    return { ok: false, reason: "invalid" };
-  }
-
-  if (!verifyHmacDigest(encodedPayload, signature, getSecret(), "base64url")) {
+  const encodedPayload = openSignedPayload(token, getSecret(), "base64url");
+  if (!encodedPayload) {
     return { ok: false, reason: "invalid" };
   }
 

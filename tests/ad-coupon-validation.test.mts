@@ -139,3 +139,38 @@ describe("ad coupon validation", () => {
     );
   });
 });
+
+describe("ad coupon status transitions in the shared form parser", () => {
+  it("accepts allowed edits and rejects reopening an ended coupon with a safe message", async () => {
+    const { AdStatusTransitionError } = await import("../src/lib/ad-packages.ts");
+    const { parseUpdateAdCouponForm } = await import("../src/lib/ad-package-validation.ts");
+
+    const paused = parseCreateAdCouponForm(buildForm({ status: "paused" }), {
+      currentStatus: "active",
+    });
+    assert.equal(paused.status, "paused");
+    assert.equal(
+      parseCreateAdCouponForm(buildForm({ status: "ended" }), { currentStatus: "ended" }).status,
+      "ended",
+    );
+
+    let rejected: unknown = null;
+    try {
+      parseUpdateAdCouponForm(buildForm({ couponId: "coupon-1", status: "active" }), {
+        currentStatus: "ended",
+      });
+    } catch (error) {
+      rejected = error;
+    }
+    assert.ok(rejected instanceof AdStatusTransitionError);
+    assert.equal(rejected.code, "ad_coupon_invalid_status_transition");
+    assert.equal(
+      getSafeAdCouponFormMessage(rejected),
+      "종료된 쿠폰은 다시 열 수 없습니다. 새 쿠폰으로 운영해 주세요.",
+    );
+    assert.throws(
+      () => parseCreateAdCouponForm(buildForm({ status: "draft" }), { currentStatus: "active" }),
+      /활성 상태의 쿠폰은 초안 상태로 바꿀 수 없습니다\./,
+    );
+  });
+});

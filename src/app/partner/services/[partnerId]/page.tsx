@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
-import { resolvePartnerPortalCompanyIdForService } from "@/lib/partner-portal-scope";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-auth/portal-paths";
+import { resolvePartnerPortalCompanyIdForService } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 

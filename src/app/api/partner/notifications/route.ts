@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import {
   deletePartnerStoredNotifications,
-  listPartnerStoredNotifications,
   markPartnerStoredNotificationsRead,
 } from "@/lib/partner-notification-store";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
+import { listPartnerNotificationCenterStoredEntries } from "@/lib/partner-notifications";
+import {
+  parsePartnerNotificationPageQuery,
+  type PartnerNotificationListResponse,
+} from "@/lib/partner-notification-contract";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   NotificationRequestError,
@@ -17,6 +21,7 @@ import {
   normalizePartnerNotificationIds,
 } from "@/lib/partner-notification-input";
 import { readRouteJsonBodyWithinLimit } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -33,17 +38,12 @@ async function requirePartnerNotificationSession(request: NextRequest) {
     return { response: getInvalidRequestResponse() };
   }
 
-  const session = await getPartnerSession();
-  if (!session) {
-    return {
-      response: NextResponse.json(
-        { message: "로그인이 필요합니다." },
-        { status: 401 },
-      ),
-    };
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth;
   }
 
-  return { accountId: session.accountId, session };
+  return { accountId: auth.session.accountId, session: auth.session };
 }
 
 async function parseNotificationIds(request: NextRequest) {
@@ -67,31 +67,36 @@ async function parseNotificationIds(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   const companyId = request.nextUrl.searchParams.get("companyId")?.trim() ?? "";
   if (companyId && !isPartnerPortalCompanyAllowed(session, companyId)) {
     return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
   }
   try {
-    const result = await listPartnerStoredNotifications({
+    const { offset, limit } = parsePartnerNotificationPageQuery(
+      request.nextUrl.searchParams,
+    );
+    const result = await listPartnerNotificationCenterStoredEntries({
       accountId: session.accountId,
-      companyId,
-      limit: 30,
+      companyIds: session.companyIds,
+      companyId: companyId || null,
+      offset,
+      limit,
     });
-    if (companyId && result.isEmptyScope) {
-      return NextResponse.json({ unreadCount: 0, items: [] });
-    }
     return NextResponse.json({
       ok: true,
       summary: { unreadCount: result.unreadCount },
       unreadCount: result.unreadCount,
       items: result.items,
-    });
+      nextOffset: result.nextOffset,
+      hasMore: result.hasMore,
+    } satisfies PartnerNotificationListResponse);
   } catch (error) {
-    console.error("[partner-notifications] list failed", error);
+    logServerError("[partner-notifications] list failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -118,7 +123,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-notifications] mark read failed", error);
+      logServerError("[partner-notifications] mark read failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,
@@ -146,7 +151,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-notifications] delete failed", error);
+      logServerError("[partner-notifications] delete failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

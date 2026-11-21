@@ -36,6 +36,25 @@ async function createCodeCoupon(
   });
 }
 
+/** Redemption is issue-based only: download the coupon, then redeem that issue. */
+async function issueAndRedeemCoupon(
+  repository: MockAdPackageRepository,
+  input: { couponId: string; memberId: string; sessionId?: string },
+) {
+  const issued = await repository.issueCoupon(input);
+  assert.equal(issued.ok, true);
+  if (!issued.ok || !issued.issue.issueId) {
+    throw new Error("expected the coupon to be issued");
+  }
+  const redeemed = await repository.redeemCouponIssue({
+    issueId: issued.issue.issueId,
+    memberId: input.memberId,
+    sessionId: input.sessionId,
+  });
+  assert.equal(redeemed.ok, true);
+  return redeemed;
+}
+
 describe("mock ad package repository", () => {
   it("prepares campaign options with the trimmed sponsor fallback", async () => {
     const repository = new MockAdPackageRepository();
@@ -337,7 +356,7 @@ describe("mock ad package repository", () => {
     );
 
     const used = await createCodeCoupon(repository);
-    await repository.redeemCoupon({
+    await issueAndRedeemCoupon(repository, {
       couponId: used.id,
       memberId: "member-delete-guard",
       sessionId: "session-delete-guard",
@@ -346,6 +365,92 @@ describe("mock ad package repository", () => {
       ok: false,
       reason: "usage_history",
     });
+  });
+
+  it("refuses to delete an active coupon without history until it is paused or ended", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "활성 삭제 차단",
+      redemptionType: "code",
+      status: "active",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+
+    assert.deepEqual(await repository.deleteCoupon(coupon.id), {
+      ok: false,
+      reason: "active",
+    });
+    await repository.updateCoupon({
+      couponId: coupon.id,
+      partnerId: coupon.partnerId,
+      campaignId: coupon.campaignId,
+      title: coupon.title,
+      redemptionType: coupon.redemptionType,
+      status: "paused",
+      startsAt: coupon.startsAt,
+      endsAt: coupon.endsAt,
+    });
+    assert.deepEqual(await repository.deleteCoupon(coupon.id), { ok: true });
+  });
+
+  it("applies the coupon status transition table on update (ended is terminal)", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "종료 후 재활성 차단",
+      redemptionType: "code",
+      status: "active",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+    const updateWithStatus = (status: "active" | "ended") =>
+      repository.updateCoupon({
+        couponId: coupon.id,
+        partnerId: coupon.partnerId,
+        campaignId: coupon.campaignId,
+        title: coupon.title,
+        redemptionType: coupon.redemptionType,
+        status,
+        startsAt: coupon.startsAt,
+        endsAt: coupon.endsAt,
+      });
+
+    assert.equal((await updateWithStatus("ended")).status, "ended");
+    await assert.rejects(updateWithStatus("active"), {
+      name: "AdStatusTransitionError",
+      code: "ad_coupon_invalid_status_transition",
+    });
+    assert.equal((await repository.getAdminCouponById(coupon.id))?.status, "ended");
+  });
+
+  it("applies the campaign status transition table", async () => {
+    const repository = new MockAdPackageRepository();
+    const campaign = await repository.createCampaign({
+      partnerId: "restaurant-001",
+      packageTier: "basic",
+      title: "전이 테스트",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: campaign.id, status: "active" }),
+      { ok: true },
+    );
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: campaign.id, status: "ended" }),
+      { ok: true },
+    );
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: campaign.id, status: "active" }),
+      { ok: false, reason: "invalid_transition", from: "ended" },
+    );
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: "missing", status: "active" }),
+      { ok: false, reason: "not_found" },
+    );
   });
 
   it("lists active coupons for a partner", async () => {
@@ -358,17 +463,16 @@ describe("mock ad package repository", () => {
     assert.equal(coupons[0]?.title, "점심 세트 10% 할인");
   });
 
-  it("redeems a coupon and updates campaign reporting counts", async () => {
+  it("redeems an issued coupon and updates campaign reporting counts", async () => {
     const repository = new MockAdPackageRepository();
     const coupon = await createCodeCoupon(repository);
-    const first = await repository.redeemCoupon({
+    const first = await issueAndRedeemCoupon(repository, {
       couponId: coupon.id,
       memberId: "member-1",
       sessionId: "session-1",
     });
 
-    assert.equal(first.ok, true);
-    assert.equal(first.redemption?.couponId, coupon.id);
+    assert.equal(first.ok && first.couponId, coupon.id);
 
     const campaigns = await repository.listAdminCampaigns();
     const campaign = campaigns.find((item) => item.id === coupon.campaignId);
@@ -380,19 +484,21 @@ describe("mock ad package repository", () => {
   it("enforces per-member coupon redemption limits", async () => {
     const repository = new MockAdPackageRepository();
     const coupon = await createCodeCoupon(repository);
-    await repository.redeemCoupon({
+    await issueAndRedeemCoupon(repository, {
       couponId: coupon.id,
       memberId: "member-1",
       sessionId: "session-1",
     });
-    const second = await repository.redeemCoupon({
+    // The member already used the single allowed redemption, so a new
+    // download is refused before another redemption can exist.
+    const second = await repository.issueCoupon({
       couponId: coupon.id,
       memberId: "member-1",
       sessionId: "session-2",
     });
 
     assert.equal(second.ok, false);
-    assert.equal(second.reason, "member_limit");
+    assert.equal(!second.ok && second.reason, "member_limit");
   });
 
   it("lists available wallet coupons with member and global remaining counts", async () => {
@@ -426,7 +532,7 @@ describe("mock ad package repository", () => {
       true,
     );
 
-    await repository.redeemCoupon({
+    await issueAndRedeemCoupon(repository, {
       couponId: coupon.id,
       memberId: "member-1",
       sessionId: "session-1",
@@ -448,12 +554,11 @@ describe("mock ad package repository", () => {
       title: "선착순 체험권",
       redemptionType: "code",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-12-31T23:59:59.000Z",
+      ...activeCouponWindow(),
       usageLimit: 1,
       perMemberLimit: 5,
     });
-    await repository.redeemCoupon({
+    await issueAndRedeemCoupon(repository, {
       couponId: coupon.id,
       memberId: "member-2",
       sessionId: "session-1",
@@ -462,7 +567,7 @@ describe("mock ad package repository", () => {
     const coupons = await repository.listAvailableCouponsForMember({
       memberId: "member-1",
       partnerIds: ["health-001"],
-      now: new Date("2026-07-15T12:00:00.000Z"),
+      now: new Date(),
     });
 
     assert.equal(coupons.some((item) => item.coupon.id === coupon.id), false);
@@ -654,14 +759,10 @@ describe("mock ad package repository", () => {
     assert.equal(coupons.some((item) => item.coupon.id === coupon.id), false);
   });
 
-  it("blocks direct coupon-id redemption for onsite coupons", async () => {
+  it("exposes no coupon-id redemption outside the issue-based path", () => {
     const repository = new MockAdPackageRepository();
-    const result = await repository.redeemCoupon({
-      couponId: "coupon-restaurant-lunch",
-      memberId: "member-1",
-    });
 
-    assert.equal(result.ok, false);
-    assert.equal(result.reason, "onsite_verification_required");
+    assert.equal("redeemCoupon" in repository, false);
+    assert.equal(typeof repository.redeemCouponIssue, "function");
   });
 });

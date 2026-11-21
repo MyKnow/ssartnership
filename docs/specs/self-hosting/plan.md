@@ -1,8 +1,8 @@
 ---
 title: 자체 호스팅 기술 계획
 type: implementation-plan
-status: active
-authority: normative
+status: completed
+authority: evidence
 issue: https://github.com/MyKnow/ssartnership/issues/435
 ---
 
@@ -18,7 +18,7 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 ## 공개 경로와 데이터 경계
 
-로컬 앱 포트는 loopback에만 연다. 운영에서는 TLS reverse proxy가 정상 Host와 protocol을 전달하고 입력 크기·요청 제한을 적용한다. 현재 앱의 비Vercel client IP 처리를 우회하여 외부에서 보낸 forwarded 헤더를 신뢰하지 않는다. 홈 서버 ingress 구성과 신뢰 경계 검증은 실제 호스트 접근 후 진행한다.
+로컬 앱 포트는 loopback에만 연다. 운영에서는 TLS reverse proxy가 정상 Host와 protocol을 전달하고 입력 크기·요청 제한을 적용한다. client IP는 [클라이언트 IP 신뢰 계약](../../security/client-ip-trust.md)에 따라 엣지·relay 체인이 기록한 값만 신뢰하고, 외부에서 보낸 forwarded 헤더를 그대로 믿지 않는다.
 
 데이터 서비스 작업은 앱 이미지와 독립적으로 진행한다. 기존 Supabase API에 대한 강한 의존 때문에 SQL만 옮겨도 Storage, PostgREST, RPC, RLS 계약이 자동 대체되지 않는다. 최종 서비스 선택과 복원 시험 결과를 확인한 뒤 앱과 연결한다. managed Supabase를 유지하는 중간 실행은 전체 자체 호스팅 완료 조건을 충족하지 않는다.
 
@@ -28,7 +28,7 @@ cloud 기능은 사용처와 운영 목적을 조사하여 자체 운영 대체�
 
 ## Cron과 배포
 
-`vercel.json`의 UTC 일정을 이식 도구가 읽는다. 도구는 등록된 endpoint에만 Bearer 인증 GET을 보내고 redirect, timeout, non-2xx 응답을 실패로 처리한다. 반복 스케줄러 자체는 로컬 smoke에서 시작하지 않는다. 운영 전환 시 Vercel Cron 비활성화와 새 scheduler 활성화를 한 절차로 수행하며 중복 실행 여부를 로그로 검증한다.
+`deploy/self-host-operations/production-cron/schedules.json`의 UTC 일정을 이식 도구가 읽는다(RF-04 전에는 `vercel.json`). 도구는 등록된 endpoint에만 Bearer 인증 GET을 보내고 redirect, timeout, non-2xx 응답을 실패로 처리한다. 반복 스케줄러 자체는 로컬 smoke에서 시작하지 않는다. 운영 전환 시 Vercel Cron 비활성화와 새 scheduler 활성화를 한 절차로 수행하며 중복 실행 여부를 로그로 검증한다.
 
 CI의 산출물은 source SHA와 연결된 OCI image다. `dev`와 `main`은 별도 workflow에서 각각 Preview·Production origin으로 빌드하며 환경별 tag와 manifest artifact를 사용한다. 운영 CD는 현재 branch의 첫 성공 attempt, 전체 필수 step, schema migration tree 승인과 immutable digest를 다시 확인한 뒤 app만 pull·교체하고 health 결과를 기록한다. 앱 롤백은 이전 digest 재적용으로 수행한다. 새 DB에 쓰기가 생겼다면 앱 이미지/DNS만 되돌리는 방식은 데이터 롤백이 아니며 별도 복구 절차가 필요하다.
 

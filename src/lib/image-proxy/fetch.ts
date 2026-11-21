@@ -15,6 +15,7 @@ import {
 export type FetchPublicImageOptions = {
   allowedContentTypes?: readonly string[];
   maxBytes?: number;
+  timeoutMs?: number;
 };
 
 function resolveMaxBytes(value: number | undefined) {
@@ -27,7 +28,22 @@ function resolveMaxBytes(value: number | undefined) {
   return value;
 }
 
-async function resolvePublicImageAddress(hostname: string) {
+export function resolveImageFetchTimeoutMs(value: number | undefined) {
+  if (value === undefined) {
+    return IMAGE_FETCH_TIMEOUT_MS;
+  }
+  if (
+    !Number.isSafeInteger(value) ||
+    value <= 0 ||
+    value > IMAGE_FETCH_TIMEOUT_MS
+  ) {
+    throw new ImageProxyError("Invalid image timeout", 500);
+  }
+  return value;
+}
+
+async function resolvePublicImageAddress(hostname: string, signal: AbortSignal) {
+  signal.throwIfAborted();
   const resolvedIpVersion = net.isIP(hostname);
   if (resolvedIpVersion === 4 || resolvedIpVersion === 6) {
     if (!isPublicIpAddress(hostname)) {
@@ -38,9 +54,22 @@ async function resolvePublicImageAddress(hostname: string) {
 
   let lookupResults: Array<{ address: string }>;
   try {
-    lookupResults = await dns.lookup(hostname, {
-      all: true,
-      verbatim: true,
+    lookupResults = await new Promise<Array<{ address: string }>>((resolve, reject) => {
+      const onAbort = () => {
+        signal.removeEventListener("abort", onAbort);
+        reject(signal.reason);
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      dns.lookup(hostname, { all: true, verbatim: true }).then(
+        (addresses) => {
+          signal.removeEventListener("abort", onAbort);
+          resolve(addresses);
+        },
+        (error: unknown) => {
+          signal.removeEventListener("abort", onAbort);
+          reject(error);
+        },
+      );
     });
   } catch {
     throw new ImageProxyError("Failed to resolve image host", 502);
@@ -96,11 +125,35 @@ export async function fetchPublicImage(
   options: FetchPublicImageOptions = {},
 ) {
   const maxBytes = resolveMaxBytes(options.maxBytes);
+  const timeoutMs = resolveImageFetchTimeoutMs(options.timeoutMs);
+  const controller = new AbortController();
+  const deadline = setTimeout(() => {
+    controller.abort(new ImageProxyError("Failed to fetch image", 502));
+  }, timeoutMs);
+  deadline.unref();
+  try {
+    return await fetchPublicImageWithinDeadline(
+      target,
+      { ...options, maxBytes, timeoutMs },
+      controller.signal,
+    );
+  } finally {
+    clearTimeout(deadline);
+  }
+}
+
+async function fetchPublicImageWithinDeadline(
+  target: URL,
+  options: FetchPublicImageOptions & { maxBytes: number; timeoutMs: number },
+  signal: AbortSignal,
+) {
+  const { maxBytes, timeoutMs } = options;
   const internalTarget = resolveInternalPublicSupabaseImageTarget(target);
   const requestTarget = internalTarget ?? target;
   const resolvedAddress = internalTarget
     ? requestTarget.hostname
-    : await resolvePublicImageAddress(requestTarget.hostname);
+    : await resolvePublicImageAddress(requestTarget.hostname, signal);
+  signal.throwIfAborted();
   const isHttps = requestTarget.protocol === "https:";
   const client = isHttps ? https : http;
   const requestOptions: RequestOptions = {
@@ -116,8 +169,8 @@ export async function fetchPublicImage(
       "Accept-Encoding": "identity",
       Host: requestTarget.host,
     },
-    signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
-    timeout: IMAGE_FETCH_TIMEOUT_MS,
+    signal,
+    timeout: timeoutMs,
     ...(isHttps
       ? {
           servername: requestTarget.hostname,
@@ -141,7 +194,7 @@ export async function fetchPublicImage(
 
   const statusCode = response.statusCode ?? 0;
   if (statusCode < 200 || statusCode >= 300) {
-    response.resume();
+    response.destroy();
     throw new ImageProxyError("Failed to fetch image", 502);
   }
 
@@ -150,13 +203,13 @@ export async function fetchPublicImage(
     options.allowedContentTypes,
   );
   if (!contentType) {
-    response.resume();
+    response.destroy();
     throw new ImageProxyError("Unsupported media type", 415);
   }
 
   const contentLength = getContentLength(response.headers);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-    response.resume();
+    response.destroy();
     throw new ImageProxyError("Image too large", 413);
   }
 

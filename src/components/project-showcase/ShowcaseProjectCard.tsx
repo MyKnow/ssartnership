@@ -1,4 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
+import { SHOWCASE_PROJECT_CARD_IMAGE_SIZES } from "@/components/project-showcase/image-sizes";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import type { ShowcaseProject } from "@/lib/project-showcase/types";
 
@@ -16,13 +19,13 @@ export default function ShowcaseProjectCard({
   const content = (
     <>
       <div className="relative aspect-video overflow-hidden bg-surface-muted">
-        {/* Project covers live in a public Storage bucket rather than next/image remote patterns. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={project.imageUrl}
+        {/* 공개 Storage 커버는 다른 공개 이미지와 같이 /api/image 프록시를 거쳐 옵티마이저가 카드 폭에 맞춘다. */}
+        <Image
+          src={getCachedImageUrl(project.imageUrl)}
           alt=""
-          loading="lazy"
-          className={`h-full w-full object-cover ${previewMode ? "" : "transition-transform duration-300 group-hover:scale-[1.02]"}`}
+          fill
+          sizes={SHOWCASE_PROJECT_CARD_IMAGE_SIZES}
+          className={`object-cover ${previewMode ? "" : "transition-transform duration-300 group-hover:scale-[1.02]"}`}
         />
         <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900">
           {SHOWCASE_TYPE_LABELS[project.projectType]}

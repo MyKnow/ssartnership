@@ -1,5 +1,8 @@
 import "server-only";
 
+import { revalidateTag, unstable_cache } from "next/cache";
+import { COHORT_CARD_THEMES_CACHE_TAG } from "@/lib/cache-tags";
+import { SLOW_CHANGING_DATA_CACHE_SECONDS } from "@/lib/cache-ttl";
 import { isMockDataSource } from "@/lib/mock/member";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -48,20 +51,36 @@ export async function listCohortCardThemes() {
     ];
   }
 
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("ssafy_cohort_card_themes")
-    .select(COHORT_THEME_SELECT)
-    .order("cohort_year", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message || "기수별 카드 색상을 불러오지 못했습니다.");
-  }
-
-  return ((data ?? []) as CohortCardThemeRow[])
-    .map(normalizeCohortCardTheme)
-    .filter((theme): theme is CohortCardTheme => Boolean(theme));
+  return getCachedCohortCardThemes();
 }
+
+/**
+ * Admin-only edits, read on every certification, coupon verification and QR
+ * verification render. Writes below revalidate the tag; the TTL only bounds
+ * staleness after an out-of-band change such as a migration.
+ */
+const getCachedCohortCardThemes = unstable_cache(
+  async (): Promise<CohortCardTheme[]> => {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("ssafy_cohort_card_themes")
+      .select(COHORT_THEME_SELECT)
+      .order("cohort_year", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message || "기수별 카드 색상을 불러오지 못했습니다.");
+    }
+
+    return ((data ?? []) as CohortCardThemeRow[])
+      .map(normalizeCohortCardTheme)
+      .filter((theme): theme is CohortCardTheme => Boolean(theme));
+  },
+  ["cohort-card-themes", "list"],
+  {
+    revalidate: SLOW_CHANGING_DATA_CACHE_SECONDS,
+    tags: [COHORT_CARD_THEMES_CACHE_TAG],
+  },
+);
 
 export async function upsertCohortCardTheme(input: CohortCardThemeInput) {
   const supabase = getSupabaseAdminClient();
@@ -82,6 +101,8 @@ export async function upsertCohortCardTheme(input: CohortCardThemeInput) {
   if (error) {
     throw new Error(error.message || "기수별 카드 색상을 저장하지 못했습니다.");
   }
+  // Expire immediately so the admin list and member cards show the edit.
+  revalidateTag(COHORT_CARD_THEMES_CACHE_TAG, { expire: 0 });
 }
 
 export async function deleteCohortCardTheme(cohortYear: number) {
@@ -94,4 +115,6 @@ export async function deleteCohortCardTheme(cohortYear: number) {
   if (error) {
     throw new Error(error.message || "기수별 카드 색상을 삭제하지 못했습니다.");
   }
+  // Expire immediately so the admin list and member cards show the edit.
+  revalidateTag(COHORT_CARD_THEMES_CACHE_TAG, { expire: 0 });
 }

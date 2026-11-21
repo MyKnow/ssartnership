@@ -1,10 +1,10 @@
 import type {
   PartnerPortalCompanySummary,
   PartnerPortalServiceSummary,
-} from "./partner-portal.ts";
+} from "./partner-auth/portal.ts";
 import type { PartnerCompanyPlanTier } from "./partner-company-plans.ts";
 import { canAccessPartnerMetric } from "./partner-company-plans.ts";
-import { isPartnerPortalMock } from "./partner-portal.ts";
+import { isPartnerPortalMock } from "./partner-auth/portal.ts";
 import { getMockPartnerPortalDashboard } from "./mock/partner-portal.ts";
 import { getSupabasePartnerPortalDashboard } from "./partner-dashboard.supabase.ts";
 

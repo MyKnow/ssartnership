@@ -102,10 +102,10 @@ generic UI 자기점검과 제거할 장식:
 | 페이지 진입 | `PageHeader`, `PageSection` | 단일 h1, 짧은 설명, primary CTA 하나 |
 | 표면 | `Surface`, `Card`, `Container` | 같은 depth는 같은 surface/elevation 사용 |
 | 목록 필터 | `FilterBar`, `AdvancedFilterDisclosure`, `Input`, `Select` | 기본 3~4개, 나머지는 disclosure, URL query가 기준 |
-| 데이터 밀도 | `DataPanel`, `StatsRow`, `CompactEntityRow` 계열 | 핵심 식별자·상태·한두 메타·상세 이동만 우선 노출 |
+| 데이터 밀도 | `DataPanel`, `StatsRow`(압축 행·`+N` 축약은 [계획된 패턴](../../design-system/components.md#계획된-패턴공용-컴포넌트-미구현)으로, 공용 컴포넌트 없이 기존 primitive로 구현) | 핵심 식별자·상태·한두 메타·상세 이동만 우선 노출 |
 | 입력 | `FormSection`, `FormMessage`, `InlineMessage`, `SubmitButton` | field error와 첫 오류 focus를 제공 |
 | 피드백 | `Skeleton`, `EmptyState`, `InlineMessage`, `Toast`, `Modal` | toast는 일시 확인, recovery는 문맥 안에서 제공 |
-| 반응형·모션 | `ResponsiveGrid`, `MotionReveal` | reduced motion을 존중하며 정보 재배치를 우선 |
+| 반응형·모션 | `ResponsiveGrid`, CSS transition([Layout And Motion](../../design-system/layout-and-motion.md)) | reduced motion을 존중하며 정보 재배치를 우선. 등장 애니메이션 래퍼(`MotionReveal`)는 새 코드에서 쓰지 않는다 |
 
 ## 5. 공통 상태 전이와 오류 복구
 

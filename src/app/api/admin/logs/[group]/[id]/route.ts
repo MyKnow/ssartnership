@@ -4,6 +4,7 @@ import { getAdminLogAccessPolicy } from "@/lib/admin-log-access";
 import { getAdminSession } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { withServerTiming } from "@/lib/server-timing";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const runtime = "nodejs";
 
@@ -12,12 +13,6 @@ type LogGroup = (typeof LOG_GROUPS)[number];
 
 function isLogGroup(value: string): value is LogGroup {
   return LOG_GROUPS.includes(value as LogGroup);
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
 }
 
 export async function GET(
@@ -41,7 +36,7 @@ export async function GET(
     }
 
     const { group: rawGroup, id } = await params;
-    if (!isLogGroup(rawGroup) || !isUuid(id)) {
+    if (!isLogGroup(rawGroup) || !isUuidFormat(id)) {
       return NextResponse.json(
         { message: "로그 상세 대상을 확인해 주세요." },
         { status: 400 },

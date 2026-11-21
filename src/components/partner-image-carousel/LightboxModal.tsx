@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { CarouselOffset } from "./types";
 import { clampCarouselZoom, getTouchDistance } from "./helpers";
 
@@ -45,25 +46,27 @@ export default function LightboxModal({
   });
   const mouseDraggingRef = useRef(false);
   const lastTapRef = useRef(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Escape·Tab 순환·초기 포커스·opener 복원은 공용 다이얼로그 계약을 따른다.
+  useDialogFocus({ open, containerRef: dialogRef, onClose });
 
   useEffect(() => {
-    if (!open) {
+    if (!open || !canNavigate) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      } else if (canNavigate && event.key === "ArrowLeft") {
+      if (event.key === "ArrowLeft") {
         onPrev();
-      } else if (canNavigate && event.key === "ArrowRight") {
+      } else if (event.key === "ArrowRight") {
         onNext();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canNavigate, onClose, onNext, onPrev, open]);
+  }, [canNavigate, onNext, onPrev, open]);
 
   if (!open) {
     return null;
@@ -71,14 +74,16 @@ export default function LightboxModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      ref={dialogRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 focus:outline-hidden"
       role="dialog"
       aria-modal="true"
       aria-label={name}
+      tabIndex={-1}
     >
       <button
         type="button"
-        className="absolute right-6 top-6 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
+        className="absolute right-6 top-6 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
         onClick={onClose}
         aria-label="닫기"
       >
@@ -88,7 +93,7 @@ export default function LightboxModal({
         <>
           <button
             type="button"
-            className="absolute left-4 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
+            className="absolute left-4 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
             onClick={onPrev}
             aria-label={`이전 ${navigationUnit}`}
           >
@@ -108,7 +113,7 @@ export default function LightboxModal({
           </button>
           <button
             type="button"
-            className="absolute right-4 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
+            className="absolute right-4 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
             onClick={onNext}
             aria-label={`다음 ${navigationUnit}`}
           >

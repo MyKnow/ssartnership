@@ -6,12 +6,12 @@ import {
 } from "@/lib/image-upload/policy";
 import type { ImageUploadSignRequest } from "@/lib/image-upload/repository";
 import type { ImageUploadActorMode } from "@/lib/image-upload/auth.server";
+import { isUuidFormat } from "@/lib/uuid";
 
 const MAX_IMAGE_UPLOADS_PER_REQUEST = 20;
 const MAX_FILE_NAME_LENGTH = 255;
 const MAX_CLIENT_ID_LENGTH = 128;
 const MAX_ROLE_LENGTH = 64;
-const IMAGE_UPLOAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTOR_MODES = ["admin", "member", "partner", "guest", "signup"] as const;
 
 export type ParsedImageUploadSignRequest = {
@@ -91,7 +91,7 @@ function parseUpload(value: unknown, purpose: ImageUploadPurpose): ImageUploadSi
 }
 
 export function isImageUploadId(value: unknown): value is string {
-  return typeof value === "string" && IMAGE_UPLOAD_ID_PATTERN.test(value);
+  return isUuidFormat(value);
 }
 
 export function parseImageUploadSignRequest(value: unknown): ParsedImageUploadSignRequest | null {

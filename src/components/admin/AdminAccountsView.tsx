@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
@@ -265,8 +266,7 @@ export default function AdminAccountsView({
                                         key={campus.slug}
                                         className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
                                       >
-                                        <input
-                                          type="checkbox"
+                                        <Checkbox
                                           name="managedCampusSlugs"
                                           value={campus.slug}
                                           defaultChecked={account.managedCampusSlugs.includes(
@@ -385,8 +385,7 @@ export default function AdminAccountsView({
                             key={campus.slug}
                             className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
                           >
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               name="managedCampusSlugs"
                               value={campus.slug}
                               className="h-4 w-4 accent-primary"

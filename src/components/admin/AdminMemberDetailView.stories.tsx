@@ -115,8 +115,8 @@ const meta = {
     securityLogPagination: {
       totalCount: 2,
       page: 1,
-      pageSize: 50,
-      pageSizeOptions: [25, 50, 100],
+      pageSize: 20,
+      pageSizeOptions: [20, 50, 100],
     },
     updateAction: async () => {},
     deleteAction: async () => {},

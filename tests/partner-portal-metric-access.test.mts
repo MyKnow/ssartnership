@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { getPartnerPortalMetricAccessItems } from "../src/lib/partner-portal-metric-access.ts";
+import { getPartnerPortalMetricAccessItems } from "../src/lib/partner-auth/portal-metric-access.ts";
 
 describe("partner portal metric access", () => {
   it("describes allowed and locked metrics for each plan tier", () => {

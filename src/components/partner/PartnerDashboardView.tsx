@@ -1,11 +1,11 @@
 "use client";
 
+import { formatCount } from "@/lib/number-format";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
-import MotionReveal from "@/components/ui/MotionReveal";
 import Surface from "@/components/ui/Surface";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
@@ -30,17 +30,8 @@ import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
 import {
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPartnerServiceNewHref,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 
-const partnerPortalDataSource =
-  process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
-  process.env.NEXT_PUBLIC_DATA_SOURCE ??
-  "supabase";
-const isPartnerPortalMock = partnerPortalDataSource !== "supabase";
-
-function formatCount(value: number) {
-  return value.toLocaleString("ko-KR");
-}
 
 function ServiceMetric({
   label,
@@ -353,8 +344,10 @@ function CompanyOperationsSummary({
 
 export default function PartnerDashboardView({
   dashboard,
+  isMock,
 }: {
   dashboard: PartnerPortalDashboard;
+  isMock: boolean;
 }) {
   const activeCompany = dashboard.companies[0] ?? null;
 
@@ -362,18 +355,18 @@ export default function PartnerDashboardView({
     <div className="bg-background">
       <Container size="wide" className="pb-16 pt-6 lg:pt-8">
         <div className="space-y-6">
-          <MotionReveal>
+          <div>
             <ShellHeader
               eyebrow="Partner Portal"
               title="운영 홈"
               description="처리할 항목을 먼저 확인하고 제휴처 운영 현황과 핵심 지표를 이어서 살펴봅니다."
             />
-          </MotionReveal>
+          </div>
 
           {dashboard.warningMessage ? (
-            <MotionReveal delay={0.03}>
+            <div>
               <FormMessage variant="info">{dashboard.warningMessage}</FormMessage>
-            </MotionReveal>
+            </div>
           ) : null}
 
           {dashboard.companies.length === 0 ? (
@@ -385,21 +378,21 @@ export default function PartnerDashboardView({
             <>
               {activeCompany ? (
                 <div className="grid min-w-0 gap-5">
-                  <MotionReveal delay={0.05}>
+                  <div>
                     <CompanyOperationsSummary company={activeCompany} />
-                  </MotionReveal>
-                  <MotionReveal delay={0.08}>
+                  </div>
+                  <div>
                     <CompanyBrandList company={activeCompany} />
-                  </MotionReveal>
-                  <MotionReveal delay={0.11}>
+                  </div>
+                  <div>
                     <CompanyMetrics company={activeCompany} />
-                  </MotionReveal>
+                  </div>
                 </div>
               ) : null}
             </>
           )}
 
-          {isPartnerPortalMock ? (
+          {isMock ? (
             <div className="flex flex-wrap items-center gap-3">
               <PartnerPendingButtonLink href="/partner/setup" variant="secondary">
                 초기 설정 데모

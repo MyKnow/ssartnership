@@ -1,4 +1,6 @@
 "use client";
+import type { AdminMemberSecurityLog } from "@/lib/admin-member-security-log";
+export type { AdminMemberSecurityLog } from "@/lib/admin-member-security-log";
 
 import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -8,38 +10,27 @@ import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
-export type AdminMemberSecurityLog = {
-  id: string;
-  eventName: string;
-  status: string | null;
-  identifier: string | null;
-  path: string | null;
-  ipAddress: string | null;
-  properties: Record<string, unknown> | null;
-  createdAt: string;
-};
+
 
 type SortFilter = "newest" | "oldest" | "event" | "ip";
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [10, ADMIN_LIST_DEFAULT_PAGE_SIZE, 50, 100] as const;
 
 function formatDate(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-  return formatKoreanDateTimeToMinute(value);
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 function getStatusBadgeClass(status: string | null) {
   switch (status) {
     case "success":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200";
+      return "border-success/20 bg-success/10 text-success border-success/30 bg-success/10 text-success";
     case "failure":
-      return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200";
+      return "border-danger/20 bg-danger/10 text-danger border-danger/30 bg-danger/10 text-danger";
     case "blocked":
-      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200";
+      return "border-warning/20 bg-warning/10 text-warning border-warning/30 bg-warning/10 text-warning";
     default:
       return "border-border bg-surface-muted text-muted-foreground";
   }
@@ -83,7 +74,9 @@ export default function AdminMemberSecurityLogExplorer({
   const [statusFilter, setStatusFilter] = useState("all");
   const [pathFilter, setPathFilter] = useState("all");
   const [sortFilter, setSortFilter] = useState<SortFilter>("newest");
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(25);
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(
+    ADMIN_LIST_DEFAULT_PAGE_SIZE,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [requestedPagination, setRequestedPagination] = useState<{
     page: number;
@@ -182,7 +175,7 @@ export default function AdminMemberSecurityLogExplorer({
     } else {
       next.set("logPage", String(safePage));
     }
-    if (nextPageSize === 50) {
+    if (nextPageSize === ADMIN_LIST_DEFAULT_PAGE_SIZE) {
       next.delete("logPageSize");
     } else {
       next.set("logPageSize", String(nextPageSize));
@@ -209,8 +202,8 @@ export default function AdminMemberSecurityLogExplorer({
           description="로그 조회와 같은 방식으로 이벤트, 상태, 경로, 검색어를 조합해 이 회원의 보안 활동을 탐색합니다."
         />
         <Badge className="w-fit bg-surface text-muted-foreground">
-          현재 페이지 필터 {filteredLogs.length.toLocaleString()}건 / 전체{" "}
-          {(pagination?.totalCount ?? logs.length).toLocaleString()}건
+          현재 페이지 필터 {filteredLogs.length.toLocaleString("ko-KR")}건 / 전체{" "}
+          {(pagination?.totalCount ?? logs.length).toLocaleString("ko-KR")}건
         </Badge>
       </div>
 

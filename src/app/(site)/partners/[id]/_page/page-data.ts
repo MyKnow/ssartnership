@@ -8,6 +8,7 @@ import {
   normalizeBenefitUseInquiry,
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
+import { isLegacyPartnerBenefitId } from "@/lib/partner-benefit-items";
 import {
   adPackageRepository,
   partnerBenefitUsageRepository,
@@ -26,6 +27,11 @@ import type {
 } from "@/lib/repositories/ad-package-repository";
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
+import {
+  emptyCouponListLoad,
+  loadCouponListSafely,
+} from "@/lib/partner-detail-coupon-load";
+import { logServerError } from "@/lib/server-log";
 
 const getCategoriesCached = cache(async () => partnerRepository.getCategories());
 
@@ -47,49 +53,35 @@ const getPartnerByIdRawCached = cache(async (id: string) =>
   partnerRepository.getPartnerByIdRaw(id),
 );
 
-const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
+// React `cache` keys by argument identity, so memoize by the partner id
+// string; an array argument would be a new key on every call.
+const getFavoriteCountSafe = cache(async (partnerId: string) => {
   try {
-    return await partnerFavoriteRepository.getFavoriteCounts(partnerIds);
+    const counts = await partnerFavoriteRepository.getFavoriteCounts([partnerId]);
+    return counts.get(partnerId) ?? 0;
   } catch (error) {
-    console.error("[partner-detail] favorite count fetch failed", error);
-    return new Map<string, number>();
+    logServerError("[partner-detail] favorite count fetch failed", error);
+    return 0;
   }
 });
 
-function isMissingAdCouponSchemaError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("ad_coupons") &&
-    (message.includes("schema cache") || message.includes("does not exist"))
-  );
-}
+const getActiveCouponsSafe = cache(async (partnerId: string) =>
+  loadCouponListSafely(
+    () => adPackageRepository.listActiveCouponsForPartner(partnerId),
+    "[partner-detail] ad coupon fetch failed",
+  ),
+);
 
-const getActiveCouponsSafe = cache(async (partnerId: string) => {
-  try {
-    return await adPackageRepository.listActiveCouponsForPartner(partnerId);
-  } catch (error) {
-    if (isMissingAdCouponSchemaError(error)) {
-      return [] as AdCoupon[];
-    }
-    console.error("[partner-detail] ad coupon fetch failed", error);
-    return [] as AdCoupon[];
-  }
-});
-
-const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) => {
-  try {
-    return await adPackageRepository.listIssuedCouponsForMember({
-      memberId,
-      partnerIds: [partnerId],
-    });
-  } catch (error) {
-    if (isMissingAdCouponSchemaError(error)) {
-      return [] as AvailableAdCoupon[];
-    }
-    console.error("[partner-detail] issued coupon fetch failed", error);
-    return [] as AvailableAdCoupon[];
-  }
-});
+const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) =>
+  loadCouponListSafely(
+    () =>
+      adPackageRepository.listIssuedCouponsForMember({
+        memberId,
+        partnerIds: [partnerId],
+      }),
+    "[partner-detail] issued coupon fetch failed",
+  ),
+);
 
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
@@ -120,7 +112,7 @@ function getCategoryLabel(categories: Category[], partner: Partner) {
 function hasCanonicalBenefitItems(partner: Partner) {
   const items = partner.benefitItems ?? [];
   return items.length > 0 && items.every(
-    (item) => !item.id.startsWith("legacy-benefit-"),
+    (item) => !isLegacyPartnerBenefitId(item.id),
   );
 }
 
@@ -174,6 +166,8 @@ export type PartnerDetailPageData = {
   isFavorited: boolean;
   adCoupons: AdCoupon[];
   issuedAdCoupons: AvailableAdCoupon[];
+  /** A coupon lookup failed; the page shows an inline notice, not "no coupons". */
+  couponsUnavailable: boolean;
   isPreview: boolean;
 };
 
@@ -189,11 +183,11 @@ export async function getPartnerDetailPageData(
   viewerAudience?: PartnerAudienceKey | null,
   previewToken?: string | null,
 ): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
-  const [categories, partner, favoriteIds, favoriteCounts] = await Promise.all([
+  const [categories, partner, favoriteIds, favoriteCount] = await Promise.all([
     getCategoriesCached(),
     getPartnerByIdCached(rawId, authenticated, viewerAudience, previewToken),
     currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
-    getFavoriteCountsSafe([rawId]),
+    getFavoriteCountSafe(rawId),
   ]);
 
   if (!partner) {
@@ -221,7 +215,7 @@ export async function getPartnerDetailPageData(
         };
       }
     } catch (error) {
-      console.error("[partner-detail] canonical benefit items lookup failed", error);
+      logServerError("[partner-detail] canonical benefit items lookup failed", error);
     }
   }
 
@@ -257,18 +251,20 @@ export async function getPartnerDetailPageData(
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(resolvedPartner.id)}`);
-  const [adCoupons, memberCoupons] = await Promise.all([
+  const [activeCoupons, memberCoupons] = await Promise.all([
     getActiveCouponsSafe(resolvedPartner.id),
     currentUserId
       ? getIssuedCouponsSafe(currentUserId, resolvedPartner.id)
-      : Promise.resolve([] as AvailableAdCoupon[]),
+      : Promise.resolve(emptyCouponListLoad<AvailableAdCoupon>()),
   ]);
-  const issuedAdCoupons = memberCoupons.filter(
+  const adCoupons = activeCoupons.items;
+  const couponsUnavailable = activeCoupons.unavailable || memberCoupons.unavailable;
+  const issuedAdCoupons = memberCoupons.items.filter(
     (item) => item.coupon.partnerId === resolvedPartner.id,
   );
   const metrics = {
     ...createEmptyPartnerServiceMetrics(),
-    favoriteCount: favoriteCounts.get(rawId) ?? 0,
+    favoriteCount,
   };
 
   return {
@@ -323,6 +319,7 @@ export async function getPartnerDetailPageData(
     isFavorited: favoriteIds.has(rawId),
     adCoupons,
     issuedAdCoupons,
+    couponsUnavailable,
     isPreview: Boolean(previewToken),
   };
 }

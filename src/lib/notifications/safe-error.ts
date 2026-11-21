@@ -1,5 +1,6 @@
 import { PushError } from "@/lib/push/types";
 import { RouteJsonBodyError } from "@/lib/route-json-body";
+import { NotificationPolicyConflictError } from "./preference-patch";
 
 export class NotificationRequestError extends Error {
   constructor(message: string) {
@@ -18,6 +19,9 @@ export function getSafeNotificationRouteError(
   error: unknown,
   fallback: string,
 ) {
+  if (error instanceof NotificationPolicyConflictError) {
+    return { message: error.message, status: 409 as const };
+  }
   if (error instanceof RouteJsonBodyError) {
     return { message: error.message, status: error.status };
   }

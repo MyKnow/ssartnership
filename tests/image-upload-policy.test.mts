@@ -47,6 +47,7 @@ test("역할별 공통 WebP 정책은 기존 출력 규격을 유지한다", asy
       maxInputPixels: 25_000_000,
       maxOutputBytes: 5 * 1024 * 1024,
       fit: "cover",
+      allowSvgSource: true,
     },
   );
 

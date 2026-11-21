@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import AdminMemberManager from "./AdminMemberManager";
-import type { AdminMember } from "./member-manager/selectors";
+import type { AdminMember } from "../../lib/admin-member-selectors";
 
 const members: AdminMember[] = [
   {

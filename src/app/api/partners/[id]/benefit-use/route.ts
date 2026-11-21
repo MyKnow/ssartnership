@@ -9,19 +9,20 @@ import {
   recordPartnerBenefitUsage,
 } from "@/lib/partner-benefit-usage-service";
 import { buildPartnerBenefitUseLogProperties } from "@/lib/partner-benefit-use-logging";
+import { isUuidFormat } from "@/lib/uuid";
+import { isFourDigitPin } from "@/lib/validation";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isMockDataSource } from "@/lib/mock/member";
+import { readRouteParam } from "@/lib/route-params";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type BenefitUseRequestBody = {
   benefitId?: unknown;
@@ -31,14 +32,6 @@ type BenefitUseRequestBody = {
   useCount?: unknown;
   sessionId?: unknown;
 };
-
-function safeDecodeSegment(value: string) {
-  try {
-    return decodeURIComponent(value).trim();
-  } catch {
-    return "";
-  }
-}
 
 function isSafeMockPartnerId(value: string) {
   return value.length <= 120 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(value);
@@ -141,21 +134,6 @@ function scheduleAttemptLog(
       ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
     },
   });
-  if (input.result === "failure") {
-    scheduleProductEventLog({
-      ...context,
-      actorType: "member",
-      actorId: input.actorId,
-      sessionId: input.sessionId,
-      eventName: "partner_benefit_use_failure",
-      targetType: "partner",
-      targetId: input.partnerId,
-      properties: {
-        reasonCode: input.reasonCode ?? "unknown",
-        ...benefitProperties,
-      },
-    });
-  }
 }
 
 export async function POST(
@@ -171,13 +149,14 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
-  const partnerId = safeDecodeSegment((await params).id ?? "");
-  if (!UUID_PATTERN.test(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
+  const partnerId = readRouteParam((await params).id);
+  if (!isUuidFormat(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
     return NextResponse.json({ ok: false, message: "제휴처 정보를 확인할 수 없습니다." }, { status: 400 });
   }
 
@@ -228,7 +207,7 @@ export async function POST(
     });
     return NextResponse.json({ ok: false, message: "혜택 정보를 확인해 주세요." }, { status: 400 });
   }
-  if (typeof body.pin !== "string" || !/^\d{4}$/.test(body.pin)) {
+  if (!isFourDigitPin(body.pin)) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -240,7 +219,7 @@ export async function POST(
     });
     return NextResponse.json({ ok: false, message: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요." }, { status: 400 });
   }
-  if (typeof body.idempotencyKey !== "string" || !UUID_PATTERN.test(body.idempotencyKey)) {
+  if (!isUuidFormat(body.idempotencyKey)) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -297,24 +276,6 @@ export async function POST(
       benefit: result.benefitSnapshot,
       useCount: result.useCount,
     });
-    scheduleProductEventLog({
-      ...context,
-      actorType: "member",
-      actorId: session.userId,
-      sessionId,
-      eventName: "partner_benefit_use_success",
-      targetType: "partner",
-      targetId: partnerId,
-      properties: {
-        benefitLength: result.benefitSnapshot.length,
-        ...buildPartnerBenefitUseLogProperties({
-          benefitId: result.benefitId,
-          benefit: result.benefitSnapshot,
-          useCount: result.useCount,
-        }),
-        verificationMethod: "pin",
-      },
-    });
     if (result.isNew) {
       scheduleProductEventLog({
         ...context,
@@ -355,7 +316,7 @@ export async function POST(
       );
     }
 
-    console.error("[partner-benefit-use] failed", error);
+    logServerError("[partner-benefit-use] failed", error);
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,

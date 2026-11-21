@@ -10,3 +10,9 @@
 *.png binary
 *.webp binary
 *.woff2 binary
+
+*.xlsx binary
+
+# Preserve upstream license and vendored source formatting.
+public/fonts/OFL.txt -whitespace
+vendor/braces-depth-guard/lib/stringify.js -whitespace

@@ -35,6 +35,15 @@ const SECRET_ENV_NAMES = new Set([
   "CRON_SECRET",
 ]);
 
+// Server-rendered dates and month-based rules assume Korean local time.
+export const SELF_HOST_TIMEZONE = "Asia/Seoul";
+// The relay Caddy keeps idle upstream connections for 2 minutes. Node must
+// keep an idle socket open longer, or Caddy can reuse a socket Node already
+// closed and answer 502. Images and Compose pin the default below.
+export const RELAY_UPSTREAM_KEEPALIVE_MS = 120_000;
+export const DEFAULT_KEEP_ALIVE_TIMEOUT_MS = 130_000;
+const MAX_KEEP_ALIVE_TIMEOUT_MS = 600_000;
+
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const INTERNAL_HTTP_HOSTS = new Set(["gateway", ...LOOPBACK_HOSTS]);
 
@@ -257,8 +266,38 @@ function isValidMattermostSenderKey(value) {
   return Buffer.from(normalized, "base64").length === 32;
 }
 
+/**
+ * Optional process defaults. Unset values fall back to the image defaults;
+ * an explicit value must keep Korean local time and outlive the relay's idle
+ * upstream keepalive, because a silent fallback to Node's 5s keep-alive
+ * reintroduces intermittent 502 responses.
+ */
+export function validateRuntimeProcessDefaults(environment) {
+  const diagnostics = [];
+  const timezone = valueOf(environment, "TZ");
+  if (timezone && timezone !== SELF_HOST_TIMEZONE) {
+    diagnostics.push(diagnostic("runtime_timezone_invalid", "TZ"));
+  }
+
+  const keepAlive = valueOf(environment, "KEEP_ALIVE_TIMEOUT");
+  if (keepAlive) {
+    const milliseconds = /^\d{1,7}$/u.test(keepAlive) ? Number(keepAlive) : Number.NaN;
+    if (
+      !Number.isSafeInteger(milliseconds)
+      || milliseconds <= RELAY_UPSTREAM_KEEPALIVE_MS
+      || milliseconds > MAX_KEEP_ALIVE_TIMEOUT_MS
+    ) {
+      diagnostics.push(diagnostic("keep_alive_timeout_invalid", "KEEP_ALIVE_TIMEOUT"));
+    }
+  }
+  return diagnostics;
+}
+
 export function validateSelfHostRuntimeEnvironment(environment, manifest) {
-  const diagnostics = [...validateBuildEnvironmentManifest(manifest)];
+  const diagnostics = [
+    ...validateBuildEnvironmentManifest(manifest),
+    ...validateRuntimeProcessDefaults(environment),
+  ];
   const mode = valueOf(environment, "SELF_HOST_MODE");
 
   if (mode !== "real" && mode !== "local-mock") {

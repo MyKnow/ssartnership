@@ -21,7 +21,7 @@ test("관리자 회원 비밀번호 재발급은 권한·동일 출처·무캐�
     read("src/lib/admin-member-password-reset.ts"),
     read("src/components/admin/member-detail/AdminMemberPasswordResetPanel.tsx"),
     read("src/lib/event-catalog.ts"),
-    read("src/components/admin/logs/utils.ts"),
+    read("src/lib/event-labels.ts"),
   ]);
 
   assert.match(route, /isTrustedSameOriginRequest/);
@@ -141,7 +141,7 @@ test("회원 목록과 상세는 이메일 식별과 검색을 함께 제공한�
     memberListFilterMigration,
   ] = await Promise.all([
     read("src/lib/admin-member-list.server.ts"),
-    read("src/components/admin/member-manager/selectors.ts"),
+    read("src/lib/admin-member-selectors.ts"),
     read("src/components/admin/AdminMemberListItem.tsx"),
     read("src/components/admin/AdminMemberDetailView.tsx"),
     read("src/app/admin/(protected)/members/[memberId]/page.tsx"),

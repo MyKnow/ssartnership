@@ -18,21 +18,25 @@ import {
   markPushFailure,
   markPushSuccess,
 } from "@/lib/push/logs";
-import { buildTrustedPushSubscriptionRequest } from "@/lib/push/subscription-trust";
-import { PushError } from "@/lib/push/types";
+import {
+  sendWebPush,
+  shouldDeactivatePushSubscription,
+} from "@/lib/push/web-push-client";
 import type { ResolvedPushAudience, StoredSubscription, WebPushModule } from "@/lib/push/types";
 import type {
   AdminNotificationComposerInput,
   AdminNotificationSource,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import {
   mergeNotificationTemplateVariables,
   type NotificationTemplateContext,
 } from "@/lib/notification-templates/context";
+import { logServerError } from "@/lib/server-log";
 
 type AudienceMember = {
   id: string;
@@ -75,7 +79,10 @@ async function runBookkeepingTasks(
         memberId,
       );
       bookkeepingErrors.push(warning);
-      console.error(`[admin-notification-ops] ${warning}`, result.reason);
+      logServerError("[admin-notification-ops] delivery bookkeeping failed", result.reason, {
+        channel,
+        memberId,
+      });
     }
   }
 }
@@ -97,10 +104,7 @@ export async function finalizeSuccessfulPushDelivery(
       return "sent" as const;
     }
   } catch (error) {
-    console.error(
-      "[admin-notification-ops] push success transition failed",
-      { deliveryId, error },
-    );
+    logServerError("[admin-notification-ops] push success transition failed", error, { deliveryId });
   }
 
   try {
@@ -110,10 +114,7 @@ export async function finalizeSuccessfulPushDelivery(
       errorMessage: "provider_success_ledger_unknown",
     });
   } catch (error) {
-    console.error(
-      "[admin-notification-ops] push reconciliation transition failed",
-      { deliveryId, error },
-    );
+    logServerError("[admin-notification-ops] push reconciliation transition failed", error, { deliveryId });
   }
   return "needs_reconciliation" as const;
 }
@@ -137,6 +138,8 @@ export async function runPushDeliveryAttempt(
   input: {
     claim: Parameters<PushDeliveryRepository["claimNotificationDelivery"]>[0];
     send: () => Promise<void>;
+    isDefinitiveFailure?: (error: unknown) => boolean;
+    onSent?: (deliveryId: string) => Promise<void>;
   },
   repository: PushDeliveryRepository = notificationRepository,
 ): Promise<PushDeliveryAttemptResult> {
@@ -147,10 +150,7 @@ export async function runPushDeliveryAttempt(
   try {
     claimedDelivery = await repository.claimNotificationDelivery(input.claim);
   } catch (error) {
-    console.error("[admin-notification-ops] push delivery claim failed", {
-      memberId,
-      error,
-    });
+    logServerError("[admin-notification-ops] push delivery claim failed", error, { memberId });
     return {
       outcome: "failed",
       warning: `푸시 발송 상태를 저장하지 못했습니다. (회원 ${memberId})`,
@@ -186,10 +186,7 @@ export async function runPushDeliveryAttempt(
       };
     }
   } catch (error) {
-    console.error("[admin-notification-ops] push delivery lease failed", {
-      memberId,
-      error,
-    });
+    logServerError("[admin-notification-ops] push delivery lease failed", error, { memberId });
     return {
       outcome: "failed",
       warning: `푸시 발송 상태를 저장하지 못했습니다. (회원 ${memberId})`,
@@ -212,7 +209,8 @@ export async function runPushDeliveryAttempt(
       const markedFailed =
         await repository.transitionNotificationDelivery({
           deliveryId: claimedDelivery.deliveryId,
-          transition: "failed",
+          transition: input.isDefinitiveFailure && !input.isDefinitiveFailure(providerError)
+            ? "needs_reconciliation" : "failed",
           errorMessage: safeErrorMessage,
         });
       if (!markedFailed) {
@@ -222,10 +220,7 @@ export async function runPushDeliveryAttempt(
     } catch (error) {
       ledgerWarning =
         `푸시 실패 상태를 저장하지 못했습니다. (회원 ${memberId})`;
-      console.error(
-        "[admin-notification-ops] push failure transition failed",
-        { memberId, error },
-      );
+      logServerError("[admin-notification-ops] push failure transition failed", error, { memberId });
     }
     return {
       outcome: "provider_failed",
@@ -239,6 +234,9 @@ export async function runPushDeliveryAttempt(
     repository,
   );
   if (successResolution === "sent") {
+    try { await input.onSent?.(claimedDelivery.deliveryId); } catch (error) {
+      logServerError("[admin-notification-ops] sent delivery annotation failed", error, { memberId });
+    }
     return { outcome: "sent", providerCalled: true };
   }
   return {
@@ -246,6 +244,35 @@ export async function runPushDeliveryAttempt(
     warning:
       `푸시 발송 성공 여부를 원장에 확정하지 못했습니다. (회원 ${memberId})`,
   };
+}
+
+/** Only an explicit rejecting response proves that the post was not accepted. */
+export function isDefinitiveMattermostFailure(error: unknown) {
+  return error instanceof MattermostApiError && error.status !== null
+    && [400, 401, 403, 404, 413, 422, 429].includes(error.status)
+    && ["unauthorized", "forbidden", "not_found", "rate_limited", "request_rejected"].includes(error.code);
+}
+
+export async function runMattermostDeliveryAttempt(
+  input: { notificationId: string; memberId: string; send: () => Promise<{ id: string }> },
+  repository: PushDeliveryRepository & Pick<typeof notificationRepository, "annotateSentNotificationDelivery"> = notificationRepository,
+) {
+  let providerNotificationId: string | null = null;
+  return runPushDeliveryAttempt({
+    claim: {
+      notificationId: input.notificationId,
+      memberId: input.memberId,
+      channel: "mm", provider: "mattermost",
+      providerCampaignId: input.notificationId,
+      providerIdempotencyKey: `ssartnership:delivery:v2:${input.notificationId}:mm:${input.memberId}`,
+      leaseDurationSeconds: PUSH_DELIVERY_LEASE_SECONDS,
+    },
+    send: async () => { providerNotificationId = (await input.send()).id; },
+    onSent: async (deliveryId) => {
+      if (providerNotificationId) await repository.annotateSentNotificationDelivery(deliveryId, providerNotificationId);
+    },
+    isDefinitiveFailure: isDefinitiveMattermostFailure,
+  }, repository);
 }
 
 function toMattermostDeliveryCode(error: unknown) {
@@ -311,6 +338,7 @@ async function markGroupMattermostFailure(input: {
   notificationId: string;
   members: AudienceMember[];
   error: unknown;
+  knownBeforeSend?: boolean;
   bookkeepingErrors: string[];
 }) {
   const code = toMattermostDeliveryCode(input.error);
@@ -322,7 +350,7 @@ async function markGroupMattermostFailure(input: {
         notificationId: input.notificationId,
         member,
         status: "failed",
-        providerStatus: code,
+        providerStatus: input.knownBeforeSend ? "failed" : code,
         errorMessage: getSafeMattermostDeliveryErrorMessage(code),
         bookkeepingErrors: input.bookkeepingErrors,
       });
@@ -339,12 +367,17 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   members: AudienceMember[];
   source: AdminNotificationSource;
   templateContext?: NotificationTemplateContext;
+  retrySafe?: boolean;
 }): Promise<ChannelDeliveryResult> {
   const bookkeepingErrors: string[] = [];
   let sent = 0;
   let failed = 0;
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("mattermost", params.notificationType, params.source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("mm"),
+      params.notificationType,
+      params.source,
+    ),
   );
   const categoryLabel = params.notificationType === "marketing" ? "광고" : "공지";
   const templateVariables = mergeNotificationTemplateVariables({
@@ -384,15 +417,27 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   }
 
   for (const [generation, members] of grouped) {
+    let operationStarted = false;
     try {
       const outcome = await withActiveMattermostSenderForGeneration(
         generation,
         async (session) => {
+          operationStarted = true;
           const outcomes: Array<"sent" | "failed"> = Array(members.length);
           await forEachWithConcurrency(
             members,
             MATTERMOST_SEND_CONCURRENCY,
             async (member, index) => {
+              if (params.retrySafe) {
+                const attempt = await runMattermostDeliveryAttempt({
+                  notificationId: params.notificationId, memberId: member.id,
+                  send: () => session.sendDirectMessage(member.mattermostUserId, message),
+                });
+                outcomes[index] = attempt.outcome === "sent" ? "sent" : "failed";
+                if ("warning" in attempt) bookkeepingErrors.push(attempt.warning.replaceAll("푸시", "Mattermost"));
+                if (attempt.outcome === "provider_failed" && attempt.ledgerWarning) bookkeepingErrors.push(attempt.ledgerWarning);
+                return;
+              }
               try {
                 const post = await session.sendDirectMessage(member.mattermostUserId, message);
                 await recordMattermostDelivery({
@@ -429,6 +474,7 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
         notificationId: params.notificationId,
         members,
         error,
+        knownBeforeSend: params.retrySafe && !operationStarted,
         bookkeepingErrors,
       });
     }
@@ -457,13 +503,18 @@ export async function sendPushCampaignDeliveries(params: {
   resolvedAudience: ResolvedPushAudience;
   subscriptions: StoredSubscription[];
   getWebPush: () => Promise<WebPushModule>;
+  retrySafe?: boolean;
 }): Promise<ChannelDeliveryResult> {
   if (!params.subscriptions.length) {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("push", params.payload.type, params.source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("push"),
+      params.payload.type,
+      params.source,
+    ),
   );
   const templateVariables = mergeNotificationTemplateVariables({
     context: params.templateContext,
@@ -506,15 +557,12 @@ export async function sendPushCampaignDeliveries(params: {
           providerIdempotencyKey,
           leaseDurationSeconds: PUSH_DELIVERY_LEASE_SECONDS,
         },
+        isDefinitiveFailure: params.retrySafe
+          ? (error) => typeof error === "object" && error !== null && "statusCode" in error
+            && [400, 401, 403, 404, 410, 413, 429].includes(Number(error.statusCode))
+          : undefined,
         send: async () => {
-          await webpush.sendNotification(
-            await buildTrustedPushSubscriptionRequest({
-              endpoint: subscription.endpoint,
-              p256dh: subscription.p256dh,
-              auth: subscription.auth,
-            }),
-            serialized,
-          );
+          await sendWebPush(webpush, subscription, serialized);
         },
       });
 
@@ -529,22 +577,8 @@ export async function sendPushCampaignDeliveries(params: {
         if (attempt.ledgerWarning) {
           bookkeepingErrors.push(attempt.ledgerWarning);
         }
-        const statusCode =
-          typeof attempt.error === "object" &&
-          attempt.error &&
-          "statusCode" in attempt.error
-            ? Number((attempt.error as { statusCode?: number }).statusCode)
-            : null;
-        const deactivate =
-          (attempt.error instanceof PushError &&
-            attempt.error.code === "invalid_request") ||
-          statusCode === 404 ||
-          statusCode === 410;
-        console.error("[admin-notification-ops] push delivery failed", {
-          subscriptionId: subscription.id,
-          memberId: subscription.member_id,
-          error: attempt.error,
-        });
+        const deactivate = shouldDeactivatePushSubscription(attempt.error);
+        logServerError("[admin-notification-ops] push delivery failed", attempt.error, { subscriptionId: subscription.id, memberId: subscription.member_id });
         const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
         await runBookkeepingTasks(
           [
@@ -618,6 +652,7 @@ export async function sendMattermostCampaignDeliveries(params: {
   members: AudienceMember[];
   source?: AdminNotificationSource;
   templateContext?: NotificationTemplateContext;
+  retrySafe?: boolean;
 }): Promise<ChannelDeliveryResult> {
   if (!params.members.length) {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };

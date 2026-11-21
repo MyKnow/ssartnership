@@ -22,7 +22,7 @@ import {
 } from "@/lib/campuses";
 import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
-import { sanitizePartnerLinkValue } from "@/lib/validation";
+import { isFourDigitPin, sanitizePartnerLinkValue } from "@/lib/validation";
 import { isPartnerDetailDescriptionValid } from "@/lib/partner-detail-description";
 import { isPartnerFormRequestWithinSafeLimit } from "@/lib/partner-form-request-size";
 import ImageUploadSubmissionProvider, {
@@ -288,7 +288,7 @@ export default function PartnerCardForm({
         }
       : null;
     const benefitVerificationPinError =
-      benefitVerificationPin && !/^\d{4}$/.test(benefitVerificationPin)
+      benefitVerificationPin && !isFourDigitPin(benefitVerificationPin)
         ? {
             field: "benefitVerificationPin" as const,
             message: partnerFormErrorMessages.partner_form_invalid_benefit_verification_pin,

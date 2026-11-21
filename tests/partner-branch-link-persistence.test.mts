@@ -15,10 +15,7 @@ test("파트너 지점 연결은 공용 청크 저장 경로를 사용한다", a
       "utf8",
     ),
     readFile(
-      new URL(
-        "src/app/admin/(protected)/partner-registrations/actions.ts",
-        root,
-      ),
+      new URL("src/lib/partner-registration-conversion.server.ts", root),
       "utf8",
     ),
   ]);

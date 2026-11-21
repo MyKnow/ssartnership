@@ -369,6 +369,14 @@ export class SupabaseNotificationRepository implements NotificationRepository {
     return data === true;
   }
 
+  async annotateSentNotificationDelivery(deliveryId: string, providerNotificationId: string) {
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase.from("notification_deliveries")
+      .update({ provider_notification_id: providerNotificationId })
+      .eq("id", deliveryId).eq("status", "sent");
+    if (error) throw error;
+  }
+
   async recordNotificationDelivery(input: NotificationDeliveryInput) {
     const supabase = getSupabaseAdminClient();
     const { error } = await supabase.from("notification_deliveries").insert({

@@ -28,6 +28,7 @@ export type HomeDirectoryState = {
   audience: PartnerAudienceFilter;
   sort: HomeDirectorySort;
   view: HomeDirectoryView;
+  favoritesOnly?: boolean;
 };
 
 export const DEFAULT_HOME_DIRECTORY_STATE: HomeDirectoryState = {
@@ -67,6 +68,7 @@ export function parseHomeDirectoryState(
   const rawView = searchParams.get("view")?.trim() ?? "";
 
   return {
+    ...(searchParams.get("saved") === "1" ? { favoritesOnly: true } : {}),
     q: searchParams.get("q")?.trim() ?? "",
     category: parseCategory(
       searchParams.get("category")?.trim() ?? "",
@@ -95,6 +97,7 @@ export function serializeHomeDirectoryState(
 ) {
   const params = new URLSearchParams(currentParams.toString());
   const entries = [
+    ["saved", state.favoritesOnly ? "1" : "", ""],
     ["q", state.q.trim(), DEFAULT_HOME_DIRECTORY_STATE.q],
     ["category", state.category, DEFAULT_HOME_DIRECTORY_STATE.category],
     ["campus", state.campus, DEFAULT_HOME_DIRECTORY_STATE.campus],

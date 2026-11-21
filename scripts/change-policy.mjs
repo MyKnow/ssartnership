@@ -47,7 +47,6 @@ function writeGitHubOutputs(path, policy, targetSha) {
     run_smoke: String(policy.runSmoke),
     run_release: String(policy.runRelease),
     run_job: String(policy.runJob),
-    requires_vercel: String(policy.requiresVercel),
     target_sha: targetSha,
   };
   appendFileSync(

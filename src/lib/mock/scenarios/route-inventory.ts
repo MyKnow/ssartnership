@@ -340,6 +340,30 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.dashboard.default"],
   },
   {
+    routePath: "/admin/mcp",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "McpConnectionsPage",
+    dataSources: ["repository", "service", "api-route"],
+    requiredScenarioIds: ["admin.mcp.connections"],
+  },
+  {
+    routePath: "/admin/mcp/authorize",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "McpAuthorizePage",
+    dataSources: ["repository", "service", "api-route"],
+    requiredScenarioIds: ["admin.mcp.connections"],
+  },
+  {
+    routePath: "/admin/mcp/reviews/[reviewId]",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "McpReviewPage",
+    dataSources: ["repository", "service", "api-route"],
+    requiredScenarioIds: ["admin.mcp.connections"],
+  },
+  {
     routePath: "/admin/admins",
     surface: "admin",
     authScope: "admin",
@@ -1004,6 +1028,21 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "canonical",
     screenContractId: "admin.dashboard",
     primaryTask: "처리가 필요한 운영 업무를 파악하고 바로 이동한다.",
+  },
+  "/admin/mcp": {
+    routeKind: "canonical",
+    screenContractId: "admin.mcp.connections",
+    primaryTask: "AI 앱을 등록하고 내 연결을 확인·철회한다.",
+  },
+  "/admin/mcp/authorize": {
+    routeKind: "canonical",
+    screenContractId: "admin.mcp.authorize",
+    primaryTask: "클라이언트·환경·권한을 확인한 뒤 연결을 허용하거나 거절한다.",
+  },
+  "/admin/mcp/reviews/[reviewId]": {
+    routeKind: "canonical",
+    screenContractId: "admin.mcp.review",
+    primaryTask: "리뷰 변경 전후와 만료를 확인하고 한 건의 실행을 승인한다.",
   },
   "/admin/tasks": {
     routeKind: "canonical",

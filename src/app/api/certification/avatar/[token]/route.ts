@@ -3,6 +3,7 @@ import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getActiveMemberProfileImage } from "@/lib/member-profile-images";
 import { getMockMemberProfileImageUrl, isMockDataSource } from "@/lib/mock/member";
+import { readRouteParam } from "@/lib/route-params";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ export async function GET(
   context: { params: Promise<{ token: string }> },
 ) {
   const { token } = await context.params;
-  const rawToken = token ? decodeURIComponent(token).trim() : "";
+  const rawToken = readRouteParam(token, 1_024);
   const verification = verifyCertificationQrToken(rawToken);
   if (!verification.ok) {
     return NextResponse.json(

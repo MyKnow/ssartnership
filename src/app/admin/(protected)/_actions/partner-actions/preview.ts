@@ -8,7 +8,6 @@ import {
   createPartnerPreviewExpiresAt,
   createPartnerPreviewToken,
   hashPartnerPreviewToken,
-  isMissingPartnerPreviewExpiryColumnError,
 } from "@/lib/partner-preview";
 import { encryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -63,24 +62,9 @@ export async function generatePartnerPreviewLink(partnerId: string) {
     created_at: createdAt,
     expires_at: expiresAt,
   };
-  const previewTokenPayloadLegacy = {
-    partner_id: normalizedPartnerId,
-    token_hash: hashPartnerPreviewToken(token),
-    token_ciphertext: encryptedToken.ciphertext,
-    token_nonce: encryptedToken.nonce,
-    token_auth_tag: encryptedToken.authTag,
-    token_key_version: encryptedToken.keyVersion,
-    created_at: createdAt,
-  };
-  let { error } = await supabase
+  const { error } = await supabase
     .from("partner_preview_tokens")
     .upsert(previewTokenPayload, { onConflict: "partner_id" });
-
-  if (error && isMissingPartnerPreviewExpiryColumnError(error.message)) {
-    ({ error } = await supabase
-      .from("partner_preview_tokens")
-      .upsert(previewTokenPayloadLegacy, { onConflict: "partner_id" }));
-  }
 
   if (error) {
     throw new Error(error.message);

@@ -1,6 +1,10 @@
 import { formatSsafyYearLabel } from "../ssafy-year.ts";
 import { getMmUserDirectoryEntriesByAccountIds } from "../mm-directory/identities.ts";
 import {
+  MEMBER_DIRECTORY_LINK_SELECT,
+  type MemberDirectoryLinkRow,
+} from "../members/projections.ts";
+import {
   collectPagedRows,
   collectRowsByFilterChunks,
 } from "../supabase/paging.ts";
@@ -11,11 +15,6 @@ import { PushError } from "./types.ts";
 import type { PushAudience, ResolvedPushAudience } from "./types.ts";
 
 type AudienceMemberIdRow = { id: string };
-type AudienceMemberRow = {
-  id: string;
-  display_name: string | null;
-  mattermost_account_id: string | null;
-};
 
 async function listAudienceMemberIds(input: {
   year?: number;
@@ -154,18 +153,18 @@ export async function resolvePushAudience(
     typeof audience.memberId === "string" ? audience.memberId.trim() : String(audience.memberId ?? "").trim();
   const targetIds =
     memberIds.length > 0 ? Array.from(new Set(memberIds)) : fallbackMemberId ? [fallbackMemberId] : [];
-  const memberResult = await collectRowsByFilterChunks<string, AudienceMemberRow>(
+  const memberResult = await collectRowsByFilterChunks<string, MemberDirectoryLinkRow>(
     targetIds,
     async (memberIdChunk) => {
       const { data, error } = await supabase
         .from("members")
-        .select("id,display_name,mattermost_account_id")
+        .select(MEMBER_DIRECTORY_LINK_SELECT)
         .is("deleted_at", null)
         .in("id", [...memberIdChunk]);
       if (error) {
         throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
       }
-      return { rows: (data ?? []) as AudienceMemberRow[], error: false };
+      return { rows: (data ?? []) as MemberDirectoryLinkRow[], error: false };
     },
   );
   const data = memberResult.rows;

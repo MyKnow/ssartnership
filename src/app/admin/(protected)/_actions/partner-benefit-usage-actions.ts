@@ -15,10 +15,7 @@ import {
   logAdminAction,
   redirectAdminActionError,
 } from "./shared-helpers";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
+import { readString } from "@/lib/form-data";
 
 function getDetailPath(partnerId: string) {
   return `/admin/partners/${encodeURIComponent(partnerId)}`;
@@ -59,11 +56,11 @@ async function requireManagedPartner(partnerId: string, action: "create" | "upda
 function parseUsageInput(formData: FormData, detailPath: string) {
   try {
     return parseAdminPartnerBenefitUsageForm({
-      partnerId: getString(formData, "partnerId"),
-      memberId: getString(formData, "memberId"),
-      benefitId: getString(formData, "benefitId"),
-      useCount: getString(formData, "useCount"),
-      verifiedAt: getString(formData, "verifiedAt"),
+      partnerId: readString(formData, "partnerId"),
+      memberId: readString(formData, "memberId"),
+      benefitId: readString(formData, "benefitId"),
+      useCount: readString(formData, "useCount"),
+      verifiedAt: readString(formData, "verifiedAt"),
     });
   } catch (error) {
     const code = error instanceof AdminPartnerBenefitUsageValidationError
@@ -74,7 +71,7 @@ function parseUsageInput(formData: FormData, detailPath: string) {
 }
 
 export async function createPartnerBenefitUsageAction(formData: FormData) {
-  const partnerId = getString(formData, "partnerId");
+  const partnerId = readString(formData, "partnerId");
   const { adminSession, detailPath } = await requireManagedPartner(partnerId, "create");
   const input = parseUsageInput(formData, detailPath);
   if (input.partnerId !== partnerId) {
@@ -104,8 +101,8 @@ export async function createPartnerBenefitUsageAction(formData: FormData) {
 }
 
 export async function updatePartnerBenefitUsageAction(formData: FormData) {
-  const partnerId = getString(formData, "partnerId");
-  const usageId = getString(formData, "usageId");
+  const partnerId = readString(formData, "partnerId");
+  const usageId = readString(formData, "usageId");
   const { adminSession, detailPath } = await requireManagedPartner(partnerId, "update");
   if (!isUuid(usageId)) {
     redirectAdminActionError(detailPath, "admin_usage_invalid_request");
@@ -141,8 +138,8 @@ export async function updatePartnerBenefitUsageAction(formData: FormData) {
 }
 
 export async function deleteBenefitUsageAction(formData: FormData) {
-  const partnerId = getString(formData, "partnerId");
-  const usageId = getString(formData, "usageId");
+  const partnerId = readString(formData, "partnerId");
+  const usageId = readString(formData, "usageId");
   const { adminSession, detailPath } = await requireManagedPartner(partnerId, "delete");
   if (!isUuid(usageId)) {
     redirectAdminActionError(detailPath, "admin_usage_invalid_request");

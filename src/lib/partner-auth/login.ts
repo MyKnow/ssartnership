@@ -1,5 +1,5 @@
-import type { PartnerPortalLoginResult } from "../partner-portal.ts";
-import { PartnerPortalLoginError } from "../partner-portal-errors.ts";
+import type { PartnerPortalLoginResult } from "./portal.ts";
+import { PartnerPortalLoginError } from "./portal-errors.ts";
 import { verifyPassword } from "../password.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds } from "./company.ts";

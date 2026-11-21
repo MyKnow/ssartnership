@@ -12,6 +12,20 @@ export type PartnerSetupLinkStateInput = {
   completedAt: string | null;
 };
 
+/**
+ * A setup link is usable only before the expiry stored when it was issued. A
+ * missing or malformed expiry counts as expired: the send time is never used
+ * to extend a link. The setup page and the admin account badge share this
+ * rule so the admin never sees a link as usable that the setup page rejects.
+ */
+export function isPartnerSetupLinkExpired(
+  expiresAt: string | null | undefined,
+  nowMs = Date.now(),
+) {
+  const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
+  return !Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs;
+}
+
 export function getPartnerSetupLinkState(
   input: PartnerSetupLinkStateInput,
   nowMs = Date.now(),
@@ -24,10 +38,7 @@ export function getPartnerSetupLinkState(
     return "missing_token";
   }
 
-  const expiresAtMs = input.expiresAt
-    ? new Date(input.expiresAt).getTime()
-    : Number.NaN;
-  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) {
+  if (isPartnerSetupLinkExpired(input.expiresAt, nowMs)) {
     return "expired";
   }
 

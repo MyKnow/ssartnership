@@ -49,9 +49,16 @@ body:
     id: verification
     attributes:
       label: 검증 계획
-      description: 실행할 명령 또는 수동 확인 시나리오를 적어 주세요.
+      description: verify:change와 필요한 집중 검증 또는 수동 확인 시나리오를 적어 주세요.
       placeholder: |
         - npx eslint src/components/Footer.tsx src/lib/site.ts
         - rg -n "myknow00@naver\\.com|myknow@ssafy\\.com" src
+    validations:
+      required: true
+  - type: textarea
+    id: branch-flow
+    attributes:
+      label: Branch Flow
+      placeholder: dev → typed work branch → dev → Preview 검증 → main
     validations:
       required: true

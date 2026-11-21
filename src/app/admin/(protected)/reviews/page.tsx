@@ -15,6 +15,7 @@ import {
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +32,7 @@ async function AdminReviewsContent({
 }) {
   const filters = parseAdminReviewFilters(params);
   const pagination = parseAdminReviewPagination(params);
-  const errorMessage =
-    typeof params.error === "string"
-      ? (adminReviewsErrorMessages[params.error] ?? null)
-      : null;
+  const errorMessage = pickAllowedEntry(adminReviewsErrorMessages, params.error);
   const queryString = serializeAdminReviewPageQuery(filters, pagination);
   const returnTo = queryString
     ? `/admin/reviews?${queryString}`

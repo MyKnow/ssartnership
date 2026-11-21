@@ -13,10 +13,8 @@ import {
   ChevronDoubleRightIcon,
   ChevronRightIcon,
   HomeIcon,
-  QueueListIcon,
-  Squares2X2Icon,
 } from "@heroicons/react/24/outline";
-import ThemeToggle from "@/components/ThemeToggle";
+import { PV2_FOCUS_RING_ON_SIDEBAR_CLASS_NAME } from "@/components/portal-v2/portal-v2-classes";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import AdminQuickNavigatorProvider, {
@@ -33,6 +31,7 @@ import {
   ADMIN_NAV_ICON_BY_KEY,
   type AdminNavGroup,
   findAdminNavItem,
+  getAdminMobileNavigation,
   isAdminNavActive,
 } from "@/components/admin/admin-navigation";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -70,18 +69,7 @@ export default function AdminShellView({
       .flatMap((group) => group.items)
       .find((item) => isAdminNavActive(pathname, item.href)) ??
     findAdminNavItem(pathname);
-  const taskNavItem = navGroups
-    .flatMap((group) => group.items)
-    .find((item) => item.href === "/admin/tasks");
-  const dataGroup = navGroups.find(
-    (group) => group.label === "데이터",
-  );
-  const memberNavItem = dataGroup?.items.find(
-    (item) => item.href === "/admin/members",
-  );
-  const isMemberDataActive = Boolean(
-    memberNavItem && isAdminNavActive(pathname, memberNavItem.href),
-  );
+  const mobileNavEntries = getAdminMobileNavigation(navGroups);
   const mobileNavItemClassName = (active: boolean) =>
     cn(
       "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-inset",
@@ -143,10 +131,10 @@ export default function AdminShellView({
         <section key={group.label} className="grid gap-2" aria-label={group.label}>
           {expanded ? (
             <div className="px-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="pv2-caption text-pv2-nav-text">
                 {group.label}
               </p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground/80">
+              <p className="mt-1 pv2-caption text-pv2-nav-text">
                 {group.description}
               </p>
             </div>
@@ -167,18 +155,19 @@ export default function AdminShellView({
                   title={expanded ? undefined : item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-colors",
+                    "group flex min-h-11 items-center gap-3 rounded-pv2-control px-3 py-2 text-sm transition-colors",
+                    PV2_FOCUS_RING_ON_SIDEBAR_CLASS_NAME,
                     active
-                      ? "border-strong bg-surface-elevated text-foreground shadow-flat"
-                      : "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-surface-elevated hover:text-foreground",
+                      ? "bg-pv2-nav-active text-pv2-on-dark"
+                      : "text-pv2-nav-text hover:bg-pv2-nav-active/60 hover:text-pv2-on-dark",
                     expanded ? "justify-start" : "justify-center px-2.5",
                   )}
                 >
-                  <Icon className={cn("h-5 w-5 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                  <Icon className="h-5 w-5 shrink-0" />
                   {expanded ? (
                     <span className="grid min-w-0 gap-0.5">
-                      <span className={cn("truncate font-semibold", active ? "text-foreground" : "text-foreground")}>{item.label}</span>
-                      <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+                      <span className="truncate pv2-label">{item.label}</span>
+                      <span className="truncate pv2-caption opacity-80">{item.description}</span>
                     </span>
                   ) : (
                     <span className="sr-only">{item.label}</span>
@@ -195,7 +184,7 @@ export default function AdminShellView({
   return (
     <AdminQuickNavigatorProvider navGroups={navGroups}>
       <div
-        className="min-h-screen bg-background"
+        className="portal-v2 min-h-dvh"
         data-admin-hydrated={hydrated}
       >
       <a
@@ -232,7 +221,6 @@ export default function AdminShellView({
               </div>
               <div className="flex items-center gap-2">
                 <AdminQuickNavigatorTrigger compact />
-                <ThemeToggle />
               </div>
             </Container>
           </div>
@@ -242,89 +230,79 @@ export default function AdminShellView({
 
       <nav
         aria-label="관리자 주요 탐색"
+        data-admin-mobile-navigation
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl md:hidden"
       >
           <Container size="dashboard" className="flex items-stretch">
-            <Link
-              href="/admin"
-              prefetch={false}
-              onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
-              onPointerLeave={() => cancelHoverPrefetch("/admin")}
-              onFocus={() => prefetchOnIntent("/admin", "focus")}
-              aria-current={pathname === "/admin" ? "page" : undefined}
-              className={mobileNavItemClassName(pathname === "/admin")}
-            >
-              <HomeIcon className="h-5 w-5" aria-hidden="true" />
-              <span>홈</span>
-            </Link>
-            {taskNavItem ? (
-              <Link
-                href={taskNavItem.href}
-                prefetch={false}
-                onPointerEnter={() => prefetchOnIntent(taskNavItem.href, "hover")}
-                onPointerLeave={() => cancelHoverPrefetch(taskNavItem.href)}
-                onFocus={() => prefetchOnIntent(taskNavItem.href, "focus")}
-                aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
-                className={mobileNavItemClassName(
-                  isAdminNavActive(pathname, taskNavItem.href),
-                )}
-              >
-                <QueueListIcon className="h-5 w-5" aria-hidden="true" />
-                <span>작업함</span>
-              </Link>
-            ) : null}
-            <AdminQuickNavigatorTrigger
-              compact
-              compactLabel="검색"
-              className={cn(
-                mobileNavItemClassName(false),
-                "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
-              )}
-            />
-            {memberNavItem ? (
-              <Link
-                href={memberNavItem.href}
-                prefetch={false}
-                onPointerEnter={() => prefetchOnIntent(memberNavItem.href, "hover")}
-                onPointerLeave={() => cancelHoverPrefetch(memberNavItem.href)}
-                onFocus={() => prefetchOnIntent(memberNavItem.href, "focus")}
-                title={memberNavItem.label}
-                aria-current={isMemberDataActive ? "page" : undefined}
-                className={mobileNavItemClassName(isMemberDataActive)}
-              >
-                <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
-                <span>회원</span>
-              </Link>
-            ) : null}
-            <AdminMobileNav
-              title={title}
-              backHref={backHref}
-              backLabel={backLabel}
-              logoutAction={logoutAction}
-              navGroups={navGroups}
-              triggerClassName={cn(
-                mobileNavItemClassName(false),
-                "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
-              )}
-              triggerContent={
-                <>
-                  <Bars3Icon className="h-5 w-5" aria-hidden="true" />
-                  <span>더보기</span>
-                </>
+            {mobileNavEntries.map((entry) => {
+              if (entry.kind === "search") {
+                return (
+                  <AdminQuickNavigatorTrigger
+                    key={entry.id}
+                    compact
+                    compactLabel={entry.label}
+                    className={cn(
+                      mobileNavItemClassName(false),
+                      "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
+                    )}
+                  />
+                );
               }
-            />
+
+              if (entry.kind === "more") {
+                return (
+                  <AdminMobileNav
+                    key={entry.id}
+                    title={title}
+                    backHref={backHref}
+                    backLabel={backLabel}
+                    logoutAction={logoutAction}
+                    navGroups={navGroups}
+                    triggerClassName={cn(
+                      mobileNavItemClassName(false),
+                      "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
+                    )}
+                    triggerContent={
+                      <>
+                        <Bars3Icon className="h-5 w-5" aria-hidden="true" />
+                        <span>{entry.label}</span>
+                      </>
+                    }
+                  />
+                );
+              }
+
+              const Icon = ADMIN_NAV_ICON_BY_KEY[entry.iconKey];
+              const active = isAdminNavActive(pathname, entry.href);
+              return (
+                <Link
+                  key={entry.id}
+                  href={entry.href}
+                  prefetch={false}
+                  onPointerEnter={() => prefetchOnIntent(entry.href, "hover")}
+                  onPointerLeave={() => cancelHoverPrefetch(entry.href)}
+                  onFocus={() => prefetchOnIntent(entry.href, "focus")}
+                  title={entry.fullLabel !== entry.label ? entry.fullLabel : undefined}
+                  aria-current={active ? "page" : undefined}
+                  className={mobileNavItemClassName(active)}
+                >
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <span>{entry.label}</span>
+                </Link>
+              );
+            })}
           </Container>
       </nav>
 
       <div
         className={cn(
-          "md:grid md:min-h-screen xl:grid-cols-[18rem_minmax(0,1fr)]",
+          "md:grid md:min-h-dvh xl:grid-cols-[18rem_minmax(0,1fr)]",
           isTabletNavExpanded
             ? "md:grid-cols-[18rem_minmax(0,1fr)]"
             : "md:grid-cols-[5.5rem_minmax(0,1fr)]",
         )}
       >
-        <aside className="hidden border-r border-border/70 bg-surface/95 backdrop-blur-xl md:sticky md:top-0 md:block md:h-screen">
+        <aside className="hidden bg-pv2-sidebar md:sticky md:top-0 md:block md:h-dvh">
           <div
             className={cn(
               "flex h-full flex-col gap-4 py-4 xl:gap-6 xl:px-4 xl:py-5",
@@ -339,13 +317,14 @@ export default function AdminShellView({
               onFocus={() => prefetchOnIntent("/admin", "focus")}
               aria-label="관리 홈"
               className={cn(
-                "flex items-center rounded-2xl border border-border/70 bg-surface-elevated px-3 py-3 text-foreground shadow-flat",
+                "flex min-h-12 items-center rounded-pv2-control bg-pv2-nav-active px-3 py-2 text-pv2-on-dark",
+                PV2_FOCUS_RING_ON_SIDEBAR_CLASS_NAME,
                 isTabletNavExpanded
                   ? "justify-start gap-3"
                   : "justify-center xl:justify-start xl:gap-3",
               )}
             >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border/70 bg-surface-muted">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-pv2-control bg-pv2-sidebar">
                 <HomeIcon className="h-5 w-5" />
               </span>
               <span
@@ -354,15 +333,16 @@ export default function AdminShellView({
                   isTabletNavExpanded ? "grid" : "hidden xl:grid",
                 )}
               >
-                <span className="truncate text-sm font-semibold">{SITE_NAME}</span>
-                <span className="truncate text-xs text-muted-foreground">관리자</span>
+                <span className="truncate pv2-label">{SITE_NAME}</span>
+                <span className="truncate pv2-caption text-pv2-nav-text">관리자</span>
               </span>
             </Link>
 
             <button
               type="button"
               className={cn(
-                "hidden min-h-11 items-center rounded-2xl border border-border/70 bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-colors hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 xl:hidden md:flex",
+                "hidden min-h-11 items-center rounded-pv2-control px-3 text-sm font-semibold text-pv2-nav-text transition-colors hover:bg-pv2-nav-active/60 hover:text-pv2-on-dark xl:hidden md:flex",
+                PV2_FOCUS_RING_ON_SIDEBAR_CLASS_NAME,
                 isTabletNavExpanded ? "justify-between" : "justify-center",
               )}
               aria-label={isTabletNavExpanded ? "관리 메뉴 접기" : "관리 메뉴 펼치기"}
@@ -387,7 +367,7 @@ export default function AdminShellView({
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-30 hidden border-b border-border/70 bg-background/90 backdrop-blur-xl md:block">
+          <header className="sticky top-0 z-30 hidden border-b border-pv2-border bg-pv2-surface md:block">
             <Container className="flex min-h-[4.75rem] items-center justify-between gap-4 py-4" size="dashboard">
               <div className="min-w-0">
                 {activeNavItem?.href !== "/admin" ? (
@@ -452,7 +432,6 @@ export default function AdminShellView({
                     <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                   </span>
                 </Button>
-                <ThemeToggle />
                 <AdminLogoutButton action={logoutAction} />
               </div>
             </Container>

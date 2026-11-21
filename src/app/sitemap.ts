@@ -1,33 +1,18 @@
 import type { MetadataRoute } from "next";
-import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 import { partnerRepository } from "@/lib/repositories";
-import { createSitemapEntry } from "@/lib/seo";
+import { logServerError } from "@/lib/server-log";
+import type { PublicPartnerSeoEntry } from "@/lib/repositories/partner-repository";
+import { buildSitemapEntries } from "@/lib/seo/sitemap";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const entries: MetadataRoute.Sitemap = [
-    createSitemapEntry("/", "daily", 1),
-    ...CAMPUS_DIRECTORY.map((campus) =>
-      createSitemapEntry(getCampusPageHref(campus.slug), "weekly", 0.8),
-    ),
-  ];
-
+  let partners: PublicPartnerSeoEntry[] | null = null;
   try {
-    const partners = await partnerRepository.getPublicPartnerSeoEntries();
-
-    entries.push(
-      ...partners.map((partner) =>
-        createSitemapEntry(
-          `/partners/${encodeURIComponent(partner.id)}`,
-          "weekly",
-          0.7,
-        ),
-      ),
-    );
+    partners = await partnerRepository.getPublicPartnerSeoEntries();
   } catch (error) {
-    console.error("[sitemap] failed to load partner URLs", error);
+    logServerError("[sitemap] failed to load partner URLs", error);
   }
 
-  return entries;
+  return buildSitemapEntries(partners);
 }

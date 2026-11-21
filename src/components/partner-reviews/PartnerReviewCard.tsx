@@ -77,7 +77,7 @@ export default function PartnerReviewCard({
       >
         <Icon className="h-4 w-4" />
         <span className="tabular-nums text-xs font-semibold opacity-80">
-          {count.toLocaleString()}
+          {count.toLocaleString("ko-KR")}
         </span>
       </Button>
     );

@@ -42,7 +42,7 @@ node scripts/self-host-environments/cli.mjs prepare-copy .tmp/environments/pair
 
 1. 읽기 전용 백업 저장소에서 네트워크 없는 새 볼륨으로 PITR/Storage 복원과 기존 marker 검증.
 2. 원본 ledger가 검토된 dev prefix인지 확인. 원본 migration 199개를 넘으면 copy-policy 검토 전 거부. 원본 catalog와 해당 migration을 재생한 새 DB catalog도 비교.
-3. 격리 복원본에서 회원 비밀번호·avatar_base64 제거, 필수 password column 난수 교체, 이메일 마스킹, 인증/발송/Wallet 자격증명·로그 테이블 비우기. 원본 DB 계정·세션·backup key는 새 DB로 dump하지 않음.
+3. 격리 복원본에서 회원 비밀번호 제거(이미 삭제된 레거시 `avatar_base64` 열이 남은 오래된 백업이면 함께 제거), 필수 password column 난수 교체, 이메일 마스킹, 인증/발송/Wallet 자격증명·로그 테이블 비우기. 원본 DB 계정·세션·backup key는 새 DB로 dump하지 않음.
 4. 새로운 Preview DB에 public 데이터와 허용 Storage metadata를 transaction으로 로드하고 FK 검증. dev 후속 마이그레이션 적용.
 5. 공개 bucket과 private `member-profile-images`만 복사. 사진은 익명화되지 않으므로 이 사본도 개인정보로 보호. 다른 private bucket은 정책상 제외하며 완전한 모든 파일 복제라고 부르지 않음.
 6. ledger가 참조하는 file-backend 객체를 새 Storage 볼륨에 복사하고 각 SHA256 확인. 파일의 확장 속성도 보존한다. 파일 내용만 같아도 Storage HTTP metadata가 없으면 API 조회가 실패하므로 바이트 비교만으로 성공 처리하지 않는다. symlink·경로 이탈·중복 파일은 거부.
@@ -51,6 +51,19 @@ node scripts/self-host-environments/cli.mjs prepare-copy .tmp/environments/pair
 후보는 Preview 기본 포트보다 100 높은 임시 포트와 새 프로젝트/키/볼륨을 사용한다. 충돌하면 실패하며 다른 서비스를 중지하지 않는다. 실패해도 기존 Preview는 그대로다. 실패 후보/격리 복원 볼륨은 조사 대상으로 남기며 명시적인 정확한 대상 정리 외에 자동 prune을 하지 않는다. 복원 컨테이너는 제거하지만 데이터 볼륨에는 민감한 원본 복원본이 있을 수 있다. 따라서 실데이터 실행은 암호화된 승인 호스트에서만 허용한다. FileVault가 꺼진 Mac에서는 합성 데이터 실습만 한다.
 
 새 사본의 운영 비밀번호는 사용할 수 없다. `seed-preview-member <pair-directory> <private-credential.json>` 명령에 `memberId`, `password`만 가진 0600 JSON을 전달하면 정확한 Preview 회원 한 명의 테스트 비밀번호를 설정한다. Production role 인수를 받지 않으며 원본 비밀번호를 되살리지 않는다. 자격증명 파일·값을 채팅/로그/명령 인수로 노출하지 않는다.
+
+## 211개 이력 대상 Preview 갱신 순서
+
+`20261006010931_fence_consent_profile_delivery_and_upload_transitions.sql`을 포함한 [회귀 수정 #530](https://github.com/MyKnow/ssartnership/issues/530)은 구 쓰기 경로와 새 DB 계약의 혼용을 피해야 한다. 아래는 해당 Preview 갱신의 실행 조건이며 Production 적용 완료나 Preview 활성화 증거를 뜻하지 않는다. 일반 승인 파일 형식과 전체 checksum 검증은 [스키마 변경 배포 절차](./self-host-ci-maintenance.md#스키마-변경을-포함한-배포-완료-순서)를 따른다.
+
+1. 211개 이력을 포함한 dev 병합 전에 현재 Preview 210개 이력·앱·DB identity·승인·receiver 상태·실제 writer 목록을 확인한다. 이 단계는 아직 존재하지 않는 최종 dev SHA나 CI archive를 요구하지 않는다. receiver의 원 활성화 상태를 비공개 journal에 내구성 있게 기록한 뒤 timer를 영구 비활성화하고 service의 지속 조건으로 자동 재시작을 차단한다. timer를 일시 중지하는 것만으로 재부팅 이후까지 보호됐다고 판단하지 않는다. 후보 준비 동안 기존 앱은 유지한다.
+2. 병합 후 첫 CI에서 검증한 exact dev source archive와 migration tree를 고정하고 사전 중지 journal에 연결한다. 새로운 Production 208개 이력 백업을 격리 복원·sanitize한 뒤 별도 Preview 소유 208개 이력 후보에 먼저 복사한다. 원본 ledger와 catalog는 별도 검토한 정확한 208개 정책으로 대조하며, 일반 copy-policy 허용 범위를 늘리지 않는다. Production 비밀번호·역할·JWT 키를 복원하지 않는다.
+3. 복사 후보에 같은 source의 후속 209·210·211 migration을 적용하고 **211개 전체 파일명과 SHA256**을 `verify-schema`로 대조한다. 전체 public 행·FK·선택한 private 프로필 이미지 및 공개 Storage의 메타데이터·실제 바이트를 검증한다. 별도 폐기 가능한 복제본에서 동의 철회/정책 교체, 사진 승인·반려, 알림 claim, 업로드 참조·정리 경합을 검증하고 QA 잔여와 폐기를 확인한다. 합성 DB의 성공은 실제 복사본의 rehearsal을 대신하지 않으며, QA 쓰기를 수행한 복제본은 라이브 가져오기 원본으로 사용하지 않는다.
+4. 라이브 전환 직전에 기존 210개 이력 identity·mount/network·승인·상태·writer 목록을 다시 확인한다. 예약 writer의 원 활성화 상태와 앱·REST·Storage·gateway의 container ID·재시작 정책을 기록하고 지속적으로 재시작을 차단한 뒤 중지한다. 진행 중인 요청·DB 트랜잭션이 끝났음을 확인하고 기존 210개 DB·Storage·env·승인·receiver 상태·이미지를 일치하는 복구 쌍으로 백업한다. 격리 복원과 행·파일 정합성 검증이 끝나야 전환할 수 있다.
+5. 기존 라이브 Preview에는 211 forward DDL을 먼저 적용하고, 검증된 후보의 public 211 데이터와 원본에서 선택한 Storage metadata·파일을 가져온다. 따라서 **복사 후 migration 리허설은 격리 Preview 후보에서 수행하고, 기존 라이브는 DDL 후 검증된 데이터 가져오기로 전환**한다. 기존 DB identity·API 키·network를 유지하고 후보의 system/auth/self_host 스키마를 가져오지 않는다. DB transaction과 Storage 파일 교환은 하나의 원자적 작업이 아니므로 각 단계의 증거를 따로 확인한다. 세 가지 Preview 앱 session secret을 무효화하고 전체 정합성·권한 노출·인증된 Storage 읽기를 확인한 뒤 exact SHA/tree의 schema approval을 기록한다.
+6. 동의·기기 설정, 사진 활성화·심사, 이벤트 발송, 리뷰·가입 업로드의 새 writer가 모두 통합된 앱을 구 이미지 fallback 없이 기동한다. 정확한 revision·image digest·durable receiver 상태·health·인증 및 실제 통합 흐름을 확인한다. 상태 기록 실패도 새 앱과 data writer를 중지하는 실패다. 수용 증거를 고정한 뒤 검토한 writer와 data container 재시작 정책을 원 상태로 복구하고 receiver를 마지막에 재개한다. 원래 비활성화된 작업을 새로 활성화하거나 필요한 작업이 계속 차단된 상태를 완료로 보고하지 않는다.
+
+211개 이력을 적용한 뒤 앱 이미지만 구 버전으로 되돌려 쓰기를 재개하면 동의 전체 행 upsert나 구 발송/업로드 경로가 새 계약을 우회할 수 있다. 수신기의 이전 이미지 자동 rollback도 이 경계에 포함한다. 실패 시 Preview 쓰기를 지속 차단한 상태로 호환되는 앱을 수정·재배포한다. 전체 210개 복구 쌍으로의 복원은 이후 쓰기를 잃을 수 있는 별도 복구 결정이며 자동 예외 처리로 실행하지 않는다. 승인 파일을 구 값으로 바꾸거나 migration ledger를 고쳐 롤백을 가장하지 않는다.
 
 ## 아직 완료가 아닌 경계
 

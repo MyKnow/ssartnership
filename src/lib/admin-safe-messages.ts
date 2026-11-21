@@ -1,3 +1,5 @@
+import { pickAllowedErrorMessage, pickAllowedMessage } from "@/lib/safe-messages";
+
 const SAFE_ADMIN_MESSAGE_PATTERNS = [
   "관리자 인증이 필요합니다.",
   "요청한 로그 그룹 조회 권한이 없습니다.",
@@ -47,14 +49,9 @@ const SAFE_ADMIN_MESSAGE_PATTERNS = [
 ] as const;
 
 export function getSafeAdminMessage(error: unknown, fallback: string) {
-  const message = error instanceof Error ? error.message : "";
-  return SAFE_ADMIN_MESSAGE_PATTERNS.some((pattern) => message === pattern)
-    ? message
-    : fallback;
+  return pickAllowedErrorMessage(error, SAFE_ADMIN_MESSAGE_PATTERNS, fallback);
 }
 
 export function getSafeAdminResponseMessage(value: unknown, fallback: string) {
-  return typeof value === "string" && SAFE_ADMIN_MESSAGE_PATTERNS.includes(value as (typeof SAFE_ADMIN_MESSAGE_PATTERNS)[number])
-    ? value
-    : fallback;
+  return pickAllowedMessage(value, SAFE_ADMIN_MESSAGE_PATTERNS, fallback);
 }

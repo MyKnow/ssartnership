@@ -3,14 +3,14 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
 const tones = {
-  info: "border-primary/15 bg-primary-soft/80",
+  info: "border-info/20 bg-info-soft",
   success: "border-success/15 bg-success/10",
   warning: "border-warning/20 bg-warning/10",
   danger: "border-danger/20 bg-danger/10",
 } as const;
 
 const badgeVariants = {
-  info: "primary",
+  info: "info",
   success: "success",
   warning: "warning",
   danger: "danger",

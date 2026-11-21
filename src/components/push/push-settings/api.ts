@@ -1,6 +1,6 @@
 "use client";
 
-import type { PushPreferenceState } from "@/lib/push";
+import type { NotificationPreferencePatch } from "@/lib/notifications/preference-patch";
 import { parsePushSettingsJson } from "./device";
 import type { PushDeviceSummary } from "./types";
 
@@ -57,9 +57,9 @@ export async function unsubscribePushEveryDevice(endpoint: string | null) {
   return parsePushSettingsJson(response);
 }
 
-export async function savePushPreferences(preferences: PushPreferenceState) {
+export async function savePushPreferences(preferences: NotificationPreferencePatch) {
   const response = await fetch("/api/notifications/preferences", {
-    method: "POST",
+    method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },

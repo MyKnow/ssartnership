@@ -21,6 +21,10 @@ const nextCliPath = fileURLToPath(
   new URL("../node_modules/next/dist/bin/next", import.meta.url),
 );
 const selected = loadEnvironmentProfile({ root: repositoryRoot, command: "dev" });
+// `--webpack` keeps the development server on the same bundler as `npm run build`
+// (see scripts/next.mjs). The fixture boundary, atomic dev manifests, and heic
+// wasm rule in next.config.ts are webpack hooks, so Turbopack is not a drop-in
+// replacement. Release conditions: docs/plans/tech-debt.md ("webpack 고정").
 process.stdout.write(`[environment] dev: ${selected.loadedFiles[0] ?? "injected"}\n`);
 const child = spawn(
   process.execPath,

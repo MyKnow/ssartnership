@@ -6,8 +6,7 @@ import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { withServerTiming } from "@/lib/server-timing";
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { isUuidFormat } from "@/lib/uuid";
 
 export const runtime = "nodejs";
 
@@ -20,7 +19,7 @@ export async function GET(
     if (denied) return denied;
 
     const { imageId } = await context.params;
-    if (!UUID_PATTERN.test(imageId)) {
+    if (!isUuidFormat(imageId)) {
       return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 400 });
     }
 

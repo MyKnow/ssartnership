@@ -11,6 +11,7 @@ const scenarioSchema = z.object({ winner: z.enum(["submitter", "experiencer", "n
 /** Synthetic local fixtures only; production ignores the enabling environment flag. */
 export async function POST(request: Request) {
   if (!isE2eMockMutationEnabled()) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // Malformed JSON is an expected invalid_scenario input, so no server-fault log is emitted.
   const parsed = scenarioSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid_scenario" }, { status: 400 });
   if (parsed.data.winner === "reset") {

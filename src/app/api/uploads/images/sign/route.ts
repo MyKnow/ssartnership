@@ -23,6 +23,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -129,11 +130,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     await recordImageUploadAttempt("sign", { ...rateLimitContext, success: false });
-    console.error("[image-upload/sign]", {
-      purpose: parsed.purpose,
-      actor: actorResult.actor.kind,
-      error: error instanceof Error ? error.message : "unknown",
-    });
+    logServerError("[image-upload/sign]", error, { purpose: parsed.purpose, actor: actorResult.actor.kind });
     const isUnavailable = error instanceof ImageUploadError
       && error.code === "image_upload_unavailable";
     const isQuotaExceeded = error instanceof ImageUploadError

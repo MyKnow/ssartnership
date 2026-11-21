@@ -3,15 +3,18 @@ import { expect, userEvent, within } from "storybook/test";
 import MemberEmailVerificationPageHeader from "@/components/certification/MemberEmailVerificationPageHeader";
 import MemberEmailVerificationView from "@/components/certification/MemberEmailVerificationView";
 import { ToastProvider } from "@/components/ui/Toast";
+import type { MemberRecentAuthRequirement } from "@/lib/member-recent-auth";
 
 function StoryFrame({
   emailVerified = false,
   initialEmail,
   required = false,
+  recentAuthRequirement = "none",
 }: {
   emailVerified?: boolean;
   initialEmail?: string | null;
   required?: boolean;
+  recentAuthRequirement?: MemberRecentAuthRequirement;
 }) {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 p-4 sm:p-6">
@@ -26,6 +29,7 @@ function StoryFrame({
           }
           emailVerified={emailVerified}
           completionHref="/certification"
+          recentAuthRequirement={recentAuthRequirement}
         />
       </ToastProvider>
     </div>
@@ -42,6 +46,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Unverified: Story = {};
+
+export const CurrentPasswordRequired: Story = {
+  args: { emailVerified: true, recentAuthRequirement: "password" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const emailInput = canvas.getByLabelText("이메일");
+    await userEvent.clear(emailInput);
+    await userEvent.type(emailInput, "new-member@example.com");
+    await userEvent.click(canvas.getByRole("button", { name: "인증 코드 보내기" }));
+    await expect(canvas.getByText("현재 비밀번호를 입력해 주세요.")).toBeVisible();
+    await expect(canvas.getByLabelText("현재 비밀번호")).toHaveFocus();
+  },
+};
 
 export const RequiredAfterMattermostDisabled: Story = {
   args: { required: true },

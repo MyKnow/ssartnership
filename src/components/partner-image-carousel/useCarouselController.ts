@@ -11,6 +11,7 @@ import {
   normalizeCarouselIndex,
 } from "./helpers";
 import type { CarouselOffset, CarouselThumbPlacement } from "./types";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const SWIPE_NAVIGATION_THRESHOLD_PX = 36;
 const HORIZONTAL_WHEEL_THRESHOLD_PX = 72;
@@ -62,21 +63,17 @@ export function useCarouselController({
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
 
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
-    if (typeof document === "undefined") {
+    if (typeof document === "undefined" || !isOpen) {
       return;
     }
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      const originalTouchAction = document.body.style.touchAction;
-      document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none";
-      return () => {
-        document.body.style.overflow = originalOverflow;
-        document.body.style.touchAction = originalTouchAction;
-      };
-    }
-    return;
+    const originalTouchAction = document.body.style.touchAction;
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.touchAction = originalTouchAction;
+    };
   }, [isOpen]);
 
   useEffect(() => {

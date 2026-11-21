@@ -1,5 +1,5 @@
 import type { PushAudienceScope } from "@/lib/push";
-import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
+import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops-types";
 import type { MemberOption, SortOption } from "./types";
 
 export function createCampusOptions(members: MemberOption[]) {

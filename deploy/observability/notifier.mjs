@@ -8,17 +8,23 @@ import { createOperatorPush } from "./pwa-push.mjs";
 
 const DASHBOARD = "https://ssartnership-infra.myknow.xyz/infra/grafana/d/ssartnership-operations";
 const ENVIRONMENTS = { production: "Production", preview: "Preview", operations: "공용 인프라" };
-const CATALOG = {
+export const CATALOG = {
   ServiceDown: ["서비스 상태 이상", "서비스 상태 확인 실패"],
   ExporterDown: ["지표 수집 중단", "수집 대상 접속 실패가 2분 지속"],
   AppHealthFailed: ["앱 상태 확인 실패", "내부 앱 상태 실패 또는 갱신 지연이 2분 지속"],
   DatabaseUnavailable: ["DB 접속 실패", "PostgreSQL 연결 실패가 1분 지속"],
+  AppDependencyUnavailable: ["앱 의존성 준비 실패", "앱에서 DB·gateway·Storage 중 하나에 연결하지 못한 상태가 2분 지속"],
+  DatabaseConnectionsHigh: ["DB 연결 수 과다", "DB 연결 수가 최대 연결의 80%를 10분 이상 초과"],
+  DatabaseSizeForecast: ["DB 용량 증가 경고", "최근 하루 증가 추세로 14일 안에 VM 루트 여유 공간을 넘을 것으로 예상"],
   HostDiskLow: ["디스크 여유 부족", "디스크 여유 15% 미만이 5분 지속"],
   HostMemoryLow: ["메모리 여유 부족", "가용 메모리 10% 미만이 5분 지속"],
   HostCpuBusy: ["CPU 부하 지속", "CPU 사용률 90% 초과가 10분 지속"],
   AlertDeliveryUnavailable: ["알림 전달 이상", "발송 설정 누락 또는 발송 실패"],
   IngressEndpointDown: ["Ingress HTTPS 접속 실패", "내부 회선의 HTTP 또는 TLS 확인 실패가 2분 지속"],
   CertificateExpiring: ["인증서 만료 임박", "TLS 인증서 유효 기간이 14일 미만"],
+  ServerErrorBurst: ["공개 edge 5xx 증가", "공개 edge의 upstream 5xx 비율 5% 초과가 5분 지속"],
+  ProductionCronStale: ["운영 예약 작업 지연", "예약 작업 성공이 예정 주기의 3배 이상 없음"],
+  ReleaseReceiverStale: ["배포 수신기 지연", "배포 수신기 성공 실행이 1시간 이상 없음"],
   ProductionBackupCollectorStale: ["백업 지표 갱신 지연", "백업 지표가 10분 이상 갱신되지 않음"],
   ProductionBackupStale: ["운영 백업 지연", "유효 백업이 없거나 8시간 이상 경과"],
   ProductionMacBackupStale: ["Mac 백업 복사본 지연", "복사본이 없거나 26시간 이상 경과"],

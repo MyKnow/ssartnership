@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import BackLink from "@/components/ui/BackLink";
 import { cn } from "@/lib/cn";
 
 export default function PageHeader({
@@ -30,15 +29,7 @@ export default function PageHeader({
       )}
     >
       <div className="min-w-0 space-y-3">
-        {backHref ? (
-          <Link
-            href={backHref}
-            className="ui-caption inline-flex min-h-11 items-center gap-2 rounded-[1rem] px-1 text-muted-foreground transition-interactive hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-          >
-            <ArrowLeftIcon className="h-4 w-4" aria-hidden="true" />
-            {backLabel}
-          </Link>
-        ) : null}
+        {backHref ? <BackLink href={backHref}>{backLabel}</BackLink> : null}
         {eyebrow ? <p className="ui-kicker">{eyebrow}</p> : null}
         <div className="space-y-2">
           <h1 className={cn("ui-page-title text-ko-title text-balance", titleClassName)}>{title}</h1>

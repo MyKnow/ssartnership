@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createConcurrencyLimiter,
   forEachWithConcurrency,
   mapWithConcurrency,
 } from "../src/lib/async-concurrency.ts";
@@ -52,4 +53,80 @@ test("mapWithConcurrency preserves input order while bounding active work", asyn
 
   assert.equal(maxActive, 2);
   assert.deepEqual(results, ["item-4", "item-3", "item-2", "item-1"]);
+});
+
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((resolveFn, rejectFn) => {
+    resolve = resolveFn;
+    reject = rejectFn;
+  });
+  return { promise, resolve, reject };
+}
+
+test("createConcurrencyLimiter bounds active tasks across callers and runs waiters in FIFO order", async () => {
+  const limiter = createConcurrencyLimiter(2);
+  const gates = Array.from({ length: 5 }, () => deferred());
+  const started: number[] = [];
+  const runs = gates.map((gate, index) =>
+    limiter.run(async () => {
+      started.push(index);
+      await gate.promise;
+      return index;
+    }),
+  );
+
+  await Promise.resolve();
+  assert.deepEqual(started, [0, 1]);
+  assert.equal(limiter.activeCount, 2);
+  assert.equal(limiter.pendingCount, 3);
+
+  gates[1]!.resolve();
+  await runs[1];
+  await Promise.resolve();
+  assert.deepEqual(started, [0, 1, 2]);
+  assert.equal(limiter.activeCount, 2);
+  assert.equal(limiter.pendingCount, 2);
+
+  for (const gate of gates) {
+    gate.resolve();
+  }
+  assert.deepEqual(await Promise.all(runs), [0, 1, 2, 3, 4]);
+  assert.deepEqual(started, [0, 1, 2, 3, 4]);
+  assert.equal(limiter.activeCount, 0);
+  assert.equal(limiter.pendingCount, 0);
+});
+
+test("createConcurrencyLimiter releases the slot when a task fails or throws synchronously", async () => {
+  const limiter = createConcurrencyLimiter(1);
+
+  await assert.rejects(
+    limiter.run(async () => {
+      throw new Error("async failure");
+    }),
+    /async failure/,
+  );
+  await assert.rejects(
+    limiter.run((() => {
+      throw new Error("sync failure");
+    }) as () => Promise<never>),
+    /sync failure/,
+  );
+  assert.equal(await limiter.run(async () => "ok"), "ok");
+  assert.equal(limiter.activeCount, 0);
+});
+
+test("createConcurrencyLimiter normalizes invalid limits to one slot", async () => {
+  const limiter = createConcurrencyLimiter(Number.NaN);
+  const gate = deferred();
+  const first = limiter.run(() => gate.promise);
+  const second = limiter.run(async () => "second");
+
+  await Promise.resolve();
+  assert.equal(limiter.activeCount, 1);
+  assert.equal(limiter.pendingCount, 1);
+  gate.resolve();
+  await first;
+  assert.equal(await second, "second");
 });

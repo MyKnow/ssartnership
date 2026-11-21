@@ -338,7 +338,7 @@ test("관리자 운영 표는 모바일에서 카드 표현으로 전환하고 �
     await Promise.all([
       readFile(
         new URL(
-          "../src/app/admin/(protected)/event/[slug]/page.tsx",
+          "../src/components/admin/event-rewards/SignupRewardOverviewSection.tsx",
           import.meta.url,
         ),
         "utf8",
@@ -385,7 +385,11 @@ test("관리자 민감 작업은 공용 접근성 확인 모달을 사용한다"
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
-  assert.match(sources[0]!, /<Modal/);
+  assert.match(sources[0]!, /export \{ default \} from "@\/components\/ui\/ConfirmDialog";/);
+  assert.match(
+    await readFile(new URL("../src/components/ui/ConfirmDialog.tsx", import.meta.url), "utf8"),
+    /<Modal/,
+  );
   for (const source of sources.slice(1, 5)) {
     assert.match(source, /AdminConfirmDialog/);
     assert.doesNotMatch(source, /window\.confirm/);
@@ -399,6 +403,9 @@ test("푸시 관리 화면은 가로 overflow를 숨겨 결함을 가리지 않�
       "../src/components/admin/AdminPushManager.tsx",
       "../src/components/admin/push-manager/PushComposerSection.tsx",
       "../src/components/admin/push-manager/PushLogsSection.tsx",
+      "../src/components/admin/push-manager/MemberPickerModal.tsx",
+      "../src/components/admin/push-manager/PushAudienceReview.tsx",
+      "../src/components/admin/push-manager/SendConfirmModal.tsx",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 

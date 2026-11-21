@@ -1,12 +1,15 @@
+import Checkbox from "@/components/ui/Checkbox";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import AdminReviewCard from "@/components/admin/review-manager/AdminReviewCard";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
+import NavigationForm from "@/components/ui/NavigationForm";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
+import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import type {
   AdminReviewCounts,
@@ -67,17 +70,17 @@ export default function AdminPartnerReviewManager({
         items={[
           {
             label: "전체 리뷰",
-            value: `${counts.totalCount.toLocaleString()}건`,
+            value: `${counts.totalCount.toLocaleString("ko-KR")}건`,
             hint: "삭제 제외",
           },
           {
             label: "공개 리뷰",
-            value: `${counts.visibleCount.toLocaleString()}건`,
+            value: `${counts.visibleCount.toLocaleString("ko-KR")}건`,
             hint: "상세 노출",
           },
           {
             label: "비공개 리뷰",
-            value: `${counts.hiddenCount.toLocaleString()}건`,
+            value: `${counts.hiddenCount.toLocaleString("ko-KR")}건`,
             hint: "관리자 보관",
           },
         ]}
@@ -88,7 +91,7 @@ export default function AdminPartnerReviewManager({
         description="이 제휴처에 작성된 리뷰를 필터링하고, 수정·비공개·복원·삭제합니다."
       />
 
-      <form action={basePath} method="get">
+      <NavigationForm action={basePath}>
         <FilterBar
           title="리뷰 필터"
           description="제휴처 범위는 현재 페이지에 고정됩니다."
@@ -142,8 +145,7 @@ export default function AdminPartnerReviewManager({
           </div>
 
           <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
+            <Checkbox
               name="imagesOnly"
               value="true"
               defaultChecked={filters.imagesOnly}
@@ -153,10 +155,10 @@ export default function AdminPartnerReviewManager({
           </label>
 
           <div className="flex items-end">
-            <Button type="submit">적용</Button>
+            <SubmitButton pendingText="적용 중">적용</SubmitButton>
           </div>
         </FilterBar>
-      </form>
+      </NavigationForm>
 
       {reviews.length === 0 ? (
         <EmptyState

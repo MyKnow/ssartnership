@@ -5,8 +5,9 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 
 test("플랜 검토 서비스는 관리자 액션에 안정적인 오류 코드를 제공한다", async () => {
-  const [service, action, messages] = await Promise.all([
+  const [serviceSource, rpcErrorSource, action, messages] = await Promise.all([
     readFile(new URL("src/lib/partner-plan-service.ts", root), "utf8"),
+    readFile(new URL("src/lib/partner-plan-rpc-errors.ts", root), "utf8"),
     readFile(
       new URL(
         "src/app/admin/(protected)/_actions/plan-actions.ts",
@@ -16,6 +17,10 @@ test("플랜 검토 서비스는 관리자 액션에 안정적인 오류 코드�
     ),
     readFile(new URL("src/lib/admin-action-errors.ts", root), "utf8"),
   ]);
+
+  const service = `${serviceSource}\n${rpcErrorSource}`;
+  assert.match(serviceSource, /mapPartnerPlanRpcError\("adminApproveUpgrade"/);
+  assert.match(serviceSource, /mapPartnerPlanRpcError\("adminRejectUpgradeBilling"/);
 
   for (const code of [
     "partner_company_plan_processed",

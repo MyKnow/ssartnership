@@ -5,8 +5,10 @@ import { ArrowDownTrayIcon, CheckCircleIcon, ClipboardIcon, TicketIcon } from "@
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import Modal from "@/components/ui/Modal";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { useToast } from "@/components/ui/Toast";
+import InlineMessage from "@/components/ui/InlineMessage";
 import {
   ClientSafeRequestError,
   getClientSafeRequestError,
@@ -28,19 +30,39 @@ type RedeemResponse = {
 
 type IssueResponse = { ok?: boolean; message?: string; issue?: AvailableAdCoupon };
 
+const COUPONS_UNAVAILABLE_MESSAGE =
+  "쿠폰 정보를 잠시 불러오지 못했습니다. 잠시 후 새로고침해 주세요.";
+
+function CouponsUnavailableNotice() {
+  return (
+    <InlineMessage
+      className="mt-4"
+      tone="warning"
+      description={COUPONS_UNAVAILABLE_MESSAGE}
+    />
+  );
+}
+
 function getLoginHref(returnTo: string) {
   return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+function getCouponVerificationHref(issueId: string, returnTo: string) {
+  return `/coupons?${new URLSearchParams({ issueId, returnTo }).toString()}`;
 }
 
 export default function PartnerDetailCoupons({
   coupons,
   initialIssuedCoupons,
+  unavailable = false,
   partnerId,
   currentUserId,
   returnTo,
 }: {
   coupons: AdCoupon[];
   initialIssuedCoupons: AvailableAdCoupon[];
+  /** A coupon lookup failed on the server; never render it as "no coupons". */
+  unavailable?: boolean;
   partnerId: string;
   currentUserId: string | null;
   returnTo: string;
@@ -48,6 +70,10 @@ export default function PartnerDetailCoupons({
   const { notify } = useToast();
   const viewedCouponIds = useRef(new Set<string>());
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [confirmingCoupon, setConfirmingCoupon] = useState<AdCoupon | null>(null);
+  const [redeemedCouponIds, setRedeemedCouponIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [issuingId, setIssuingId] = useState<string | null>(null);
   const initialIssuedCouponMap = useMemo(
     () => indexIssuedCouponsByCouponId(initialIssuedCoupons),
@@ -82,7 +108,15 @@ export default function PartnerDetailCoupons({
   }, [coupons, partnerId]);
 
   if (coupons.length === 0) {
-    return null;
+    if (!unavailable) {
+      return null;
+    }
+    return (
+      <Card id="coupons" className="w-full scroll-mt-28 p-4 sm:p-5">
+        <SectionHeading title="쿠폰" />
+        <CouponsUnavailableNotice />
+      </Card>
+    );
   }
 
   async function copyCouponCode(coupon: AdCoupon) {
@@ -110,7 +144,7 @@ export default function PartnerDetailCoupons({
         },
       }));
     } catch {
-      notify("쿠폰 코드 복사에 실패했습니다.");
+      notify("쿠폰 코드 복사에 실패했습니다.", { tone: "error" });
       setMessages((current) => ({
         ...current,
         [coupon.id]: {
@@ -143,7 +177,7 @@ export default function PartnerDetailCoupons({
         networkUnavailable:
           "쿠폰 다운로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
       }).message;
-      notify(message);
+      notify(message, { tone: "error" });
       setMessages((current) => ({ ...current, [coupon.id]: { tone: "error", text: message } }));
     } finally {
       setIssuingId(null);
@@ -181,6 +215,7 @@ export default function PartnerDetailCoupons({
         );
       }
 
+      setRedeemedCouponIds((current) => new Set(current).add(coupon.id));
       setMessages((current) => ({
         ...current,
         [coupon.id]: {
@@ -202,9 +237,10 @@ export default function PartnerDetailCoupons({
           text: message,
         },
       }));
-      notify(message);
+      notify(message, { tone: "error" });
     } finally {
       setRedeemingId(null);
+      setConfirmingCoupon(null);
     }
   }
 
@@ -213,6 +249,7 @@ export default function PartnerDetailCoupons({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <SectionHeading title="쿠폰" />
       </div>
+      {unavailable ? <CouponsUnavailableNotice /> : null}
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {coupons.map((coupon) => {
@@ -221,6 +258,7 @@ export default function PartnerDetailCoupons({
           const assignedCode = issued?.assignedCode ?? null;
           const canCopy = Boolean(assignedCode);
           const isRedeeming = redeemingId === coupon.id;
+          const isRedeemed = redeemedCouponIds.has(coupon.id);
           return (
             <article
               key={coupon.id}
@@ -313,11 +351,21 @@ export default function PartnerDetailCoupons({
                   </Button>
                 ) : currentUserId && coupon.redemptionType === "onsite" && coupon.hasOnsitePassword && issued?.issueId ? (
                   <Button
-                    href={`/coupons?issueId=${encodeURIComponent(issued.issueId)}`}
+                    href={getCouponVerificationHref(issued.issueId, returnTo)}
                     variant="primary"
                     className="w-full justify-center sm:flex-1"
                   >
                     사용하기
+                  </Button>
+                ) : currentUserId && isRedeemed ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full justify-center sm:flex-1"
+                    disabled
+                  >
+                    <CheckCircleIcon className="size-4" />
+                    사용 완료
                   </Button>
                 ) : currentUserId ? (
                   <Button
@@ -327,7 +375,7 @@ export default function PartnerDetailCoupons({
                     loading={isRedeeming}
                     loadingText="확인 중"
                     onClick={() => {
-                      void redeemCoupon(coupon);
+                      setConfirmingCoupon(coupon);
                     }}
                   >
                     <CheckCircleIcon className="size-4" />
@@ -347,6 +395,40 @@ export default function PartnerDetailCoupons({
           );
         })}
       </div>
+
+      <Modal
+        open={confirmingCoupon !== null}
+        title="쿠폰을 사용 처리할까요?"
+        description="사용 확인은 되돌릴 수 없습니다. 제휴처에서 혜택을 받기 직전에 눌러 주세요."
+        onClose={
+          redeemingId
+            ? () => undefined
+            : () => setConfirmingCoupon(null)
+        }
+        bodyClassName="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+      >
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setConfirmingCoupon(null)}
+          disabled={Boolean(redeemingId)}
+        >
+          취소
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          loading={Boolean(redeemingId)}
+          loadingText="확인 중"
+          onClick={() => {
+            if (confirmingCoupon) {
+              void redeemCoupon(confirmingCoupon);
+            }
+          }}
+        >
+          사용 확인
+        </Button>
+      </Modal>
     </Card>
   );
 }
