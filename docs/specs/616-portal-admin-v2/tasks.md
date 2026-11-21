@@ -124,6 +124,7 @@ authority: descriptive
 
 ## 진행 로그
 
+- 2026-11-20 Claude(Sonnet): PR3·4 통합 변경(`feat/616-partner-workspace`) — `.portal-v2` 안 기존 의미 토큰·텍스트 클래스를 v2로 다시 매핑하는 브리지(파트너·어드민 전 경로에 색·radius·그림자·타입 스케일 적용), 어드민 셸 사이드바·헤더를 v2로 제자리 교체(`AdminShellView` 구조·prefetch·하단 탐색 계약 유지, 테마 토글 제거). 경로별 레이아웃을 `PortalPanel`·`PortalDataTable`로 바꾸는 화면 단위 이관은 이 PR에 포함하지 않았다.
 - 2026-11-20 Claude(Sonnet): PR2 파트너 셸 어댑터·인증 5개 경로 v2 이관(`feat/616-partner-auth`).
 - 2026-11-20 Claude(Sonnet): PR1 폼·표·탭·페이지·필터·확인 대화상자·스토리·`portal-v2.md` 작성. 셸이 데스크톱에서 레일로만 보이는 버그를 찾아 `min-[1200px]:`를 이름 있는 브레이크포인트 `pv2-desktop:`로 교체했다(plan 6절 함정).
 - 2026-11-20 Claude(Opus): `feat/616-v2-foundation` 생성, PR1 토큰·셸·기본 컴포넌트·계약 테스트 작성(미커밋), 명세·계획·작업 기록 작성. 이후 구현은 Sonnet이 이어받는다.

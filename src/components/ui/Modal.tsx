@@ -50,6 +50,11 @@ export default function Modal({
 }) {
   // 열릴 때마다 붙일 위치를 다시 고른다(메뉴 dialog 안에서 연 확인 모달 등).
   const portalRoot = useMemo(() => resolveModalPortalRoot(open), [open]);
+  // 포털 안에서 연 Modal은 body로 옮겨져도 v2 토큰 매핑을 이어받는다.
+  const portalV2Scope = useMemo(
+    () => open && typeof document !== "undefined" && Boolean(document.querySelector(".portal-v2")),
+    [open],
+  );
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -63,7 +68,10 @@ export default function Modal({
 
   return createPortal(
     open ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:px-4 sm:py-6">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:px-4 sm:py-6"
+        data-portal-v2-scope={portalV2Scope || undefined}
+      >
         <button
           type="button"
           className="absolute inset-0 bg-slate-950/52 backdrop-blur-md"
